@@ -70,9 +70,12 @@ it does not substitute a quantized graph or another model.
 | `dtype` | Exact upstream precision selection; defaults to `fp16` for Laya and `fp32` for Julia. For Laya FP32, supply `dtype: 'fp32'`. Unsupported selections fail at the selected upstream loader rather than being replaced. |
 | `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. |
 | `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. |
+| `store` | Optional existing SDK DBOPFS model or speech artifact store exposing `fetchResource()`. The store remains outside Worker configuration; the SDK bridges the loader's actual resource requests to it. |
 
-The runtime, tokenizer and weights use normal upstream loading and caching;
-the SDK does not redistribute them or create a second model store. Browser
+Without `store`, the runtime, tokenizer and weights use normal upstream loading
+and caching. With `store`, the selected loader still owns filenames and model
+selection while model resources persist through that existing SDK store. The
+SDK does not redistribute upstream runtimes or models. Browser
 network, cross-origin and backend availability still apply. WebGPU needs a
 compatible browser/device context. Unsupported precision or backend errors
 are returned, not replaced with a different model, backend or precision.
@@ -87,6 +90,57 @@ Julia selects `dtype: 'fp32'`, loading root `model.onnx` with the exact
 `model.onnx.data` external-data name. Its custom five-input graph is loaded
 through the public generic `PreTrainedModel` API, not a text-generation
 pipeline. Existing Wllama, cloud, speech and chat APIs are unchanged.
+
+## Shared DBOPFS model resources
+
+```js
+import {createDbopfsModelStore} from 'arcane-os/ai/browser-wasm';
+import {createBrowserDecisionModel} from 'arcane-os/ai/browser-decisions';
+
+// dbopfs is the application's existing Arcane DBOPFS instance.
+const store = createDbopfsModelStore({dbopfs});
+const decisions = createBrowserDecisionModel(
+    {
+        family: 'laya',
+        model: 'onnx-community/laya-typed-decisions-ONNX',
+        store
+    }
+);
+await decisions.load();
+```
+
+The same `store` may serve other SDK model clients. The application supplies no
+tokenizer/configuration/graph manifest and performs no file routing. Inside the
+dedicated decision Worker, Transformers.js's public `env.fetch` hook routes the
+actual selected tokenizer, configuration, ONNX graph and external-data requests
+to `store.fetchResource(input, options)`. Its competing browser, custom and
+filesystem model caches are disabled only for this explicit stored mode. The
+default upstream ONNX WASM binary and factory preloads use this same hook.
+Native support-file fetches in the dedicated Worker also use the store. The
+runtime module itself still loads from `runtime.moduleUrl` through normal module
+loading. Native ESM imports remain browser-owned: an upstream custom factory
+import outside its preload path is not claimed as a DBOPFS resource. No second
+application cache or model substitution is introduced.
+
+The store returns `{file, status, statusText, headers, url, redirected}`. The
+Worker reconstructs the complete response with its actual HTTP status and
+headers, so a missing optional upstream file remains a missing-file response.
+New response bodies stream into ordered persistent shards, including resources
+with unknown totals. Completed resources are reused by their semantic request
+and URL selection. Interrupted closed shards remain available for HTTP Range
+resume; a server returning a full response restarts that member without adding
+the saved prefix twice. Independent resources remain concurrent, and repeated
+requests for the same resource share its storage mutation owner. Existing saved
+model formats are retained without a migration.
+
+Resource progress uses `{phase: 'download', completed, total, unit: 'shards',
+url}`. `completed` counts closed persistent shards; `total` is `null` until the
+resource finishes. This progress carries no network-size, rate or ETA fields.
+Cancellation aborts the owned fetch and joins reader/writer cleanup before the
+resource owner becomes available to a later request. Interrupted closed shards
+are retained. `unload()` and `dispose()` still acknowledge their lifecycle
+transition synchronously; outstanding `load()`/`evaluate()` calls settle after
+their resource cleanup.
 
 ## Complete rows and results
 
@@ -139,7 +193,7 @@ errors, including graph diagnostics when decoding fails, remain available in
 
 Work is acknowledged synchronously before loading/inference waits. Progress
 reports real semantic phases such as `waiting-for-model`, `loading-runtime`, `loading-tokenizer`,
-`loading-model`, `ready`, `evaluating` and `complete`; it is not a synthetic
+`loading-model`, `download`, `ready`, `evaluating` and `complete`; it is not a synthetic
 percentage. Loading the model and tokenizer proceeds concurrently. Repeated
 identical state text is tokenized once per batch. Independent requests are
 accepted concurrently; the selected backend still owns its execution ordering.

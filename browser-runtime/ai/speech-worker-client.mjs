@@ -5,6 +5,7 @@ import {
   SPEECH_WORKER_PROTOCOL,
 } from "./speech-worker-runtime.mjs";
 import { arcaneLogging } from "../logging.mjs";
+import { createModelResourceHost } from './model-resource-bridge.mjs';
 
 const is = new Is(false);
 
@@ -47,6 +48,10 @@ function abortError(signal, role, op) {
   );
 }
 
+function reportSpeechTerminationFailure(error) {
+    arcaneLogging.error('Speech Worker termination failed.', error);
+}
+
 function validateWorker(worker) {
   if (!worker || !is.function(worker.postMessage) || !is.function(worker.terminate)) {
     throw new TypeError("The packaged speech worker did not create a Worker.");
@@ -72,8 +77,11 @@ class SpeechWorkerClient {
   #listeners = [];
   #terminated = false;
   #onTermination;
+  #fetchResource;
+  #resourceHost = null;
+  #terminationPromise = null;
 
-  constructor({ role, onTermination = () => undefined } = {}) {
+  constructor({ role, fetchResource = null, onTermination = () => undefined } = {}) {
     if (role !== "stt" && role !== "tts") {
       throw new TypeError('SpeechWorkerClient role must be "stt" or "tts".');
     }
@@ -89,6 +97,7 @@ class SpeechWorkerClient {
       name: role === "stt" ? "arcane-whisper-stt" : "arcane-kokoro-tts",
     });
     this.#onTermination = onTermination;
+    this.#fetchResource = fetchResource;
     WORKER_CLIENTS.add(this);
     this.#trace("created", { workerUrl: workerUrl.href });
   }
@@ -131,7 +140,25 @@ class SpeechWorkerClient {
       );
     }
     const worker = validateWorker(this.#createWorker());
+    const client = this;
     this.#worker = worker;
+    if (this.#fetchResource) {
+        this.#resourceHost = createModelResourceHost({
+            fetchResource: this.#fetchResource,
+            send: function sendSpeechResource(message) {
+                worker.postMessage(message);
+            },
+            onError: function speechResourceTransportFailed(error) {
+                const failure = clientError(
+                    'ARCANE_AI_WORKER_MESSAGE_ERROR',
+                    'Unable to deliver a resource to the speech Worker.',
+                    error,
+                    `${client.#role}-worker-message-rejected`,
+                );
+                void client.terminate(failure, { intentional: false }).catch(reportSpeechTerminationFailure);
+            },
+        });
+    }
     this.#trace("started");
     this.#listen(worker, "message", (event) => {
       this.#handleMessage(event.data);
@@ -142,7 +169,7 @@ class SpeechWorkerClient {
         "The speech Worker returned an unreadable message.",
         event,
         `${this.#role}-worker-message-rejected`,
-      ), { intentional: false }).catch(() => undefined);
+      ), { intentional: false }).catch(reportSpeechTerminationFailure);
     });
     this.#listen(worker, "error", (event) => {
       void this.terminate(clientError(
@@ -150,12 +177,13 @@ class SpeechWorkerClient {
         "The speech Worker crashed.",
         event,
         `${this.#role}-worker-crashed`,
-      ), { intentional: false }).catch(() => undefined);
+      ), { intentional: false }).catch(reportSpeechTerminationFailure);
     });
     return worker;
   }
 
   #handleMessage(message) {
+    if (this.#resourceHost?.receive(message)) return;
     this.#trace("response", { message });
     if (message?.protocol !== SPEECH_WORKER_PROTOCOL) {
       void this.terminate(clientError(
@@ -163,12 +191,12 @@ class SpeechWorkerClient {
         "The speech Worker protocol did not match the SDK.",
         undefined,
         `${this.#role}-worker-protocol-mismatch`,
-      ), { intentional: false }).catch(() => undefined);
+      ), { intentional: false }).catch(reportSpeechTerminationFailure);
       return;
     }
     if (is.safeInteger(message.id) && message.type === 'progress') {
         const pending = this.#pending.get(message.id);
-        if (pending?.op === 'load') pending.onProgress?.(message.progress);
+        pending?.onProgress?.(message.progress);
         return;
     }
     if (!is.safeInteger(message.id) || !is.boolean(message.ok)) {
@@ -177,7 +205,7 @@ class SpeechWorkerClient {
         "The speech Worker response envelope shape was rejected.",
         undefined,
         `${this.#role}-worker-response-envelope-shape-rejected`,
-      ), { intentional: false }).catch(() => undefined);
+      ), { intentional: false }).catch(reportSpeechTerminationFailure);
       return;
     }
     const pending = this.#pending.get(message.id);
@@ -201,7 +229,7 @@ class SpeechWorkerClient {
         `${this.#role}-worker-error-envelope-rejected`,
       );
       pending.reject(failure);
-      void this.terminate(failure, { intentional: false }).catch(() => undefined);
+      void this.terminate(failure, { intentional: false }).catch(reportSpeechTerminationFailure);
       return;
     }
     pending.reject(clientError(
@@ -272,20 +300,14 @@ class SpeechWorkerClient {
               error,
               `${operationSubject(client.#role, op)}-message-rejected`,
             );
-            void client.terminate(failure, { intentional: false }).catch(
-              function ignoreCancellationTerminationFailure() {
-                return undefined;
-              },
-            );
+            void client.terminate(failure, { intentional: false }).catch(reportSpeechTerminationFailure);
           }
           return;
         }
         void client.terminate(
           abortError(signal, client.#role, op),
           { intentional: true },
-        ).catch(function ignoreAbortTerminationFailure() {
-          return undefined;
-        });
+        ).catch(reportSpeechTerminationFailure);
       }
       signal?.addEventListener?.("abort", onAbort, { once: true });
       client.#pending.set(
@@ -313,11 +335,7 @@ class SpeechWorkerClient {
           `${operationSubject(client.#role, op)}-message-rejected`,
         );
         reject(failure);
-        void client.terminate(failure, { intentional: false }).catch(
-          function ignoreRequestTerminationFailure() {
-            return undefined;
-          },
-        );
+        void client.terminate(failure, { intentional: false }).catch(reportSpeechTerminationFailure);
       }
     });
   }
@@ -327,7 +345,7 @@ class SpeechWorkerClient {
     if (!is.boolean(intentional)) {
       throw new TypeError("Speech Worker termination intent must be a boolean.");
     }
-    if (this.#terminated) return;
+    if (this.#terminationPromise) return this.#terminationPromise;
     const terminationReason = is.error(reason) && WORKER_CLIENT_ERRORS.has(reason)
       ? reason
       : clientError(
@@ -349,15 +367,37 @@ class SpeechWorkerClient {
     const pendingOperations = [...this.#pending.values()];
     for (const pending of pendingOperations) pending.cleanup();
     this.#pending.clear();
+    const resourceHost = this.#resourceHost;
+    this.#resourceHost = null;
+    this.#transport = null;
+    const client = this;
+    const failures = [];
+    this.#terminationPromise = Promise.resolve().then(async function terminateSpeechResources() {
+        const settlements = await Promise.allSettled([
+            Promise.resolve().then(function closeSpeechResources() {
+                return resourceHost?.close(terminationReason);
+            }),
+            Promise.resolve().then(function terminateSpeechWorker() {
+                return worker?.terminate();
+            }),
+        ]);
+        for (const settlement of settlements) {
+            if (settlement.status === 'rejected') failures.push(settlement.reason);
+        }
+        for (const pending of pendingOperations) pending.reject(terminationReason);
+        client.#trace('terminated', { reason: terminationReason, intentional });
+        if (failures.length) {
+            throw new AggregateError(failures, 'Unable to complete speech Worker termination.', { cause: terminationReason });
+        }
+    });
+    // Revoke provider readiness immediately; reentrant pool cleanup joins the
+    // already-owned promise before releasing prepared files.
     try {
-      this.#transport = null;
-      const termination = worker?.terminate();
-      if (termination && is.function(termination.then)) await termination;
-    } finally {
-      for (const pending of pendingOperations) pending.reject(terminationReason);
-      this.#trace("terminated", { reason: terminationReason, intentional });
-      this.#onTermination(completeValue({ reason: terminationReason, intentional }));
+        this.#onTermination(completeValue({ reason: terminationReason, intentional }));
+    } catch (error) {
+        failures.push(error);
     }
+    return this.#terminationPromise;
   }
 }
 

@@ -2,6 +2,8 @@ import Is from "../dependencies/strong-type/index.js";
 import {
   normalizeModelSecurity,
 } from "./model-controller.mjs";
+import { createDbopfsModelPartStore } from "./dbopfs-model-parts.mjs";
+import { createDbopfsResourceStore } from "./dbopfs-model-resources.mjs";
 
 const is = new Is(false);
 
@@ -1090,37 +1092,6 @@ function storageNames(authority, files) {
   });
 }
 
-async function* byteChunks(body, signal) {
-  if (is.instanceCheck(body, Uint8Array) || is.instanceCheck(body, ArrayBuffer) || is.arrayBufferView(body)) {
-    throwIfAborted(signal);
-    yield is.instanceCheck(body, Uint8Array)
-      ? body
-      : new Uint8Array(body.buffer ?? body, body.byteOffset ?? 0, body.byteLength);
-    return;
-  }
-  if (body && is.function(body.getReader)) {
-    const reader = body.getReader();
-    const abort = () => void reader.cancel(signal?.reason).catch(() => undefined);
-    signal?.addEventListener?.("abort", abort, { once: true });
-    try {
-      while (true) {
-        throwIfAborted(signal);
-        const { done, value } = await reader.read();
-        if (done) return;
-        yield is.instanceCheck(value, Uint8Array) ? value : new Uint8Array(value);
-      }
-    } finally {
-      signal?.removeEventListener?.("abort", abort);
-      if (signal?.aborted) await reader.cancel(signal.reason).catch(() => undefined);
-      reader.releaseLock?.();
-    }
-  }
-  throw speechError(
-    "ARCANE_AI_ARTIFACT_SOURCE_INVALID",
-    "A browser speech artifact did not provide readable bytes.",
-  );
-}
-
 function tokenizeArtifactGraphModule(source, modulePath) {
   const tokens = [];
   let index = 0;
@@ -1851,6 +1822,12 @@ export function createDbopfsSpeechArtifactStore({
   }
   let tablePromise = null;
   const operationTails = new Map();
+  const parts = createDbopfsModelPartStore({dbopfs, tableName});
+  const resources = createDbopfsResourceStore({
+    dbopfs,
+    tableName,
+    fetchImpl: fetchImpl ?? globalThis.fetch?.bind(globalThis),
+  });
 
   function serializeAuthority(authority, operation) {
     const key = storageKey(authority);
@@ -1916,22 +1893,9 @@ export function createDbopfsSpeechArtifactStore({
     }
   }
 
-  async function writeFile(name, body, { signal } = {}) {
-    const directory = await table();
-    const handle = await directory.getFileHandle(name, { create: true });
-    const writable = await handle.createWritable();
-    try {
-      for await (const chunk of byteChunks(body, signal)) {
-        await writable.write(chunk);
-      }
-      throwIfAborted(signal);
-      await writable.close();
-      return undefined;
-    } catch (error) {
-      await writable.abort?.(error).catch(() => undefined);
-      await directory.removeEntry(name).catch(() => undefined);
-      throw error;
-    }
+  async function readArtifact(name, signal) {
+    // Reuse pre-existing complete files without rewriting saved model data.
+    return await parts.read(name, {signal}) ?? await readFile(name);
   }
 
   async function removeUnlocked(authority) {
@@ -1951,6 +1915,9 @@ export function createDbopfsSpeechArtifactStore({
     const results = await Promise.all([
       removeEntry(names.selection),
       ...fileNames.map(removeEntry),
+      ...fileNames.map(function removeArtifactParts(name) {
+        return parts.remove(name);
+      }),
     ]);
     return results.some(Boolean);
   }
@@ -1976,7 +1943,6 @@ export function createDbopfsSpeechArtifactStore({
     const names = storageNames(authority, metadata.files);
     const storedSelection = await readJsonFile(names.selection);
     if (JSON.stringify(storedSelection) !== JSON.stringify(cacheSelection(authority))) {
-      await removeUnlocked(authority);
       return null;
     }
     const files = [];
@@ -1996,9 +1962,8 @@ export function createDbopfsSpeechArtifactStore({
               unit: 'files',
           }
       );
-      const file = await readFile(names.files[index]);
+      const file = await readArtifact(names.files[index], signal);
       if (!file) {
-        await removeUnlocked(authority);
         return null;
       }
       files.push({ descriptor, file });
@@ -2037,7 +2002,6 @@ export function createDbopfsSpeechArtifactStore({
         routing,
       });
     } catch (error) {
-      await removeUnlocked(authority);
       throw error;
     }
   }
@@ -2050,19 +2014,36 @@ export function createDbopfsSpeechArtifactStore({
     if (!is.function(fetchFunction)) {
       throw speechError("ARCANE_AI_ARTIFACT_SOURCE_UNAVAILABLE", "Browser fetch is unavailable.");
     }
-    await removeUnlocked(authority);
     const installed = [];
     try {
-      // This mutable cache selection is written before content. It is only an
-      // invalidation record, never a completion, byte-identity, or integrity receipt.
-      await writeFile(
-        names.selection,
-        new TextEncoder().encode(`${JSON.stringify(cacheSelection(authority))}\n`),
-        { signal },
-      );
+      const selection = cacheSelection(authority);
+      const storedSelection = await readJsonFile(names.selection);
+      if (JSON.stringify(storedSelection) !== JSON.stringify(selection)) {
+        await removeUnlocked(authority);
+        // Selection describes the caller's resources, not download completion.
+        await parts.writePart(
+          names.selection,
+          new TextEncoder().encode(`${JSON.stringify(selection)}\n`),
+          { signal },
+        );
+      }
       for (let index = 0; index < metadata.files.length; index += 1) {
         throwIfAborted(signal);
         const descriptor = metadata.files[index];
+        const cachedFile = await readArtifact(names.files[index], signal);
+        if (cachedFile) {
+          installed.push({descriptor, file: cachedFile});
+          reportArtifactProgress(onProgress, signal, {
+            phase: 'prepare',
+            stage: 'cache',
+            message: 'Opened cached speech file',
+            file: descriptor.path,
+            completed: installed.length,
+            total: metadata.files.length,
+            unit: 'files'
+          });
+          continue;
+        }
         const sourceUrl = graph ? descriptor.sourceUrl : descriptor.url;
         reportArtifactProgress(
             onProgress,
@@ -2139,8 +2120,21 @@ export function createDbopfsSpeechArtifactStore({
             `A speech artifact server returned HTTP ${String(responseStatus)}.`,
           );
         }
-        await writeFile(names.files[index], responseBody, { signal });
-        const file = await readFile(names.files[index]);
+        const file = await parts.write(names.files[index], responseBody, {
+          signal,
+          onProgress: function reportSpeechShards(shards) {
+            reportArtifactProgress(onProgress, signal, {
+              phase: 'download',
+              stage: 'artifacts',
+              message: 'Storing speech file',
+              file: descriptor.path,
+              completed: installed.length,
+              total: metadata.files.length,
+              unit: 'files',
+              resource: {...shards, file: descriptor.path},
+            });
+          },
+        });
         if (!file) {
           if (graph) {
             throw graphVerificationError(
@@ -2186,7 +2180,8 @@ export function createDbopfsSpeechArtifactStore({
         routing,
       });
     } catch (error) {
-      await removeUnlocked(authority).catch(() => undefined);
+      // Complete resources remain available for the next explicit activation.
+      // The active writer owns cleanup of only its unfinished resource.
       throw error;
     }
   }
@@ -2330,6 +2325,7 @@ export function createDbopfsSpeechArtifactStore({
     tableName,
     prepare,
     remove,
+    fetchResource: resources.fetchResource,
   });
   STORES.add(store);
   return store;

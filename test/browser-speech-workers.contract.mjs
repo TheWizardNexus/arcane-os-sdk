@@ -1,4 +1,5 @@
 import { SPEECH_WORKER_PROTOCOL } from "../browser-runtime/ai/speech-worker-runtime.mjs";
+import { createModelResourceClient } from '../browser-runtime/ai/model-resource-bridge.mjs';
 
 export function createSpeechWorkerContract({
   role,
@@ -14,6 +15,11 @@ export function createSpeechWorkerContract({
   const heldUseNotifications = [];
   const heldUseWaiters = [];
   const cancelledUseIds = [];
+  const resources = createModelResourceClient({
+    send: function sendContractResource(message) {
+      emit('message', message);
+    },
+  });
 
   function emit(type, data) {
     for (const listener of listeners.get(type) ?? []) listener({ data });
@@ -74,6 +80,7 @@ export function createSpeechWorkerContract({
 
   function handleMessage(message, reply) {
     posted.push(message);
+    if (resources.receive(message)) return;
     if (message.op === "cancel") {
       const targetId = message.payload?.targetId;
       const cancelled = heldUses.delete(targetId);
@@ -112,6 +119,7 @@ export function createSpeechWorkerContract({
     },
     terminate() {
       terminated = true;
+      resources.close(new Error('The contract Worker was terminated.'));
       heldUses.clear();
     },
   };
@@ -121,6 +129,7 @@ export function createSpeechWorkerContract({
     workerId,
     posted,
     cancelledUseIds,
+    fetchResource: resources.fetchResource,
     heldUseIds() {
       return [...heldUses.keys()];
     },

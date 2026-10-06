@@ -1506,23 +1506,39 @@ The Worker installs one private module router before importing the entrypoint:
 - a dynamic import whose target is known imports the materialized URL;
 - a fetch whose target is known reads the materialized URL;
 - a Worker whose target is known starts the SDK role Worker and imports the
-  materialized target there; and
-- a Cache match whose target is known returns the materialized file.
+  materialized target there.
 
-Every unmapped operation keeps ordinary browser behavior:
+Resource ownership extends to ordinary self-contained speech runtimes as well
+as graph runtimes:
 
 - an unmapped relative or URL-like import resolves against the calling module's
   original source URL, while a bare specifier remains unchanged for native
   import-map resolution;
-- an unmapped fetch calls native `fetch` and preserves the caller's options;
-- an unmapped Worker calls the native `Worker` constructor and preserves the
-  caller's options; and
-- an unmapped Cache operation delegates to native Cache Storage.
+- an unmapped HTTP fetch preserves the caller's request options and reaches
+  the parent DBOPFS resource store; Blob/data resources remain local;
+- an unmapped module Worker starts through the SDK role Worker and forwards
+  its resource fetches to that same store; and
+- an unmapped classic Worker retains native execution. Its internal fetches
+  are outside this module-Worker routing contract.
 
-Cache `put`, `add`, `addAll`, `delete`, and `keys` are normal mutable browser
-operations. The SDK does not replace them with a read-only cache. Relative
-requests are resolved from the calling module's original source URL before the
-native Cache operation.
+Inside the dedicated speech Worker, native CacheStorage is temporarily
+unavailable before runtime import, so the selected runtime takes its existing
+fetch path. Transformers' public browser/custom/filesystem cache switches are
+disabled there. The SDK does not fabricate Cache matches or mutation results,
+and it neither clears nor changes saved native caches. The original Worker
+environment is restored on unload or failed import. Existing explicit
+`removeBrowserSpeechModelCache()` remains a separate caller-selected operation.
+
+The existing speech store exposes `fetchResource(input, options)` for its
+Worker loaders, returning `{file,status,statusText,headers,url,redirected}`.
+New declared files and fetched model, voice, configuration, and WASM resources
+stream into ordered DBOPFS parts even without a response length. Closed-part
+progress uses `unit:'shards'`; declared-file progress retains `unit:'files'`
+with the current shard record in `resource`. Complete declared peer files and
+closed resource parts survive cancellation. Existing whole-file caches remain
+readable without migration. HTTP resume is used only when the server returns
+the requested range; otherwise the complete resource is downloaded anew.
+Worker termination aborts and joins its parent-owned resource operations.
 
 Routing discovery is best effort and is not an admission gate. If the scanner
 cannot interpret a module, that module is left unchanged and follows its native
@@ -1544,11 +1560,14 @@ provider:
   `namespace.env.backends.onnx.wasm.wasmPaths = {mjs,wasm}`, keeps remote model
   loading enabled, and applies caller-selected `numThreads` when present.
 
-Transformers and Kokoro keep their normal provider downloads and Cache behavior
-for routes not materialized by the SDK. Kokoro voice aliases and Transformers
+Transformers and Kokoro use their normal provider request semantics through
+the selected DBOPFS resource owner. Kokoro voice aliases and Transformers
 model aliases may be listed in `runtimeRequestUrls` so an upstream request for a
 known file resolves to the already materialized local file. Model, voice, and
 runtime selection remains with the application and upstream publisher.
+Native ESM imports remain platform-owned; only declared runtime modules are
+materialized by artifact preparation. Custom classic Worker internals are not
+claimed as stored by this contract.
 
 ## Providers
 

@@ -195,13 +195,29 @@ export function decodeDecisionOutputs(rows, outputs) {
     return {decisions, outputs};
 }
 
-export async function loadDecisionRuntime(configuration, report) {
+export async function loadDecisionRuntime(configuration, report, resourceFetch = null) {
     const {family, model: repository, revision = 'main', device = 'webgpu',
         dtype = family === 'laya' ? 'fp16' : 'fp32', runtime} = configuration;
     report(
         {phase: 'loading-runtime'}
     );
     const namespace = await import(runtime.moduleUrl);
+    if (resourceFetch) {
+        // Dedicated Worker environment: all actual tokenizer/config/graph and
+        // external-data requests use the selected SDK store. A cache hook alone
+        // can be caught and ignored by the upstream loader.
+        namespace.env.fetch = function fetchDecisionResource(input, options) {
+            return resourceFetch(input, {
+                ...options,
+                onProgress: function reportDecisionResource(progress) {
+                    report(progress);
+                }
+            });
+        };
+        namespace.env.useBrowserCache = false;
+        namespace.env.useCustomCache = false;
+        namespace.env.useFSCache = false;
+    }
     if (runtime.wasmPaths !== undefined) {
         namespace.env.backends.onnx.wasm.wasmPaths = runtime.wasmPaths;
     }

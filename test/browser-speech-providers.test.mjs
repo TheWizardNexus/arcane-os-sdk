@@ -58,7 +58,7 @@ function createMemoryDbopfs() {
           const chunks = [];
           return {
             async write(chunk) {
-              chunks.push(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+              chunks.push(chunk);
             },
             async close() {
               entries.set(name, new Blob(chunks));

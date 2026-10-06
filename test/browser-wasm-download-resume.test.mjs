@@ -73,13 +73,21 @@ function memoryDirectory() {
         return {
             async createWritable() {
                 let logicalByteLength = 0;
+                const chunks = [];
                 return {
                     async abort() {},
                     async close() {
-                        entries.set(name, logicalBlob(logicalByteLength));
+                        const value = new Blob(chunks);
+                        if (value.size !== logicalByteLength) {
+                            Object.defineProperty(value, 'size', {value: logicalByteLength});
+                        }
+                        entries.set(name, value);
                     },
                     async write(value) {
-                        logicalByteLength += value.byteLength;
+                        chunks.push(value);
+                        logicalByteLength += typeof value === 'string'
+                            ? new TextEncoder().encode(value).byteLength
+                            : value.byteLength ?? value.size;
                     }
                 };
             },
@@ -379,9 +387,9 @@ test(
         assert.equal(
             retryProgress.some(function observedRestoredRangeProgress(progress) {
                 return progress.phase === 'download'
-                    && progress.loadedBytes === 36_000_000
-                    && progress.totalBytes === RANGE_TOTAL
-                    && progress.remainingBytes === 4_000_000
+                    && progress.members[0].completed === 9
+                    && progress.members[0].total === 10
+                    && progress.members[0].unit === 'shards'
                     && progress.transferLimit === 4
                     && progress.transferMode === 'ranges';
             }),
@@ -447,8 +455,8 @@ test(
                 return error?.code === 'ARCANE_AI_MODEL_DOWNLOAD_FAILED';
             }
         );
-        assert.equal(directory.names().filter(function retainWholeFile(name) {
-            return name.endsWith('.gguf');
+        assert.equal(directory.names().filter(function retainCommittedPart(name) {
+            return name.endsWith('.arcane-part-0');
         }).length, 3);
 
         const retryProgress = [];
@@ -473,9 +481,65 @@ test(
             retryProgress.some(function observedRestoredShardProgress(progress) {
                 return progress.phase === 'download'
                     && progress.completed === 3
-                    && progress.loadedBytes === 3;
+                    && progress.members.filter(function cachedMember(member) {
+                        return member.state === 'cached';
+                    }).length === 3;
             }),
             true
         );
+    }
+);
+
+test(
+    'browser-WASM complete responses preserve all content in ordered parts without a declared total',
+    async function storeCompleteUnknownLengthResponse() {
+        const directory = memoryDirectory();
+        const first = 'first model section\n'.repeat(500000);
+        const last = '\ncomplete final model section';
+        const requests = [];
+        const source = createBrowserModelSource({
+            id: 'complete-stream-model',
+            files: [{name: 'complete.gguf', url: 'https://example.invalid/complete.gguf'}],
+        }, {
+            async fetchImpl(url) {
+                requests.push(url);
+                return {
+                    body: new Blob([first, last]).stream(),
+                    headers: responseHeaders({}),
+                    status: 200,
+                    ok: true,
+                    url,
+                };
+            },
+        });
+        const progress = [];
+        const store = storeFor(directory);
+        const installed = await store.ensure(source, {
+            onProgress(value) {
+                progress.push(value);
+            },
+        });
+        assert.equal(await installed.files[0].text(), first + last);
+        const partNames = directory.names().filter(function isCommittedPart(name) {
+            return name.includes('.arcane-part-');
+        });
+        assert.ok(partNames.length > 1);
+        assert.equal(directory.names().some(function isWholeModel(name) {
+            return name.endsWith('.gguf');
+        }), false);
+        assert.ok(progress.some(function reportsUnknownShardTotal(value) {
+            return value.members?.[0].completed > 0 && value.members[0].total === null;
+        }));
+        const final = progress.at(-1);
+        assert.equal(final.completed, 1);
+        assert.equal(final.members[0].completed, partNames.length);
+        assert.equal(final.members[0].total, partNames.length);
+        assert.equal(final.members[0].unit, 'shards');
+        assert.equal('loadedBytes' in final, false);
+        const cached = await store.ensure(source, {offline: true});
+        assert.equal(await cached.files[0].text(), first + last);
+        assert.equal(requests.length, 1);
+        await store.remove(source);
+        assert.deepEqual(directory.names(), []);
     }
 );

@@ -117,21 +117,15 @@ current mutable status snapshot. Provider states are `unloaded`, `loading`, `rea
 
 Browser-WASM model loads report `cache-check`, `download`, and `initialize`
 phases. Download records preserve the ordered model-file fields `completed`,
-`total`, and `unit:'files'`. They add `loadedBytes`, `totalBytes`,
-`remainingBytes`, `bytesPerSecond`, `etaSeconds`, `activeTransfers`,
-`transferLimit`, and `transferMode`. `loadedBytes` is aggregate downloaded or
-restored progress for the current install. Active partial writes count while
-they are staged, then are removed from that total if their transfer fails;
-completed shards or Range parts reused from an interrupted attempt remain
-counted. Unknown totals, remaining counts, rates, and ETAs are `null`;
-once known, byte values and seconds are nonnegative numbers. `activeTransfers`
-is the current transfer-worker count, `transferLimit` is the selected concurrency
-bound, and `transferMode` identifies `probing`, `files`, `ranges`, or `single`.
-The store coalesces chunk-driven changes on a 250 ms cadence and publishes
-immediately when download starts, the transfer plan or total becomes known,
-active-worker count changes, and the download completes. At known completion, remaining bytes and ETA are zero
-and active transfers are zero. Applications format the raw measures into B,
-KB, MB, GB, transfer-rate, and duration labels.
+`total`, and `unit:'files'`. Their ordered `members` records contain each file's
+`name`, committed-part `completed`, `total`, and `unit:'shards'`. A streaming
+response has `total:null` until its end is observed; completion then supplies
+the actual committed-part count. Previously complete members identify
+`state:'cached'`. `activeTransfers` is the current transfer-worker count,
+`transferLimit` is the selected concurrency, and `transferMode` identifies
+`probing`, `files`, `ranges`, or `single`. No byte progress, rate, or estimated
+completion time is produced. Closed-part and lifecycle changes publish promptly;
+the existing 250 ms heartbeat retains the current semantic state.
 
 Initialization keeps `phase:'initialize'` and reports a `stage` and a readable
 `message` from the packaged runtime's existing log signals: runtime startup,
@@ -172,8 +166,11 @@ optional descriptor `bytes` divides that member into deterministic contiguous
 parts of roughly 4 MB each, up to 4,096 parts. Each exact completed part is
 committed separately in OPFS, so retry or refresh fetches only the small
 in-flight parts plus any other missing parts; the ordered parts are exposed to
-Wllama as one logical model Blob. Range offsets remain transport-local; only
-aggregate transfer telemetry is public.
+Wllama as one logical model Blob. Ordinary full responses, including unknown
+content lengths and single-file models, also stream directly into ordered OPFS
+parts. Model data is not accumulated in one JavaScript buffer. Range offsets
+and physical part framing remain storage/transport-local; progress describes
+completed files and parts.
 
 ## Model selection, optional hardening, and cache
 
@@ -181,7 +178,7 @@ The canonical model descriptor is
 `{id, files:[{name?,url,bytes?},...]}`. The ordered `files` array is nonempty;
 names and URLs are unique. Each URL must be absolute HTTPS without credentials
 or a fragment. An optional positive safe-integer `bytes` value is used only for
-progress and HTTP Range planning. Missing or unusable metadata never blocks a
+HTTP Range planning. Missing or unusable metadata never blocks a
 download, and a declared value is not a content-length check.
 
 Fetch follows HTTPS redirects and records the requested and final HTTPS URL. A
@@ -205,10 +202,21 @@ admission work. Observational byte counting and exact HTTP Range framing remain
 transport-local. A load succeeds only after Wllama reports that the model is
 loaded.
 
-The DBOPFS adapter commits each complete member or Range part independently and
-exposes only a complete ordered model set as a cache hit.
+The DBOPFS adapter commits ordered parts independently and exposes only a
+complete ordered model set as a cache hit. Existing whole-file and Range-part
+caches remain readable without migration. Closed parts survive interrupted
+writes; a source without supported resume starts that member's next transfer
+from its beginning. Complete peer members remain cached.
 `load({offline:true})` never performs a model request; it uses a compatible
 cached entry or rejects with `ARCANE_AI_MODEL_OFFLINE_MISS`.
+
+The same store exposes `fetchResource(input, options)` for SDK-owned browser
+model loaders. It returns `{file,status,statusText,headers,url,redirected}`
+after storing the complete response through the shared part owner. Ordinary
+Fetch request options, `signal`, and semantic `onProgress` are supported.
+The browser decision model accepts this store through its additive `store`
+option; resource acquisition stays with the SDK while model selection stays
+with the application. See [browser decisions](browser-decisions.md).
 
 ```javascript
 const {security, cache} = ai.status().llm;

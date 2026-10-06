@@ -8844,13 +8844,14 @@ occurrences use source `ai-model-controller`; every load or unload owns one
 non-null operation ID shared by its state and progress occurrences. Public
 progress retains the exact selected `modelId`, `phase`, state, and nested
 file-progress field names. Browser-WASM download progress preserves
-`completed`, `total`, and `unit:'files'` and adds `loadedBytes`, `totalBytes`,
-`remainingBytes`, `bytesPerSecond`, `etaSeconds`, `activeTransfers`,
-`transferLimit`, and `transferMode`. Unknown totals, rates, remaining values,
-and ETAs are `null`; applications format the raw byte and second measures for
-display. Chunk-driven transfer changes are coalesced on a 250 ms cadence, while
-plan, active-worker, and completion boundaries publish immediately and the existing five-second
-heartbeat repeats the latest record.
+`completed`, `total`, and `unit:'files'`, with complete per-file `members`
+reporting stored shards. A member's `total` remains `null` until its complete
+response is stored, unless the HTTP range plan already establishes its shard
+total. `activeTransfers`, `transferLimit`, and `transferMode` describe the
+active download work. Closed shards, active-worker changes, and completion
+boundaries publish semantic progress; the existing heartbeat repeats the latest
+record. These fields describe files and shards, without byte-based display
+requirements or estimated transfer rates.
 Accessor-bearing provider status
 and malformed progress reject with `ARCANE_AI_PROVIDER_STATUS_INVALID` and
 `ARCANE_AI_PROVIDER_PROGRESS_INVALID`. After disposal, lifecycle operations fail with
@@ -9443,8 +9444,8 @@ console.log(provider.status().state); // unloaded
 ### Overview
 
 Adapts an existing DBOPFS instance into a complete multi-model, ordered
-multi-file cache without renaming its public methods. Each completed whole
-member or Range part is committed independently. An interrupted set
+multi-file cache without renaming its public methods. Every new full response
+or Range transfer is committed in ordered parts. An interrupted set
 is not a cache hit, but its completed members remain available to the next
 install so only missing work is fetched.
 
@@ -9462,25 +9463,26 @@ workers
 when the probe returns a usable total from exposed `Content-Range` or optional
 descriptor `bytes`. The mutable
 result contains `kind`, `tableName`, `downloadConcurrency`, the original
-`adapter`, and `ready`, `install`, `ensure`, and `remove`. `ensure()` returns
+`adapter`, and `ready`, `install`, `ensure`, `remove`, and `fetchResource`. `ensure()` returns
 `files` and `cache:'cached'|'installed'`. It preserves the complete model content.
 `offline:true` never downloads and rejects a miss with
 `ARCANE_AI_MODEL_OFFLINE_MISS`.
 
-When supplied, `onProgress` receives existing ordered file progress plus
-`loadedBytes`, `totalBytes`, `remainingBytes`, `bytesPerSecond`, `etaSeconds`,
-`activeTransfers`, `transferLimit`, and `transferMode`. `activeTransfers` is the
-current transfer-worker count. Transfer mode is
-`probing`, `files`, `ranges`, or `single`. Unknown aggregate totals, remaining
-values, rates, and ETAs are `null`. Chunk-driven changes are coalesced on a
-250 ms cadence, with immediate records at download start, plan or total
-discovery, active-worker changes, and completion. `loadedBytes` includes current staged writes and
-restored completed members or Range parts; bytes from a failed partial write
-are removed from the total when that entry is discarded. A complete set of
-declared member `bytes` values
-makes split-model total and remaining progress available from the start;
-otherwise aggregate-dependent fields remain `null` until they are honestly
-known.
+When supplied, `onProgress` receives ordered file progress and `members`
+records with each file's `name`, committed `completed` parts, `total`, and
+`unit:'shards'`. Streaming totals remain `null` until the response finishes;
+previously complete files identify `state:'cached'`. `activeTransfers` is the
+current transfer-worker count, `transferLimit` is selected concurrency, and
+`transferMode` is `probing`, `files`, `ranges`, or `single`. Closed-part and
+lifecycle changes publish promptly, with an existing 250 ms heartbeat. No
+byte progress, transfer rate, or estimated completion time is produced.
+
+`fetchResource(input,{signal,onProgress,...requestOptions})` returns
+`{file,status,statusText,headers,url,redirected}` for a complete stored Fetch
+response. SDK browser model loaders use this shared owner for configuration,
+tokenizer, graph, external-data, and other fetched resources. Successful
+complete GET resources may be reused; supported HTTP ranges resume closed
+parts after interruption. Request framing stays at the transport boundary.
 
 ### Availability and normalization
 
@@ -9491,9 +9493,9 @@ resumable Range parts. For any source member, a followed redirect that
 turns the first `bytes=0-0` probe into `200` triggers one direct probe of the
 final URL. Confirmed support cancels the original body and starts the Range
 pool; refusal keeps the original response as the ordinary single-fetch path,
-with readable `Content-Length` used for progress. A missing `Content-Range` can
+without requiring a readable `Content-Length`. A missing `Content-Range` can
 use optional descriptor `bytes` for Range planning; without either total, the
-store falls back to one full fetch. A confirmed source member is divided into
+store uses one full fetch streamed into ordered persistent parts. A confirmed source member is divided into
 deterministic OPFS Range parts of roughly 4 MB each, up to 4,096 parts. A
 monolithic source may use at most
 `downloadConcurrency` Range workers; split sources keep one Range worker per
@@ -9502,7 +9504,7 @@ in order as one logical Blob. A later non-206, contradictory exposed Range
 response, or incorrectly framed body fails rather than assembling partial
 content. On failure or cancellation, peers settle while completed shards and
 Range parts remain available for retry; an unfinished active part restarts after
-refresh. A persisted Range part whose length does not match its requested HTTP
+refresh. Existing whole-file caches remain readable without migration. A persisted Range part whose length does not match its requested HTTP
 frame is discarded and fetched again. A complete whole member supersedes its
 redundant current Range fragments. Cleanup failure is warned without
 hiding the usable model. Wllama requires every selected model Blob or File to
@@ -9784,7 +9786,7 @@ retains the complete list of deletions already completed.
 
 Adapts an existing DBOPFS instance into a complete caller-selected speech
 runtime/model store. It serializes each selected model with an exclusive Web
-Lock, removes partial state after failure, stores ordinary mutable selection
+Lock, preserves complete peer files and closed parts after failure, stores ordinary mutable selection
 metadata before content, and treats a changed file inventory or source mapping
 as a cache miss that is downloaded again.
 
@@ -9794,7 +9796,7 @@ as a cache miss that is downloaded again.
 createDbopfsSpeechArtifactStore({ dbopfs, tableName='arcane_ai_browser_speech', fetchImpl=null, objectUrlFactory=null }={})
 ```
 
-The mutable result is `{protocol,tableName,prepare,remove}`.
+The mutable result is `{protocol,tableName,prepare,remove,fetchResource}`.
 `prepare(authority,{signal,onProgress,offline=false,security})` uses a complete
 compatible cache or downloads every declared file, preserves complete content
 and materializes object URLs, then returns
@@ -9804,8 +9806,17 @@ needs those URLs. `offline:true` never fetches and rejects a miss with
 authority's files and selection metadata. Optional `onProgress` receives
 preparation and download records with `phase`, `stage`, `message`, and the
 current `file` when available. File operations report actual `completed` and
-`total` inventory counts with `unit:'files'`; module preparation uses
+`total` inventory counts with `unit:'files'`, and `resource` carries the current
+closed-part progress with `unit:'shards'`; module preparation uses
 `total:null`. Cancellation stops progress along with the owning operation.
+
+New files stream into ordered DBOPFS parts with no required response length.
+Existing complete whole files stay readable without migration.
+`fetchResource(input,{signal,onProgress,...requestOptions})` returns
+`{file,status,statusText,headers,url,redirected}` and gives the dedicated
+speech Worker the same complete resource storage owner for runtime fetches.
+Native ESM imports and unmapped classic Worker internals retain their platform
+loader; they are not claimed as intercepted HTTP fetches.
 
 ### Availability and normalization
 

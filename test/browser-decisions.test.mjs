@@ -425,9 +425,9 @@ function createWorkerFixture(context) {
             }
         }
     );
-    function createClient(family = 'laya') {
+    function createClient(family = 'laya', store = null) {
         const client = createBrowserDecisionModel(
-            {family, model: `fixture/${family}`}
+            {family, model: `fixture/${family}`, store}
         );
         clients.push(client);
         return client;
@@ -440,6 +440,64 @@ function finishFixtureLoad(worker) {
         {id: worker.messages[0].id, result: {loaded: true}}
     );
 }
+
+test('decision resource store stays outside Worker configuration and receives cancellation', async function decisionStore(context) {
+    const fixture = createWorkerFixture(context);
+    let aborted;
+    let finish;
+    let started;
+    const downloading = new Promise(function observeDownload(resolve) { started = resolve; });
+    const cancellation = new Promise(function observeAbort(resolve) { aborted = resolve; });
+    const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+    const store = {
+        async fetchResource(input, {signal}) {
+            assert.equal(input, 'https://models.example.test/dragon/model.onnx_data');
+            signal.addEventListener('abort', function resourceAborted() { aborted(); }, {once: true});
+            started();
+            await cancellation;
+            await cleanup;
+            throw signal.reason;
+        }
+    };
+    const client = fixture.createClient('laya', store);
+    assert.equal(fixture.workers.length, 0);
+    const loading = client.load();
+    const failed = assert.rejects(loading, /unloaded/u);
+    const worker = fixture.workers[0];
+    assert.equal(worker.messages[0].storedResources, true);
+    assert.equal(Object.hasOwn(worker.messages[0].payload, 'store'), false);
+    worker.reply({arcaneModelResource: true, resourceId: 1, op: 'fetch',
+        request: {url: 'https://models.example.test/dragon/model.onnx_data', options: {}}});
+    await downloading;
+    client.unload();
+    await cancellation;
+    assert.equal(worker.terminated, true);
+    finish();
+    await failed;
+});
+
+test('decision stored mode selects env.fetch and disables competing model caches', async function decisionStoredRuntime() {
+    const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#stored-resources`;
+    const namespace = await import(moduleUrl);
+    const progress = [];
+    const calls = [];
+    await loadDecisionRuntime(
+        {family: 'laya', model: 'fixture/laya', runtime: {moduleUrl}},
+        function recordProgress(value) { progress.push(value); },
+        async function fetchResource(input, options) {
+            calls.push(input);
+            options.onProgress({phase: 'download', completed: 1, total: 1, unit: 'shards'});
+            return new Response('complete fixture configuration');
+        }
+    );
+    assert.equal(namespace.env.useBrowserCache, false);
+    assert.equal(namespace.env.useCustomCache, false);
+    assert.equal(namespace.env.useFSCache, false);
+    const response = await namespace.env.fetch('https://models.example.test/dragon/config.json');
+    assert.deepEqual(calls, ['https://models.example.test/dragon/config.json']);
+    assert.equal(await response.text(), 'complete fixture configuration');
+    assert.deepEqual(progress.at(-1), {phase: 'download', completed: 1, total: 1, unit: 'shards'});
+});
 
 test(
     'client is lazy, shares activation and exposes complete evaluation and terminal lifecycle',

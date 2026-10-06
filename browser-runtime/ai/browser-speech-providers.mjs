@@ -1316,6 +1316,9 @@ function createBrowserSpeechProvider({
       };
       slot.client = createSpeechWorkerClient({
         role,
+        fetchResource: function fetchSpeechWorkerResource(input, options) {
+            return store.fetchResource(input, options);
+        },
         onTermination: function handleSpeechWorkerTermination(termination) {
           handlePoolTermination(pool, slot, termination);
         },

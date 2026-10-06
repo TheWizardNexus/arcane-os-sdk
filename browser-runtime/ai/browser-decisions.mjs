@@ -1,5 +1,6 @@
 import Is from '../dependencies/strong-type/index.js';
 import {createArcaneEventSource} from '../event-manager.mjs';
+import {createModelResourceHost} from './model-resource-bridge.mjs';
 
 const is = new Is(false);
 const STATE_EVENT = 'ai.decisions.state';
@@ -65,6 +66,7 @@ function createDecisionOperation(op) {
  */
 class BrowserDecisionModel {
     #configuration;
+    #store;
     #events;
     #activation = null;
     #generation = 0;
@@ -75,13 +77,17 @@ class BrowserDecisionModel {
     #disposed = false;
 
     constructor({family, model, revision = 'main', device = 'webgpu',
-        dtype = family === 'laya' ? 'fp16' : 'fp32', runtime = {}} = {}) {
+        dtype = family === 'laya' ? 'fp16' : 'fp32', runtime = {}, store = null} = {}) {
         if (family !== 'laya' && family !== 'julia') {
             throw new TypeError('family must be "laya" or "julia".');
         }
         if (runtime === null || !is.object(runtime)) {
             throw new TypeError('runtime must be an object.');
         }
+        if (store !== null && !is.function(store?.fetchResource)) {
+            throw new TypeError('store must expose fetchResource().');
+        }
+        this.#store = store;
         const moduleUrl = runtime.moduleUrl === undefined
             ? DEFAULT_RUNTIME_MODULE
             : runtime.moduleUrl;
@@ -197,6 +203,8 @@ class BrowserDecisionModel {
             load: createDecisionOperation('load'),
             pending: new Map(),
             evaluations: new Set(),
+            resources: null,
+            cleanup: null,
             reason: undefined
         };
         this.#activation = activation;
@@ -212,6 +220,22 @@ class BrowserDecisionModel {
                 {type: 'module', name: 'arcane-decisions'}
             );
             activation.worker = worker;
+            if (this.#store) {
+                const store = this.#store;
+                activation.resources = createModelResourceHost(
+                    {
+                        fetchResource: function fetchDecisionResource(input, options) {
+                            return store.fetchResource(input, options);
+                        },
+                        send: function sendDecisionResource(message) {
+                            worker.postMessage(message);
+                        },
+                        onError: function stopFailedDecisionResource(error) {
+                            model.#stop(activation, error, 'error');
+                        }
+                    }
+                );
+            }
             function handleDecisionWorkerMessage(event) {
                 model.#receive(activation, event.data);
             }
@@ -240,7 +264,7 @@ class BrowserDecisionModel {
             const id = this.#nextId++;
             activation.pending.set(id, activation.load);
             worker.postMessage(
-                {id, op: 'load', payload: this.#configuration}
+                {id, op: 'load', payload: this.#configuration, storedResources: this.#store !== null}
             );
         } catch (error) {
             this.#stop(activation, error, 'error');
@@ -250,6 +274,7 @@ class BrowserDecisionModel {
 
     #receive(activation, message) {
         if (!this.#isCurrent(activation)) return;
+        if (activation.resources?.receive(message)) return;
         const operation = message && activation.pending.get(message.id);
         if (!operation) {
             this.#stop(
@@ -308,6 +333,23 @@ class BrowserDecisionModel {
         this.#state = state;
         this.#progress = null;
         this.#error = reason;
+        if (activation.resources) {
+            const model = this;
+            activation.cleanup = activation.resources.close(reason).catch(
+                function preserveResourceCleanupFailure(error) {
+                    activation.reason = new AggregateError([reason, error], 'Unable to settle decision model resources.');
+                    throw activation.reason;
+                }
+            );
+            activation.cleanup.catch(
+                function reportResourceCleanupFailure(error) {
+                    if (!model.#activation) {
+                        model.#error = error;
+                        if (!model.#disposed) model.#publish();
+                    } else globalThis.console?.error('Decision model resource cleanup failed.', error);
+                }
+            );
+        }
         if (activation.worker) {
             for (const [type, listener] of Object.entries(activation.listeners ?? {})) {
                 activation.worker.removeEventListener(type, listener);
@@ -330,6 +372,7 @@ class BrowserDecisionModel {
             return this.status();
         } finally {
             stopObserving();
+            if (activation.cleanup) await activation.cleanup;
         }
     }
 
@@ -366,6 +409,7 @@ class BrowserDecisionModel {
         } finally {
             stopObserving();
             activation.evaluations.delete(evaluation);
+            if (activation.cleanup) await activation.cleanup;
             if (this.#isCurrent(activation)) this.#publish();
         }
     }

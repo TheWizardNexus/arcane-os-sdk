@@ -10,6 +10,8 @@ import {
 import { createPackagedWllamaRuntime } from "./browser-wllama-runtime.mjs";
 import { getBrowserDeviceSettings, describeBrowserGpu } from "./browser-device-settings.mjs";
 import { arcaneEvents } from "../event-manager.mjs";
+import { createDbopfsModelPartStore } from "./dbopfs-model-parts.mjs";
+import { createDbopfsResourceStore } from "./dbopfs-model-resources.mjs";
 
 const is = new Is(false);
 
@@ -28,7 +30,6 @@ const WEBGPU_ADAPTER_SELECTION_PROTOCOL = "arcane-ai-webgpu-adapter-selection/1"
 const MODEL_LOAD_HEARTBEAT_MS = 5_000;
 const DEFAULT_MODEL_DOWNLOAD_CONCURRENCY = 4;
 const MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS = 250;
-const MODEL_DOWNLOAD_SPEED_WINDOW_MS = 5_000;
 const MODEL_DOWNLOAD_MAX_RANGE_PARTS = 4_096;
 const MODEL_DOWNLOAD_TARGET_RANGE_BYTES = 4_000_000;
 const CAPABILITY_POLICY_PROTOCOL = "arcane-ai-browser-capability-policy/1";
@@ -632,6 +633,8 @@ export function createDbopfsModelStore({
     throw new TypeError("estimateStorage must be a function or null.");
   }
   const workerLimit = downloadConcurrencyValue(downloadConcurrency);
+  const parts = createDbopfsModelPartStore({dbopfs, tableName});
+  const resources = createDbopfsResourceStore({dbopfs, tableName});
   let tablePromise = null;
 
   async function table() {
@@ -665,51 +668,25 @@ export function createDbopfsModelStore({
   }
 
   function createDownloadProgressReporter(members, onProgress, retainFailure) {
-    const memberTotals = members.map((member) => member.bytes ?? null);
-    let loadedBytes = 0;
+    const shards = members.map(function initialMemberProgress(member) {
+      return {name: member.name, completed: 0, total: null, unit: 'shards'};
+    });
     let completed = 0;
     let activeTransfers = 0;
     let transferMode = members.length === 1 ? "probing" : "files";
     let timer = null;
     let lastPublishedAt = 0;
-    let samples = [];
 
-    function totalBytesValue() {
-      if (memberTotals.some((value) => value === null)) return null;
-      const totalBytes = memberTotals.reduce((sum, value) => sum + value, 0);
-      return is.safeInteger(totalBytes) ? totalBytes : null;
-    }
-
-    function progressRecord(now) {
-      samples.push(completeValue({ at: now, loadedBytes }));
-      const oldestUsefulTime = now - MODEL_DOWNLOAD_SPEED_WINDOW_MS;
-      while (samples.length > 1 && samples[1].at <= oldestUsefulTime) samples.shift();
-      const firstSample = samples[0];
-      const elapsedSeconds = (now - firstSample.at) / 1_000;
-      const sampledBytes = loadedBytes - firstSample.loadedBytes;
-      const bytesPerSecond = sampledBytes > 0 && elapsedSeconds > 0
-        ? Math.round(sampledBytes / elapsedSeconds)
-        : null;
-      const totalBytes = totalBytesValue();
-      const remainingBytes = totalBytes === null
-        ? null
-        : Math.max(0, totalBytes - loadedBytes);
-      const etaSeconds = remainingBytes === 0
-        ? 0
-        : bytesPerSecond === null || remainingBytes === null
-          ? null
-          : Math.ceil(remainingBytes / bytesPerSecond);
+    function progressRecord() {
       return completeValue({
         phase: "download",
         completed,
         total: members.length,
         unit: "files",
         heartbeat: false,
-        loadedBytes,
-        totalBytes,
-        remainingBytes,
-        bytesPerSecond,
-        etaSeconds,
+        members: shards.map(function memberProgressSnapshot(member) {
+          return {...member};
+        }),
         activeTransfers,
         transferLimit: workerLimit,
         transferMode,
@@ -726,7 +703,7 @@ export function createDbopfsModelStore({
       if (onProgress === null) return;
       const now = progressClock();
       if (!force && now - lastPublishedAt < MODEL_DOWNLOAD_PROGRESS_INTERVAL_MS) return;
-      onProgress(progressRecord(now));
+      onProgress(progressRecord());
       lastPublishedAt = now;
     }
 
@@ -741,40 +718,19 @@ export function createDbopfsModelStore({
       }
     }
 
-    function setMemberTotal(memberIndex, totalBytes) {
-      if (!is.safeInteger(totalBytes) || totalBytes <= 0) return;
-      if (memberTotals[memberIndex] === totalBytes) return;
-      memberTotals[memberIndex] = totalBytes;
-      publishSafely({ force: true });
-    }
-
-    function addBytes(value) {
-      if (!is.safeInteger(value) || value <= 0) return;
-      loadedBytes += value;
-      publishSafely();
-    }
-
-    function discardBytes(value) {
-      if (!is.safeInteger(value) || value <= 0) return;
-      loadedBytes = Math.max(0, loadedBytes - value);
-      samples = [];
-      publishSafely({ force: true });
-    }
-
     return completeValue({
-      addBytes,
+      reportShards(memberIndex, value) {
+        shards[memberIndex] = {...value, name: members[memberIndex].name};
+        publishSafely({force: true});
+      },
       beginTransfer() {
         activeTransfers += 1;
         publishSafely({ force: true });
       },
-      completeMember(memberIndex, totalBytes) {
-        if (is.safeInteger(totalBytes) && totalBytes > 0) {
-          memberTotals[memberIndex] = totalBytes;
-        }
+      completeMember() {
         completed += 1;
         publishSafely({ force: true });
       },
-      discardBytes,
       dispose: stopTimer,
       endTransfer({ publishProgress = true } = {}) {
         activeTransfers = Math.max(0, activeTransfers - 1);
@@ -783,24 +739,14 @@ export function createDbopfsModelStore({
       finish() {
         publishSafely({ force: true });
       },
-      setMemberTotal,
       setMode(value) {
         if (transferMode === value) return;
         transferMode = value;
         publishSafely({ force: true });
       },
-      restoreBytes(value) {
-        if (!is.safeInteger(value) || value <= 0) return;
-        loadedBytes += value;
-        samples = [];
-        publishSafely({ force: true });
-      },
-      restoreMember(memberIndex, totalBytes) {
-        if (!is.safeInteger(totalBytes) || totalBytes <= 0) return;
-        memberTotals[memberIndex] = totalBytes;
-        loadedBytes += totalBytes;
+      restoreMember(memberIndex) {
+        shards[memberIndex] = {...shards[memberIndex], state: 'cached'};
         completed += 1;
-        samples = [];
         publishSafely({ force: true });
       },
       start() {
@@ -814,56 +760,21 @@ export function createDbopfsModelStore({
     });
   }
 
-  async function write(name, body, {
-    signal,
-    onChunk = null,
-    onDiscard = null,
-  } = {}) {
-    const directory = await table();
-    const handle = await directory.getFileHandle(name, { create: true });
-    const writable = await handle.createWritable();
-    let written = 0;
-    try {
-      for await (const chunk of byteChunks(body, signal)) {
-        await writable.write(chunk);
-        written += chunk.byteLength;
-        onChunk?.(chunk.byteLength);
-        throwIfAborted(signal, "install");
-      }
-      throwIfAborted(signal, "install");
-      await writable.close();
-      return written;
-    } catch (error) {
-      await writable.abort?.(error).catch(() => undefined);
-      await directory.removeEntry(name).catch(() => undefined);
-      onDiscard?.(written);
-      throw error;
-    }
-  }
-
-  async function storedModelFile(name) {
-    const modelFile = await file(name);
-    if (!modelFile || modelFile.size === 0) {
-      throw fail(
-        "ARCANE_AI_MODEL_CACHE_REJECTED",
-        "A stored model file could not be reopened as a non-empty model.",
-      );
-    }
-    return modelFile;
-  }
-
   async function writeOpenedModel(name, opened, {
     signal,
-    onChunk = null,
-    onDiscard = null,
+    onProgress,
   } = {}) {
-    let written = 0;
     try {
-      written = await write(name, opened.body, { signal, onChunk, onDiscard });
-      return await storedModelFile(name);
+      return await parts.write(name, opened.body, {signal, onProgress});
     } catch (error) {
-      if (written > 0) onDiscard?.(written);
       await cancelOpenedDownload(opened, error);
+      if (signal?.aborted && error?.code !== "ARCANE_AI_REQUEST_ABORTED") {
+        throw new ArcaneAIError(
+          "ARCANE_AI_REQUEST_ABORTED",
+          "The Arcane AI request was cancelled.",
+          {cause: error, kind: "llm", operation: "install"},
+        );
+      }
       throw error;
     }
   }
@@ -883,6 +794,7 @@ export function createDbopfsModelStore({
     const ranges = rangePlanForInstall(total, signal);
     const partFiles = new Array(ranges.length);
     const pendingRangeIndexes = [];
+    let completedParts = 0;
     for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
       throwIfAborted(signal, "install");
       const range = ranges[rangeIndex];
@@ -891,12 +803,17 @@ export function createDbopfsModelStore({
       const expected = range.end - range.start + 1;
       if (partFile?.size === expected) {
         partFiles[rangeIndex] = partFile;
-        progress?.restoreBytes(expected);
+        completedParts += 1;
       } else {
         if (partFile) await removeEntry(partName);
         pendingRangeIndexes.push(rangeIndex);
       }
     }
+    progress?.reportShards(memberIndex, {
+      completed: completedParts,
+      total: ranges.length,
+      unit: 'shards'
+    });
     const linked = linkAbortSignal(signal);
     const downloadSignal = linked.controller.signal;
     let nextPendingIndex = 0;
@@ -915,7 +832,6 @@ export function createDbopfsModelStore({
         const range = ranges[rangeIndex];
         const partName = rangePartName(name, range);
         let opened = null;
-        let writable = null;
         let received = 0;
         progress?.beginTransfer();
         try {
@@ -925,33 +841,37 @@ export function createDbopfsModelStore({
             end: range.end,
             total: range.total,
           });
-          const directory = await table();
-          const handle = await directory.getFileHandle(partName, { create: true });
-          writable = await handle.createWritable();
           const expected = range.end - range.start + 1;
-          for await (const chunk of byteChunks(opened.body, downloadSignal)) {
-            const nextReceived = received + chunk.byteLength;
-            if (!is.safeInteger(nextReceived) || nextReceived > expected) {
+          async function* rangeContent() {
+            for await (const chunk of byteChunks(opened.body, downloadSignal)) {
+              const nextReceived = received + chunk.byteLength;
+              if (!is.safeInteger(nextReceived) || nextReceived > expected) {
+                throw fail(
+                  "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
+                  "The model server returned more content than the requested HTTP byte range.",
+                );
+              }
+              received = nextReceived;
+              yield chunk;
+              throwIfAborted(downloadSignal, "install");
+            }
+            if (received !== expected) {
               throw fail(
                 "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
-                "The model server returned more content than the requested HTTP byte range.",
+                "The model server returned less content than the requested HTTP byte range.",
               );
             }
-            await writable.write(chunk);
-            received = nextReceived;
-            progress?.addBytes(chunk.byteLength);
-            throwIfAborted(downloadSignal, "install");
           }
-          if (received !== expected) {
-            throw fail(
-              "ARCANE_AI_MODEL_DOWNLOAD_FAILED",
-              "The model server returned less content than the requested HTTP byte range.",
-            );
-          }
+          partFiles[rangeIndex] = await parts.writePart(partName, rangeContent(), {
+            signal: downloadSignal,
+          });
           throwIfAborted(downloadSignal, "install");
-          await writable.close();
-          writable = null;
-          partFiles[rangeIndex] = await storedModelFile(partName);
+          completedParts += 1;
+          progress?.reportShards(memberIndex, {
+            completed: completedParts,
+            total: ranges.length,
+            unit: 'shards'
+          });
         } catch (error) {
           let transferError = error;
           if (downloadSignal.aborted
@@ -970,13 +890,6 @@ export function createDbopfsModelStore({
           }
           retainFailure(transferError);
           await cancelOpenedDownload(opened, transferError);
-          try {
-            await writable?.abort?.(transferError);
-          } catch {
-            // The range part is removed below even if its writable already closed.
-          }
-          await removeEntry(partName).catch(() => undefined);
-          progress?.discardBytes(received);
           throw transferError;
         } finally {
           progress?.endTransfer({ publishProgress: failure === null });
@@ -1038,12 +951,12 @@ export function createDbopfsModelStore({
     }
     if (probe.kind === "complete") {
       if (!multiFile) progress?.setMode("single");
-      progress?.setMemberTotal(memberIndex, probe.opened.contentLength);
       try {
         const modelFile = await writeOpenedModel(name, probe.opened, {
           signal,
-          onChunk: progress?.addBytes,
-          onDiscard: progress?.discardBytes,
+          onProgress: function reportCompleteResponseShards(value) {
+            progress?.reportShards(memberIndex, value);
+          },
         });
         await removeRangePartsAfterWholeFile(name, probe.opened.contentLength);
         return modelFile;
@@ -1057,7 +970,6 @@ export function createDbopfsModelStore({
     progress?.endTransfer({ publishProgress: false });
     if (probe.kind !== "supported") return null;
     if (!multiFile) progress?.setMode("ranges");
-    progress?.setMemberTotal(memberIndex, probe.total);
     return writeParallelRanges(source, memberIndex, name, probe.total, {
       signal,
       progress,
@@ -1067,7 +979,10 @@ export function createDbopfsModelStore({
 
   async function removeNames(names) {
     const removed = [];
-    for (const entry of names.models) removed.push(await removeEntry(entry.name));
+    for (const entry of names.models) {
+      removed.push(await parts.remove(entry.name));
+      removed.push(await removeEntry(entry.name));
+    }
     return removed.some(Boolean);
   }
 
@@ -1209,13 +1124,9 @@ export function createDbopfsModelStore({
     const modelFiles = [];
     for (const entry of names.models) {
       throwIfAborted(signal, "install");
-      const modelFile = await file(entry.name);
-      if (modelFile?.size === 0) {
-        await removeEntry(entry.name);
-        modelFiles.push(null);
-      } else {
-        modelFiles.push(modelFile);
-      }
+      // Existing whole-file caches remain readable; new downloads use parts.
+      const modelFile = await parts.read(entry.name, {signal}) ?? await file(entry.name);
+      modelFiles.push(modelFile);
     }
     return modelFiles;
   }
@@ -1384,14 +1295,14 @@ export function createDbopfsModelStore({
         let opened = null;
         try {
           opened = await source.open(memberIndex, { signal: downloadSignal });
-          progress.setMemberTotal(memberIndex, opened.contentLength);
           modelFile = await writeOpenedModel(
             names.models[memberIndex].name,
             opened,
             {
               signal: downloadSignal,
-              onChunk: progress.addBytes,
-              onDiscard: progress.discardBytes,
+              onProgress: function reportSourceResponseShards(value) {
+                progress.reportShards(memberIndex, value);
+              },
             },
           );
           await removeRangePartsAfterWholeFile(
@@ -1407,7 +1318,7 @@ export function createDbopfsModelStore({
       }
       throwIfAborted(downloadSignal, "install");
       modelFiles[memberIndex] = modelFile;
-      progress.completeMember(memberIndex, modelFile.size);
+      progress.completeMember();
     }
 
     async function installWorker() {
@@ -1432,7 +1343,7 @@ export function createDbopfsModelStore({
         const modelFile = modelFiles[memberIndex];
         if (!modelFile) continue;
         pendingMembers -= 1;
-        progress.restoreMember(memberIndex, modelFile.size);
+        progress.restoreMember(memberIndex);
       }
       const workers = [];
       const workerCount = Math.min(workerLimit, pendingMembers);
@@ -1507,6 +1418,7 @@ export function createDbopfsModelStore({
     install,
     ensure,
     remove,
+    fetchResource: resources.fetchResource,
   });
   DBOPFS_MODEL_STORES.add(store);
   return store;

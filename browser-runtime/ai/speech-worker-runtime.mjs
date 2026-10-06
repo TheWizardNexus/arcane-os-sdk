@@ -1,4 +1,5 @@
 import Is from "../dependencies/strong-type/index.js";
+import { createModelResourceClient, createModelResourceHost } from './model-resource-bridge.mjs';
 
 const is = new Is(false);
 
@@ -922,14 +923,16 @@ function createOrdinaryRouteReader(
   scope,
   configuration,
   originalFetch,
-  originalCaches,
+  resourceClient,
+  getSignal,
+  getProgress,
+  sourceUrl,
 ) {
   const routeTable = createOrdinaryRoutes(scope, configuration);
-  const nativeCaches = new Map();
   const RequestConstructor = scope.Request ?? globalThis.Request;
 
   function sourceBase(modulePath) {
-    return routeTable.filesByPath.get(modulePath)?.sourceUrl ?? scope.location?.href;
+    return routeTable.filesByPath.get(modulePath)?.sourceUrl ?? sourceUrl;
   }
 
   function nativeInput(input, modulePath) {
@@ -951,52 +954,40 @@ function createOrdinaryRouteReader(
     return originalFetch(mappedInput, init);
   }
 
-  async function nativeCache(name) {
-    if (!originalCaches || !is.function(originalCaches.open)) return null;
-    if (!nativeCaches.has(name)) {
-      nativeCaches.set(name, Promise.resolve(originalCaches.open.call(originalCaches, name)));
+  function fetchResource(input, init, modulePath) {
+    const options = resourceOptions(input, init);
+    const resolution = resolve(input, modulePath);
+    if (resolution) return responseFor(resolution, input, options);
+    const target = nativeInput(input, modulePath);
+    const url = ordinaryRequestUrl(target, scope, sourceBase(modulePath));
+    if (url?.startsWith('blob:') || url?.startsWith('data:')) {
+        return originalFetch(target, options);
     }
-    return nativeCaches.get(name);
+    return resourceClient.fetch(target, options);
   }
 
-  function cacheForName(name, modulePath) {
-    return completeValue({
-      async match(input, options) {
-        const resolution = resolve(input, modulePath);
-        if (resolution) return responseFor(resolution, input);
-        const cache = await nativeCache(name);
-        return cache?.match(nativeInput(input, modulePath), options);
-      },
-      async put(input, response) {
-        const cache = await nativeCache(name);
-        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
-        return cache.put(nativeInput(input, modulePath), response);
-      },
-      async add(input) {
-        const cache = await nativeCache(name);
-        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
-        return cache.add(nativeInput(input, modulePath));
-      },
-      async addAll(inputs) {
-        const cache = await nativeCache(name);
-        if (!cache) throw new TypeError("Browser CacheStorage is unavailable.");
-        return cache.addAll(Array.from(inputs, (input) => nativeInput(input, modulePath)));
-      },
-      async delete(input, options) {
-        const cache = await nativeCache(name);
-        return cache ? cache.delete(nativeInput(input, modulePath), options) : false;
-      },
-      async keys(input, options) {
-        const cache = await nativeCache(name);
-        if (!cache) return [];
-        return input === undefined
-          ? cache.keys()
-          : cache.keys(nativeInput(input, modulePath), options);
-      },
-    });
+  function resourceOptions(input, init) {
+    const signal = getSignal();
+    const reportProgress = getProgress();
+    if (!signal && !reportProgress) return init;
+    const requestSignal = init?.signal ?? input?.signal;
+    return {
+        ...init,
+        signal: signal && requestSignal && requestSignal !== signal
+            ? AbortSignal.any([requestSignal, signal])
+            : signal ?? requestSignal,
+        onProgress: function reportResourceProgress(progress) {
+            reportProgress?.(progress);
+            if (init?.onProgress !== reportProgress) init?.onProgress?.(progress);
+        },
+    };
   }
 
-  return completeValue({ cacheForName, nativeInput, resolve, responseFor });
+  function fetchResourceRecord(input, init) {
+    return resourceClient.fetchResource(input, resourceOptions(input, init));
+  }
+
+  return completeValue({ fetchResource, fetchResourceRecord, nativeInput, resolve, responseFor });
 }
 
 function createOrdinaryArtifactModuleRouter(
@@ -1004,7 +995,6 @@ function createOrdinaryArtifactModuleRouter(
   configuration,
   role,
   reader,
-  originalFetch,
   originalWorker,
 ) {
   const nestedWorkers = new Set();
@@ -1021,14 +1011,11 @@ function createOrdinaryArtifactModuleRouter(
     },
 
     fetch(modulePath, input, init) {
-      const resolution = reader.resolve(input, modulePath);
-      return resolution
-        ? reader.responseFor(resolution, input, init)
-        : originalFetch(reader.nativeInput(input, modulePath), init);
+      return reader.fetchResource(input, init, modulePath);
     },
 
-    openCache(modulePath, name) {
-      return Promise.resolve(reader.cacheForName(name, modulePath));
+    async openCache() {
+      throw new Error('Browser CacheStorage is unavailable in this speech Worker; resources use DBOPFS through fetch.');
     },
 
     createWorker(modulePath, specifier, options = {}) {
@@ -1041,15 +1028,60 @@ function createOrdinaryArtifactModuleRouter(
         );
       }
       const resolution = reader.resolve(specifier, modulePath);
-      if (!resolution) {
+      if (!resolution && options?.type !== 'module') {
         return new originalWorker(reader.nativeInput(specifier, modulePath), options);
       }
       const workerOptions = options && is.object(options)
         ? { ...options, type: "module" }
         : { type: "module" };
       const worker = new originalWorker(nestedWorkerUrl(role), workerOptions);
+      const resourceHost = createModelResourceHost({
+          fetchResource: reader.fetchResourceRecord,
+          send: function sendNestedSpeechResource(message) {
+              worker.postMessage(message);
+          },
+          onError: function nestedResourceTransportFailed(error) {
+              const failure = workerError(
+                  'ARCANE_AI_WORKER_MESSAGE_ERROR',
+                  'Unable to deliver a resource to the nested speech Worker.',
+                  error,
+                  'speech-module-worker-resource-message-rejected',
+              );
+              void terminateNestedSpeechWorker(failure);
+              worker.dispatchEvent?.(nestedWorkerFailureEvent(scope, failure));
+          },
+      });
+      const terminateWorker = worker.terminate.bind(worker);
+      let closing = null;
+      function terminateNestedSpeechWorker(reason) {
+          if (closing) return closing;
+          closing = Promise.allSettled([
+              Promise.resolve().then(function closeNestedResources() {
+                  return resourceHost.close(reason);
+              }),
+              Promise.resolve().then(function stopNestedWorker() {
+                  return terminateWorker();
+              }),
+          ]).then(function finishNestedTermination(settlements) {
+              const failures = [];
+              for (const settlement of settlements) {
+                  if (settlement.status === 'rejected') failures.push(settlement.reason);
+              }
+              if (failures.length) throw new AggregateError(failures, 'Unable to terminate the nested speech Worker.', { cause: reason });
+          });
+          // Upstream Worker.terminate() is fire-and-forget; the parent joins it.
+          closing.catch(function reportNestedTermination(error) {
+              scope.console?.error?.('Speech Worker resource cleanup failed.', error);
+          });
+          return closing;
+      }
+      worker.terminate = terminateNestedSpeechWorker;
       nestedWorkers.add(worker);
       const onBootstrapMessage = (event) => {
+        if (resourceHost.receive(event.data)) {
+            event.stopImmediatePropagation?.();
+            return;
+        }
         if (event.data?.protocol !== NESTED_WORKER_PROTOCOL
           || event.data?.event !== "artifact-module-worker-bootstrap-rejected") return;
         event.stopImmediatePropagation?.();
@@ -1070,11 +1102,11 @@ function createOrdinaryArtifactModuleRouter(
           protocol: NESTED_WORKER_PROTOCOL,
           op: "initialize-artifact-module-worker",
           role,
-          targetPath: resolution.file.path,
+          targetPath: resolution?.file.path,
+          targetUrl: resolution ? undefined : reader.nativeInput(specifier, modulePath),
           configuration,
         });
       } catch (error) {
-        nestedWorkers.delete(worker);
         worker.terminate();
         throw workerError(
           "ARCANE_AI_WORKER_MESSAGE_ERROR",
@@ -1088,24 +1120,28 @@ function createOrdinaryArtifactModuleRouter(
   });
   return completeValue({
     router,
-    transformersCache: reader.cacheForName("transformers-cache", null),
-    cleanup() {
+    async cleanup() {
+      const terminations = [];
       for (const worker of nestedWorkers) {
-        try {
-          worker.terminate();
-        } catch {
-          // The owning speech Worker is already being torn down.
-        }
+        terminations.push(worker.terminate());
       }
       nestedWorkers.clear();
+      const settlements = await Promise.allSettled(terminations);
+      const failures = [];
+      for (const settlement of settlements) {
+          if (settlement.status === 'rejected') failures.push(settlement.reason);
+      }
+      if (failures.length) throw new AggregateError(failures, 'Unable to close nested speech Workers.');
     },
   });
 }
 
-function installOrdinaryArtifactModuleRouter(scope, configuration, role) {
+function installOrdinaryArtifactModuleRouter(scope, configuration, role, send, sourceUrl = scope.location?.href) {
   const originalFetch = scope.fetch?.bind(scope);
   const originalWorker = scope.Worker;
-  const originalCaches = scope.caches;
+  const resourceClient = createModelResourceClient({ send });
+  let requestSignal = null;
+  let reportProgress = null;
   if (!is.function(originalFetch)) {
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
@@ -1118,19 +1154,63 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role) {
     scope,
     configuration,
     originalFetch,
-    originalCaches,
+    resourceClient,
+    function getRequestSignal() { return requestSignal; },
+    function getResourceProgress() { return reportProgress; },
+    sourceUrl,
   );
   const moduleRouter = createOrdinaryArtifactModuleRouter(
     scope,
     configuration,
     role,
     reader,
-    originalFetch,
     originalWorker,
   );
-  const hadOwn = Object.prototype.hasOwnProperty.call(scope, MODULE_ROUTER_NAME);
-  const previous = scope[MODULE_ROUTER_NAME];
+  const originalProperties = ['fetch', 'Worker', MODULE_ROUTER_NAME].map(
+      function originalWorkerProperty(name) {
+          return { name, descriptor: Object.getOwnPropertyDescriptor(scope, name) };
+      },
+  );
+  const removedCacheProperties = [];
+  function restoreEnvironment() {
+      const failures = [];
+      for (const { owner, descriptor } of removedCacheProperties.splice(0).reverse()) {
+          try {
+              Object.defineProperty(owner, 'caches', descriptor);
+          } catch (error) {
+              failures.push(error);
+          }
+      }
+      for (const { name, descriptor } of originalProperties) {
+          try {
+              if (descriptor) Object.defineProperty(scope, name, descriptor);
+              else delete scope[name];
+          } catch (error) {
+              failures.push(error);
+          }
+      }
+      if (failures.length) throw new AggregateError(failures, 'Unable to restore the speech Worker resource environment.');
+  }
+  function resourceFetch(input, init) {
+      return reader.fetchResource(input, init, null);
+  }
   try {
+    // Upstream checks `caches in self` before import. Remove only this Worker's
+    // API descriptors so its normal fetch path reaches the parent DBOPFS owner.
+    for (let owner = scope; owner; owner = Object.getPrototypeOf(owner)) {
+        const descriptor = Object.getOwnPropertyDescriptor(owner, 'caches');
+        if (!descriptor) continue;
+        if (!delete owner.caches) {
+            throw new Error('The speech Worker cannot disable its native CacheStorage API.');
+        }
+        removedCacheProperties.push({ owner, descriptor });
+    }
+    scope.fetch = resourceFetch;
+    if (is.function(originalWorker)) {
+        scope.Worker = function ResourceSpeechWorker(specifier, options) {
+            return moduleRouter.router.createWorker(null, specifier, options);
+        };
+    }
     scope[MODULE_ROUTER_NAME] = moduleRouter.router;
     if (scope[MODULE_ROUTER_NAME] !== moduleRouter.router) {
       Object.defineProperty(scope, MODULE_ROUTER_NAME, {
@@ -1141,24 +1221,41 @@ function installOrdinaryArtifactModuleRouter(scope, configuration, role) {
       });
     }
   } catch (error) {
-    moduleRouter.cleanup();
+    resourceClient.close(error);
+    let cause = error;
+    try {
+        restoreEnvironment();
+    } catch (restoreError) {
+        cause = new AggregateError([error, restoreError], 'Speech Worker resource setup and restoration failed.');
+    }
     throw workerError(
       "ARCANE_AI_PROVIDER_UNAVAILABLE",
       "The speech Worker cannot install the artifact module router.",
-      error,
+      cause,
       "speech-module-router-unavailable",
     );
   }
   return completeValue({
-    cache: moduleRouter.transformersCache,
-    cleanup() {
-      moduleRouter.cleanup();
+    receive: resourceClient.receive,
+    setSignal(signal) { requestSignal = signal; },
+    setProgress(report) { reportProgress = report; },
+    async cleanup() {
+      resourceClient.close(new Error('The speech Worker resource owner was unloaded.'));
+      let cleanupFailure = null;
       try {
-        if (hadOwn) scope[MODULE_ROUTER_NAME] = previous;
-        else delete scope[MODULE_ROUTER_NAME];
-      } catch {
-        // Worker teardown releases the remaining module router reference.
+        await moduleRouter.cleanup();
+      } catch (error) {
+        cleanupFailure = error;
+      } finally {
+        try {
+            restoreEnvironment();
+        } catch (error) {
+            cleanupFailure = cleanupFailure
+                ? new AggregateError([cleanupFailure, error], 'Speech Worker resource cleanup and restoration failed.')
+                : error;
+        }
       }
+      if (cleanupFailure) throw cleanupFailure;
     },
   });
 }
@@ -1243,7 +1340,7 @@ function configuredWasmPaths(configuration) {
   return completeValue({ mjs: mjs.moduleUrl, wasm: wasm.moduleUrl });
 }
 
-function configureRuntimeNamespace(namespace, configuration, role, cache) {
+function configureRuntimeNamespace(namespace, configuration, role) {
   const cleanup = [];
   const restoreSettings = () => {
     for (const restore of cleanup.splice(0).reverse()) {
@@ -1296,6 +1393,9 @@ function configureRuntimeNamespace(namespace, configuration, role, cache) {
     );
   }
   try {
+    for (const name of ['useBrowserCache', 'useCustomCache', 'useFSCache']) {
+        if (name in env) assignSetting(env, name, false, cleanup);
+    }
     assignSetting(env, "allowLocalModels", false, cleanup, {
       assignmentRejectedReason: "transformers-env-allow-local-models-assignment-rejected",
       unavailableReason: "transformers-env-allow-local-models-unavailable",
@@ -1641,14 +1741,9 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       configuration = validateConfiguration(request.payload?.configuration, role);
       const entry = configuration.runtime.files.find((file) =>
         file.path === configuration.runtime.entry);
-      if (graphConfiguration(configuration)) {
-        environment = installOrdinaryArtifactModuleRouter(scope, configuration, role);
-      } else {
-        environment = completeValue({
-          cache: null,
-          cleanup() {},
-        });
-      }
+      environment = installOrdinaryArtifactModuleRouter(scope, configuration, role, send);
+      environment.setSignal(signal);
+      environment.setProgress(publishProgress);
       loadFailureReason = `${role}-worker-runtime-import-rejected`;
       publishProgress(
           {
@@ -1665,7 +1760,6 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
         namespace,
         configuration,
         role,
-        environment.cache,
       );
       loadFailureReason = `${role}-worker-model-load-rejected`;
       publishProgress(
@@ -1698,8 +1792,9 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       restoreNamespace?.();
       restoreNamespace = null;
       try {
-        environment?.cleanup();
-      } catch {
+        await environment?.cleanup();
+      } catch (cleanupError) {
+        scope.console?.error?.('Speech Worker resource cleanup failed after load rejection.', cleanupError);
         // A rejected load is followed by provider-owned Worker termination.
       }
       environment = null;
@@ -1785,8 +1880,9 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
       restoreNamespace?.();
       restoreNamespace = null;
       try {
-        environment?.cleanup();
-      } catch {
+        await environment?.cleanup();
+      } catch (cleanupError) {
+        scope.console?.error?.('Speech Worker resource cleanup failed during unload.', cleanupError);
         // Worker termination remains the final cleanup boundary.
       }
       environment = null;
@@ -1833,6 +1929,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
   }
 
   function handleMessage(request) {
+    if (environment?.receive(request)) return Promise.resolve();
     if (request?.protocol !== SPEECH_WORKER_PROTOCOL
       || !is.safeInteger(request.id)
       || request.id < 1) {
@@ -1871,7 +1968,14 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
     const record = { controller, op, publicOperation };
     const execute = tail.catch(() => undefined).then(() => {
       throwIfAborted(controller.signal, operationReason(role, op, "cancelled"));
-      return dispatch(request, controller.signal, op);
+      environment?.setSignal(controller.signal);
+      environment?.setProgress(function publishResourceProgress(progress) {
+          send({ protocol: SPEECH_WORKER_PROTOCOL, id: request.id, type: 'progress', progress });
+      });
+      return dispatch(request, controller.signal, op).finally(function releaseResourceSignal() {
+          environment?.setSignal(null);
+          environment?.setProgress(null);
+      });
     });
     operations.set(request.id, record);
     const operation = execute.finally(() => operations.delete(request.id));
@@ -1913,7 +2017,12 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
     throw new TypeError('Speech artifact module Worker role must be "stt" or "tts".');
   }
   let initializing = false;
+  let environment = null;
   const queued = [];
+  function receiveResource(event) {
+      if (environment?.receive(event.data)) event.stopImmediatePropagation?.();
+  }
+  scope.addEventListener('message', receiveResource);
   const bootstrap = (event) => {
     if (initializing) {
       queued.push(event);
@@ -1925,12 +2034,11 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
       || request.role !== role) return;
     initializing = true;
     void (async () => {
-      let environment = null;
       try {
         const configuration = validateConfiguration(request.configuration, role);
         const target = configuration.runtime.files.find((file) =>
           file.path === request.targetPath);
-        if (!target?.moduleUrl) {
+        if (!target?.moduleUrl && !request.targetUrl) {
           throw workerError(
             "ARCANE_AI_ARTIFACT_GRAPH_CONFIGURATION_INVALID",
             "The nested module Worker target was not materialized.",
@@ -1938,15 +2046,22 @@ export function installBrowserSpeechArtifactModuleWorker(role, scope = globalThi
             "artifact-graph-module-worker-target-not-materialized",
           );
         }
-        environment = installOrdinaryArtifactModuleRouter(scope, configuration, role);
-        await import(target.moduleUrl);
+        environment = installOrdinaryArtifactModuleRouter(
+            scope,
+            configuration,
+            role,
+            function sendNestedResource(message) { scope.postMessage(message); },
+            target?.sourceUrl ?? request.targetUrl,
+        );
+        await import(target?.moduleUrl ?? request.targetUrl);
         scope.removeEventListener("message", bootstrap);
         await new Promise((resolve) => queueMicrotask(resolve));
         for (const queuedEvent of queued.splice(0)) replayWorkerMessage(scope, queuedEvent);
       } catch (error) {
         try {
-          environment?.cleanup();
-        } catch {
+          await environment?.cleanup();
+        } catch (cleanupError) {
+          scope.console?.error?.('Nested speech Worker resource cleanup failed.', cleanupError);
           // Preserve the exact nested Worker bootstrap failure.
         }
         try {
