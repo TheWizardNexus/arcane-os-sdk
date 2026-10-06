@@ -26,7 +26,7 @@ import {
     openAIResponseFormat
 } from 'arcane-os/ai/twin-cloud';
 import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
-import {prepareSpeech} from './PreparedSpeech.js';
+import {prepareSpeech, readPreparedSpeech} from './PreparedSpeech.js';
 import {createToolTextObserver} from 'arcane-os/ai/tool-text-stream';
 
 const completeValue=(value)=>value;
@@ -6341,16 +6341,15 @@ class AI {
         return result;
     }
 
-    prepareTTS({parts, textFormat, storage = null, identity = null, signal = null, onState = null} = {}) {
+    #preparedSpeechInput(parts, textFormat, operation) {
         if(this.#providerSpeechModel()?.speech?.playback==='native'){
             const error=new Error('Native browser speech has no audio file to prepare or store; use prepareTTSPlayback.');
             error.code='ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE';
             throw error;
         }
         if(!is.array(parts)) {
-            throw new TypeError('AI.prepareTTS parts must be an array.');
+            throw new TypeError(`${operation} parts must be an array.`);
         }
-        const runtime = this;
         const selected = this.#providerRuntime.selection('tts');
         const configuredSpeech = this.browserSpeechConfiguration?.tts;
         const configuration = configuredSpeech
@@ -6367,12 +6366,9 @@ class AI {
             responseFormat: selected ? this.#providerSpeechResponseFormat() : this.audioFormat,
             configuration
         };
-        const browserGeneration = this.#browserSpeechGeneration;
-        const controlGeneration = this.#speechControlGeneration;
         const defaultVoice = selected
             ? this.#providerSpeechVoice()
             : this.#builtInSpeechDefaultVoice('tts', this.ttsService);
-        const responseFormat = selection.responseFormat;
         const segmentation = this.ttsSegmentation;
         const segments = [];
         for(const part of parts) {
@@ -6398,6 +6394,33 @@ class AI {
                 );
             }
         }
+        return {segments, selection, segmentation, selected};
+    }
+
+    async readPreparedTTS({parts, textFormat, storage = null, identity = null, signal = null, onState = null} = {}) {
+        const {segments, selection, segmentation} = this.#preparedSpeechInput(parts, textFormat, 'AI.readPreparedTTS');
+        this.#traceSpeech('readPreparedTTS.call', {parts, segments, selection, segmentation, identity, storage});
+        return readPreparedSpeech(
+            {
+                owner: this,
+                parts: segments,
+                originalParts: parts,
+                selection,
+                segmentation,
+                storage,
+                identity,
+                signal,
+                onState
+            }
+        );
+    }
+
+    prepareTTS({parts, textFormat, storage = null, identity = null, signal = null, onState = null} = {}) {
+        const {segments, selection, segmentation, selected} = this.#preparedSpeechInput(parts, textFormat, 'AI.prepareTTS');
+        const runtime = this;
+        const browserGeneration = this.#browserSpeechGeneration;
+        const controlGeneration = this.#speechControlGeneration;
+        const responseFormat = selection.responseFormat;
         this.#traceSpeech('prepareTTS.call', {parts, segments, selection, segmentation, identity, storage});
         async function synthesizePreparedSpeech(part, requestSignal) {
             function assertPreparedSpeechSelection() {

@@ -35,13 +35,18 @@ function createFakeStorage(key) {
     const records = new Map();
     const files = new Map();
     const writes = [];
+    const manifestWrites = [];
+    const manifestReads = [];
+    const reads = [];
     const audioWrite = deferred();
     let writeGate = null;
     const db = {
-        async get(table, name) {
+        async get(table, name, force, options) {
+            manifestReads.push({table, name, force, options});
             return structuredClone(records.get(`${table}/${name}`) ?? null);
         },
         async set(table, name, value) {
+            manifestWrites.push({table, name, value: structuredClone(value)});
             records.set(`${table}/${name}`, structuredClone(value));
         },
         async writeFile(table, name, blob) {
@@ -50,7 +55,8 @@ function createFakeStorage(key) {
             if(writeGate) await writeGate.promise;
             files.set(`${table}/${name}`, new Blob([blob]));
         },
-        async readFile(table, name) {
+        async readFile(table, name, options) {
+            reads.push({table, name, options});
             const file = files.get(`${table}/${name}`);
             if(!file) {
                 const error = new Error('Synthetic audio is absent.');
@@ -66,6 +72,9 @@ function createFakeStorage(key) {
         records,
         files,
         writes,
+        manifestWrites,
+        manifestReads,
+        reads,
         audioWrite,
         holdWrites() {
             writeGate = deferred();
@@ -469,12 +478,36 @@ test(
                 const cached = replayAI.prepareTTS(options);
                 preparations.push(cached);
                 await cached.ready;
+                const beforeLookup = {
+                    contexts: contexts.length,
+                    writes: store.writes.length,
+                    manifests: store.manifestWrites.length
+                };
+                const lookupSignal = new AbortController();
+                const lookupStates = [];
+                const retained = await replayAI.readPreparedTTS({
+                    ...options,
+                    signal: lookupSignal.signal,
+                    onState(state) { lookupStates.push(state); }
+                });
+                assert.ok(retained);
+                preparations.push(retained);
+                assert.equal(retained.state, 'ready');
+                assert.equal(lookupStates[0].state, 'ready');
+                assert.equal(lookupStates[0].completed, 2);
+                assert.deepEqual(await retained.ready, await cached.ready);
+                lookupSignal.abort();
+                assert.equal(retained.state, 'ready');
+                assert.equal(await (await retained.getAudio(0)).text(), first.token);
+                assert.equal(contexts.length, beforeLookup.contexts);
+                assert.equal(store.writes.length, beforeLookup.writes);
+                assert.equal(store.manifestWrites.length, beforeLookup.manifests);
                 assert.equal(providerState, 'unloaded');
                 assert.equal(loads, initialLoads);
                 assert.equal(requests.length, initialRequests);
                 const states = [];
                 const playback = replayAI.playPreparedTTS(
-                    cached,
+                    retained,
                     {
                         onState(state) { states.push(state); }
                     }
@@ -779,6 +812,15 @@ test(
                     const exactRecord = await exact.ready;
                     assert.deepEqual(exactRecord.originalParts, originalParts);
 
+                    const beforeLookupRequests = requests.length;
+                    const retained = await ai.readPreparedTTS({parts, textFormat: 'plain', storage: store.storage});
+                    preparations.push(retained);
+                    assert.equal(retained.segments[0].input, input);
+                    assert.deepEqual((await retained.ready).originalParts, originalParts);
+                    assert.equal(await ai.readPreparedTTS({parts, storage: store.storage}), null);
+                    assert.equal(requests.length, beforeLookupRequests);
+                    assert.deepEqual(parts, originalParts);
+
                     // The different synthesis text cannot reuse the plain preparation's audio.
                     const defaultResponse = responseFor('default-preparation');
                     const narration = prepare({parts, storage: store.storage});
@@ -841,6 +883,237 @@ test(
                     assert.equal(requests.length, beforeCancelled);
                 } finally {
                     ai.configureTTSSegmentation(segmentation);
+                }
+            }
+        );
+
+        await t.test(
+            'cache-only reads preserve misses, full semantic matching and partial durable audio',
+            async function testCacheOnlyDurableReads() {
+                const {prepareSpeech, readPreparedSpeech} = await import('../runtime/arcane/modules/PreparedSpeech.js');
+                const store = storeFor('cache-only-durable');
+                const options = {
+                    owner: {},
+                    parts: [
+                        {input: 'First orbital recipe.', voice: 'moon', speed: 1, pauseAfterMs: 25},
+                        {input: 'Second orbital recipe.', voice: 'moon', speed: 1, pauseAfterMs: 0}
+                    ],
+                    originalParts: ['**First orbital recipe.**', 'Second orbital recipe.'],
+                    selection: {providerId: 'fixture', modelId: 'cookbook', configuration: {device: 'cpu'}},
+                    segmentation: {punctuation: 'sentence', wordCadence: null},
+                    identity: {edition: 'complete'},
+                    storage: store.storage
+                };
+                const beforePublicMiss = {loads, requests: requests.length, contexts: contexts.length};
+                assert.equal(await ai.readPreparedTTS({parts: ['An uncached orbital recipe.'], storage: store.storage}), null);
+                assert.equal(loads, beforePublicMiss.loads);
+                assert.equal(requests.length, beforePublicMiss.requests);
+                assert.equal(contexts.length, beforePublicMiss.contexts);
+                let synthesisCalls = 0;
+                let stateCalls = 0;
+                assert.equal(await readPreparedSpeech({
+                    ...options,
+                    onState() { stateCalls += 1; }
+                }), null);
+                assert.equal(stateCalls, 0);
+                assert.equal(store.records.size, 0);
+                assert.equal(store.files.size, 0);
+                assert.equal(store.manifestWrites.length, 0);
+                assert.equal(store.writes.length, 0);
+
+                const prepared = prepareSpeech({
+                    ...options,
+                    async synthesize(part) {
+                        synthesisCalls += 1;
+                        return new Blob([part.input], {type: 'audio/wav'});
+                    }
+                });
+                preparations.push(prepared);
+                const record = await prepared.ready;
+                const originalRecords = structuredClone(Array.from(store.records));
+                const originalFiles = Array.from(store.files);
+                const writes = store.writes.length;
+                const manifests = store.manifestWrites.length;
+                const initialReads = store.reads.length;
+                const initialManifestReads = store.manifestReads.length;
+                const retained = await readPreparedSpeech({...options, owner: {}});
+                assert.ok(retained);
+                preparations.push(retained);
+                assert.equal(retained.state, 'ready');
+                assert.deepEqual(await retained.ready, record);
+                assert.deepEqual(store.reads.slice(initialReads).map(function audioName(read) {
+                    return read.name;
+                }), record.segments.map(function storedName(segment) { return segment.audioFile; }));
+                for(const [index, part] of options.parts.entries()) {
+                    const audio = await retained.getAudio(index);
+                    assert.equal(audio.type, 'audio/wav');
+                    assert.equal(await audio.text(), part.input);
+                }
+                for(const read of store.reads.slice(initialReads)) assert.deepEqual(read.options, {createTable: false});
+                for(const read of store.manifestReads.slice(initialManifestReads)) {
+                    assert.equal(read.force, true);
+                    assert.deepEqual(read.options, {createTable: false});
+                }
+
+                for(const changed of [
+                    {parts: [{...options.parts[0], voice: 'mars'}, options.parts[1]]},
+                    {parts: [{...options.parts[0], speed: 0.75}, options.parts[1]]},
+                    {parts: [{...options.parts[0], pauseAfterMs: 50}, options.parts[1]]},
+                    {originalParts: ['First orbital recipe.', 'Second orbital recipe.']},
+                    {selection: {...options.selection, modelId: 'other-cookbook'}},
+                    {selection: {...options.selection, configuration: {device: 'gpu'}}},
+                    {segmentation: {punctuation: 'none', wordCadence: null}},
+                    {identity: {edition: 'other'}}
+                ]) {
+                    assert.equal(await readPreparedSpeech({...options, ...changed}), null);
+                }
+
+                const firstPath = `${store.storage.table}/${record.segments[0].audioFile}`;
+                const firstAudio = store.files.get(firstPath);
+                store.files.delete(firstPath);
+                const beforeMissing = store.reads.length;
+                assert.equal(await readPreparedSpeech(options), null);
+                assert.equal(store.reads.length, beforeMissing + 2);
+                assert.deepEqual(Array.from(store.records), originalRecords);
+                const originalReadFile = store.storage.db.readFile;
+                const failure = new Error('Synthetic second-segment storage failure.');
+                store.storage.db.readFile = async function failSecondRead(table, name) {
+                    if(name === record.segments[1].audioFile) throw failure;
+                    return originalReadFile.call(this, table, name);
+                };
+                try {
+                    await assert.rejects(readPreparedSpeech(options), function preserveReadFailure(error) {
+                        return error === failure;
+                    });
+                } finally {
+                    store.storage.db.readFile = originalReadFile;
+                    store.files.set(firstPath, firstAudio);
+                }
+
+                const manifestPath = `${store.storage.table}/${encodeURIComponent(store.storage.key)}.json`;
+                const partial = structuredClone(store.records.get(manifestPath));
+                partial.entries[0].segments[0] = {audioFile: null, contentType: null};
+                store.records.set(manifestPath, partial);
+                const beforePartial = store.reads.length;
+                assert.equal(await readPreparedSpeech(options), null);
+                assert.equal(store.reads.length, beforePartial + 1);
+                assert.deepEqual(store.records.get(manifestPath), partial);
+                assert.equal(synthesisCalls, 2);
+                assert.equal(store.writes.length, writes);
+                assert.equal(store.manifestWrites.length, manifests);
+                for(const [path, file] of originalFiles) assert.equal(store.files.get(path), file);
+            }
+        );
+
+        await t.test(
+            'cache-only reads propagate storage errors and cancellation without later reads or writes',
+            async function testCacheReadFailuresAndCancellation() {
+                const {prepareSpeech, readPreparedSpeech} = await import('../runtime/arcane/modules/PreparedSpeech.js');
+                const store = storeFor('cache-only-errors');
+                const options = {owner: {}, parts: [{input: 'One.'}, {input: 'Two.'}], storage: store.storage};
+                const prepared = prepareSpeech({
+                    ...options,
+                    async synthesize(part) { return new Blob([part.input], {type: 'audio/wav'}); }
+                });
+                preparations.push(prepared);
+                await prepared.ready;
+                const originalRecords = structuredClone(Array.from(store.records));
+                const writes = store.writes.length;
+                const manifests = store.manifestWrites.length;
+                const originalGet = store.storage.db.get;
+                const originalReadFile = store.storage.db.readFile;
+                const failure = new Error('Synthetic manifest storage failure.');
+                store.storage.db.get = async function failManifestRead() { throw failure; };
+                try {
+                    await assert.rejects(readPreparedSpeech(options), function preserveManifestFailure(error) {
+                        return error === failure;
+                    });
+                } finally {
+                    store.storage.db.get = originalGet;
+                }
+                store.storage.db.readFile = async function unreadableAudio() { return null; };
+                try {
+                    await assert.rejects(readPreparedSpeech(options), /Stored speech audio must be a Blob/);
+                } finally {
+                    store.storage.db.readFile = originalReadFile;
+                }
+
+                for(const method of ['get', 'readFile']) {
+                    const started = deferred();
+                    const released = deferred();
+                    const controller = new AbortController();
+                    const original = store.storage.db[method];
+                    let calls = 0;
+                    store.storage.db[method] = async function holdCacheRead(...args) {
+                        calls += 1;
+                        started.resolve();
+                        await released.promise;
+                        return original.apply(this, args);
+                    };
+                    try {
+                        const reading = readPreparedSpeech({...options, signal: controller.signal});
+                        await started.promise;
+                        controller.abort();
+                        await assert.rejects(reading, {name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED'});
+                        released.resolve();
+                        await setImmediate();
+                        assert.equal(calls, 1);
+                    } finally {
+                        released.resolve();
+                        store.storage.db[method] = original;
+                    }
+                }
+                const alreadyCancelled = new AbortController();
+                alreadyCancelled.abort();
+                const beforeRead = store.reads.length;
+                await assert.rejects(readPreparedSpeech({...options, signal: alreadyCancelled.signal}), {name: 'AbortError'});
+                assert.equal(store.reads.length, beforeRead);
+                assert.equal(store.writes.length, writes);
+                assert.equal(store.manifestWrites.length, manifests);
+                assert.deepEqual(Array.from(store.records), originalRecords);
+            }
+        );
+
+        await t.test(
+            'in-memory cache reads do not join pending work and retain independent cancellation',
+            async function testMemoryCacheReadLifetime() {
+                const {prepareSpeech, readPreparedSpeech} = await import('../runtime/arcane/modules/PreparedSpeech.js');
+                const started = deferred();
+                const generated = deferred();
+                const options = {owner: {}, parts: [{input: 'A patient orbital chef.'}], identity: {edition: 'memory'}};
+                const prepared = prepareSpeech({
+                    ...options,
+                    synthesize() {
+                        started.resolve();
+                        return generated.promise;
+                    }
+                });
+                preparations.push(prepared);
+                try {
+                    await started.promise;
+                    assert.equal(await readPreparedSpeech(options), null);
+                    generated.resolve(new Blob(['Retained chef narration.'], {type: 'audio/wav'}));
+                    await prepared.ready;
+                    assert.equal(await readPreparedSpeech({...options, owner: {}}), null);
+                    const controller = new AbortController();
+                    const retained = await readPreparedSpeech({...options, signal: controller.signal});
+                    preparations.push(retained);
+                    controller.abort();
+                    assert.equal(retained.state, 'ready');
+                    assert.equal(await (await retained.getAudio(0)).text(), 'Retained chef narration.');
+                    assert.equal(retained.cancel(), true);
+                    await assert.rejects(retained.getAudio(0), {name: 'AbortError'});
+                    assert.equal(prepared.state, 'ready');
+                    assert.equal(await (await prepared.getAudio(0)).text(), 'Retained chef narration.');
+                    const duringReplay = new AbortController();
+                    await assert.rejects(readPreparedSpeech({
+                        ...options,
+                        signal: duringReplay.signal,
+                        onState(state) { if(state.state === 'ready') duringReplay.abort(); }
+                    }), {name: 'AbortError'});
+                    assert.equal(prepared.state, 'ready');
+                } finally {
+                    generated.resolve(new Blob(['Retained chef narration.'], {type: 'audio/wav'}));
                 }
             }
         );

@@ -727,6 +727,54 @@ pause delays the next queued audio on the existing `AudioContext` clock; it
 does not delay the preceding promise after that passage's last buffer ends.
 The promise is a playback result, not a listener acknowledgement.
 
+## Read stored narration without starting generation
+
+`await ai.readPreparedTTS({parts,textFormat,storage,identity,signal,onState})`
+returns a complete prepared handle or `null`. It uses the same complete inputs,
+selected speech configuration, formatting treatment, segmentation, storage key,
+and semantic `identity` as `prepareTTS()`. Supply the same options used to
+prepare the audio. A changed selection or input is a cache miss, not permission
+to generate replacement audio.
+
+This operation never activates or unmutes a provider, synthesizes speech,
+creates stored records, repairs partial audio, or joins pending generation.
+With `storage`, it reads the existing manifest and every ordered audio file.
+Missing or incomplete audio returns `null`; unreadable metadata and other
+storage errors reject. Without storage, it finds only already-complete audio
+retained by this same AI instance. A miss leaves all existing data unchanged.
+
+```javascript
+async function readNarration(text, key, signal) {
+    return ai.readPreparedTTS({
+        parts: [{
+            input: text,
+            voice: speechSelection.model.defaultVoice,
+            speed: 1,
+            pauseAfterMs: 0
+        }],
+        storage: {db: dbopfs, table: 'saved_narration', key},
+        identity: {
+            model: speechSelection.model,
+            runtime: speechSelection.runtime
+        },
+        signal
+    });
+}
+```
+
+A returned handle has the ordinary `segments`, `state`, `ready`, `getAudio(index)`,
+and `cancel()` contract and can be passed to `ai.playPreparedTTS()` from the
+application's playback action, including with its existing `audioOutput`.
+The lookup signal governs only the read and rejects cancellation as
+`AbortError`. After a successful return, aborting that signal does not invalidate
+the retained handle; explicit handle cancellation and playback cancellation
+remain separate. A successful read does not promise future autoplay permission
+or prevent a later application-owned removal of stored files.
+
+Applications decide which saved narration candidates to inspect. For example,
+newest-first lookup can skip a newer partial preparation and then inspect an
+older complete candidate without activating any model.
+
 ## Prepare narration once and replay stored audio
 
 Use `ai.prepareTTS()` when preparation must continue independently of playback,

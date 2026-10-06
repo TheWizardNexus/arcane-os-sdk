@@ -111,8 +111,10 @@ function serializeStorage(storage,execute){
     return operation;
 }
 
-async function readManifest(storage){
-    const stored=await storage.db.get(storage.table,storage.fileName,true);
+async function readManifest(storage,cacheOnly=false){
+    const stored=cacheOnly
+        ?await storage.db.get(storage.table,storage.fileName,true,{createTable:false})
+        :await storage.db.get(storage.table,storage.fileName,true);
     if(stored===null||stored===undefined)return {version:1,entries:[]};
     const manifest=copyJSON(stored);
     if(manifest.version!==1||!is.array(manifest.entries)){
@@ -349,9 +351,10 @@ function finishPreparation(job,error){
     job.finished.resolve();
 }
 
-function createJob(ownerState,input,storage,synthesize,previous){
-    const job={
+function createJobState(input,storage,synthesize=null,previous=null){
+    return {
         input,storage,synthesize,previous,
+        cacheOnly:false,
         controller:new AbortController(),
         interests:new Set(),
         state:'queued',
@@ -367,6 +370,10 @@ function createJob(ownerState,input,storage,synthesize,previous){
             return {...part,index,state:'queued',audioFile:null,contentType:null,error:null};
         })
     };
+}
+
+function createJob(ownerState,input,storage,synthesize,previous){
+    const job=createJobState(input,storage,synthesize,previous);
     const admission=ownerState.admission.then(function admitOrderedPreparation(){
         return admitPreparation(job);
     });
@@ -416,7 +423,9 @@ function createHandle(job,signal,onState){
             if(!interest.active)throw abortError();
             if(!job.storage)return job.slots[index].blob;
             const audio=job.record.segments[index];
-            const file=await job.storage.db.readFile(job.storage.table,audio.audioFile);
+            const file=job.cacheOnly
+                ?await job.storage.db.readFile(job.storage.table,audio.audioFile,{createTable:false})
+                :await job.storage.db.readFile(job.storage.table,audio.audioFile);
             if(!interest.active)throw abortError();
             return file.type===audio.contentType?file:new Blob([file],{type:audio.contentType});
         },
@@ -482,4 +491,100 @@ function prepareSpeech({
     return createHandle(job,signal,onState);
 }
 
-export {prepareSpeech};
+/** Read complete existing audio without synthesis, storage writes, or repair. */
+async function readPreparedSpeech({
+    owner,
+    parts,
+    originalParts=parts,
+    selection=null,
+    segmentation=null,
+    storage=null,
+    identity=null,
+    signal=null,
+    onState=null
+}={}){
+    if((!owner||!is.object(owner))&&!is.function(owner)){
+        throw new TypeError('Speech preparation requires its owning AI instance.');
+    }
+    if(!is.array(parts)||(onState!==null&&!is.function(onState))){
+        throw new TypeError('Cached speech requires ordered parts and an optional state callback.');
+    }
+    const input=copyJSON({parts,originalParts,selection,segmentation,identity});
+    const destination=normalizeStorage(storage);
+    if(signal?.aborted)throw abortError();
+    function completeCachedRead(job){
+        // The lookup signal owns only this read. Retained audio keeps its own
+        // explicit cancellation lifetime after a successful lookup returns.
+        const handle=createHandle(job,null,onState);
+        if(signal?.aborted){
+            handle.cancel();
+            throw abortError();
+        }
+        return handle;
+    }
+    if(!destination){
+        const jobs=owners.get(owner)?.jobs;
+        if(!jobs)return null;
+        for(const job of jobs){
+            if(job.storage||!job.done||job.failed||job.controller.signal.aborted
+                ||!sameInput(job.input,input))continue;
+            if(!job.slots.every(function hasRetainedAudio(slot){
+                return slot.settled&&slot.blob instanceof Blob;
+            }))return null;
+            return completeCachedRead(job);
+        }
+        return null;
+    }
+    const cancelled=deferred();
+    function cancelRead(){cancelled.reject(abortError());}
+    signal?.addEventListener('abort',cancelRead,{once:true});
+    try{
+        const reading=serializeStorage(destination,async function readCachedPreparation(){
+            if(signal?.aborted)throw abortError();
+            const manifest=await readManifest(destination,true);
+            if(signal?.aborted)throw abortError();
+            const record=manifest.entries.find(function findCachedPreparation(entry){
+                return sameInput(entry,input);
+            });
+            if(!record)return null;
+            if(!is.array(record.segments)||record.segments.length!==input.parts.length){
+                throw new TypeError('Stored speech preparation segments are unreadable.');
+            }
+            let complete=true;
+            for(const audio of record.segments){
+                if(!audio?.audioFile){
+                    complete=false;
+                    continue;
+                }
+                if(!is.string(audio.contentType)){
+                    throw new TypeError('Stored speech audio content type is unreadable.');
+                }
+                if(signal?.aborted)throw abortError();
+                try{
+                    const file=await destination.db.readFile(destination.table,audio.audioFile,{createTable:false});
+                    if(!(file instanceof Blob)){
+                        throw new TypeError('Stored speech audio must be a Blob.');
+                    }
+                }catch(error){
+                    if(error?.name!=='NotFoundError')throw error;
+                    complete=false;
+                }
+                if(signal?.aborted)throw abortError();
+            }
+            return complete?record:null;
+        });
+        const record=await Promise.race([reading,cancelled.promise]);
+        if(signal?.aborted)throw abortError();
+        if(!record)return null;
+        const job=createJobState(input,destination);
+        job.cacheOnly=true;
+        job.record=record;
+        for(let index=0;index<job.slots.length;index+=1)settleSegment(job,index);
+        finishPreparation(job);
+        return completeCachedRead(job);
+    }finally{
+        signal?.removeEventListener('abort',cancelRead);
+    }
+}
+
+export {prepareSpeech,readPreparedSpeech};

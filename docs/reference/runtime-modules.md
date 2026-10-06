@@ -121,7 +121,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
 | [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete values and operation context retained; exact optional namespace absence or existing Android unsupported capability selects the existing local adapter; partial-service and genuine failures remain errors; an advertised rejected batch is never retried serially. |
-| [`PreparedSpeech.js`](#preparedspeechjs) | esm | Owns detached ordered preparation, semantic audio reuse, and per-caller cancellation behind AI.prepareTTS. | Browser / native WebView with injected synthesis and optional DBOPFS | Complete original inputs, ordered audio metadata, durable reuse, and observable preparation results. |
+| [`PreparedSpeech.js`](#preparedspeechjs) | esm | Owns detached ordered preparation, semantic audio reuse, cache-only lookup, and per-caller cancellation behind AI.prepareTTS and AI.readPreparedTTS. | Browser / native WebView with optional DBOPFS and injected synthesis for generation | Complete original inputs, ordered audio metadata, durable reuse, and observable preparation results. |
 | [`PrintView.js`](#printviewjs) | esm | Prints current rendered content and title through one document-owned print lifecycle. | Browser / supported native WebView print implementation | Complete rendered snapshot, preparation cancellation, resource lifetime, and honest request result. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
 | [`Questionnaire.js`](#questionnairejs) | esm | Evaluates whether a one-time questionnaire prompt is due without performing the prompt. | Cross-host | Normalized conservative boolean. |
@@ -171,6 +171,7 @@ default `AI`; read-only `providerRuntime`, `speechActivationPending`, `browserSp
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
 `prepareTTS({parts,textFormat,storage,identity,signal,onState})`,
+`readPreparedTTS({parts,textFormat,storage,identity,signal,onState})`,
 `prepareAudioOutput()`, `playPreparedTTS(prepared,{signal,onState,audioOutput})`,
 `finishTTS()`, `prepareTTSPlayback()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
@@ -496,6 +497,34 @@ requests share synthesis only on the same AI instance and storage group;
 cancelling one handle does not cancel another active matching caller.
 Preparation cancellation prevents later synthesis and releases its activation
 interest. The provider's operation remains responsible for actual cleanup.
+
+`await readPreparedTTS({parts,textFormat,storage,identity,signal,onState})`
+returns a complete ready preparation handle or `null`. It uses the same original
+parts, selected speech configuration, voice/speed/pause values, text treatment,
+segmentation, and application identity as `prepareTTS()` for semantic matching.
+It never activates or unmutes a provider, synthesizes, starts playback, writes
+storage, or repairs a partial record. With storage, it reads the existing
+manifest and every ordered audio reference through the existing per-key storage
+queue. It passes `{createTable:false}` to DBOPFS manifest and audio reads,
+including later handle reads, so missing tables stay absent. Supplied database
+adapters are responsible for honoring that read-existing contract.
+No matching record or any missing audio returns `null`; unreadable
+metadata and other storage errors reject. Without storage, only a completed,
+matching, same-AI retained in-memory preparation can be returned; pending or
+failed work returns `null`.
+
+A hit returns `{segments,state,ready,getAudio(index),cancel()}` with `state`
+and every segment already `ready`; `onState` synchronously replays that state.
+A miss emits no state callback. The lookup signal rejects cancellation as
+`AbortError` and detaches when lookup settles; aborting it after success does
+not cancel the returned handle. An already-started non-abortable database read
+may finish after cancellation; observed cancellation prevents subsequent reads
+or a returned handle. The handle's explicit `cancel()` retains its
+own lifetime. Durable `getAudio(index)` reopens the stored file with its retained
+MIME type, so a later file removal remains an observable error. Native speech
+without audio export rejects with `ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE`, as
+`prepareTTS()` does. Pass a returned handle to `playPreparedTTS()` only when
+playback is wanted.
 
 `playPreparedTTS(prepared,{signal,onState,audioOutput})` can attach immediately. Its returned
 `{state,error,finished,pause(),resume(),stop()}` handle schedules segments in
@@ -2254,6 +2283,23 @@ default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/bac
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
+`getTableHandle(tableName='', {create=true}={})` lazily opens or creates the
+requested table by default. `{create:false}` looks up only an existing table
+without joining a pending create request; a missing table rejects with the
+platform's `NotFoundError`. The existing `memories` / `memory` alias is retained.
+`readFile(tableName='', fileName='', {createTable=true}={})` returns the complete
+raw file. `{createTable:false}` also prevents table creation, and missing tables
+or files reject with `NotFoundError`. Its synchronous-access worker fallback
+already opens existing app/table/file handles without creating them.
+
+`get(tableName='', fileName='', force=false, {createTable=true}={})` retains its
+existing parsed-value cache and `force` behavior, forwarding `createTable` when
+it reads a file. On a read, `NotFoundError` resolves `null`; other errors reject.
+Use `get(tableName,fileName,true,{createTable:false})` for an existing-storage
+lookup that does not return an earlier cached value. Omitted options preserve the previous
+lazy table-creation behavior. These options change neither write operations nor
+the owning app scope's initialization.
+
 `subscribeChanges(listener, {signal, once})` observes
 `DBOPFS_EVENT_TYPES.change` (`dbopfs-change`) through the existing canonical
 `arcane-os/event-manager` source. It returns an idempotent unsubscribe function
@@ -3649,10 +3695,11 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Shared preparation mechanism used by `AI.prepareTTS()`. It owns ordered
-generation admission, same-owner request sharing, complete audio storage and
-semantic reuse, and each caller's preparation lifetime. It does not construct
-an audio context, play speech, or select application content.
+Shared preparation mechanism used by `AI.prepareTTS()` and `AI.readPreparedTTS()`.
+It owns ordered generation admission, same-owner request sharing, complete audio
+storage and semantic reuse, cache-only lookup, and each caller's preparation
+lifetime. It does not construct an audio context, play speech, or select
+application content.
 
 ### Public surface
 
@@ -3661,9 +3708,28 @@ segmentation=null,storage=null,identity=null,signal=null,onState,synthesize})`.
 The owning AI supplies already segmented speech parts, complete original parts,
 its selection snapshot, and its synthesis callback. The returned handle is
 `{segments,state,ready,getAudio(index),cancel()}`. Applications use
-`AI.prepareTTS()` and `AI.playPreparedTTS()` so the existing AI owner retains
-automatic formatting cleanup, segmentation, provider readiness/capacity, and
+`AI.prepareTTS()`, `AI.readPreparedTTS()`, and `AI.playPreparedTTS()` so the existing
+AI owner retains automatic formatting cleanup, segmentation, provider readiness/capacity, and
 ordered playback. See the [complete preparation contract](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio).
+
+Named async `readPreparedSpeech({owner,parts,originalParts=parts,selection=null,
+segmentation=null,storage=null,identity=null,signal=null,onState=null})` uses
+the same complete semantic matcher and resolves a ready preparation handle or
+`null`. It performs no synthesis, model activation, playback, storage writes,
+or repair. A durable lookup reads the existing manifest and every audio file;
+missing matching records or audio return `null`, while malformed metadata and
+other read failures reject. Manifest, audio availability, and returned-handle
+audio reads pass `{createTable:false}` to DBOPFS so a missing table is never
+created; supplied adapters own the same read-existing behavior. Without storage
+it reads only a completed matching same-owner in-memory preparation, never
+pending or failed work. A hit replays
+ready state through `onState`; a miss emits nothing. Lookup cancellation rejects
+with `AbortError` and is detached on settlement. After success the returned
+handle's explicit `cancel()` is independent of the lookup signal; its `ready`
+resolves the complete record and `getAudio(index)` preserves the existing MIME
+and later-read error behavior. Already-started non-abortable database reads may
+settle after cancellation; no further reads or handle are returned after the
+cancellation is observed.
 
 `storage:{db,table,key}` is optional; the ready DBOPFS instance supplies
 `get`, `set`, `readFile`, and `writeFile`. JSON-compatible semantic inputs stay
@@ -3672,13 +3738,14 @@ MIME type is retained in metadata. Storage mutation serializes by database,
 table, and key within the realm. Synthesis sharing is scoped to the same owner
 and matching semantic inputs/storage; playback remains outside this module.
 
-Exact exports: `prepareSpeech`.
+Exact exports: `prepareSpeech`, `readPreparedSpeech`.
 
 ### Availability and normalization
 
-**Browser or native WebView with Blob, AbortController, an injected synthesis
-callback, and optional ready DBOPFS.** Import creates no provider or
-playback. Calling the preparation function starts owned asynchronous work.
+**Browser or native WebView with Blob, AbortController, optional ready DBOPFS,
+and an injected synthesis callback for generation.** Import creates no provider or
+playback. Calling `prepareSpeech` starts owned asynchronous generation/reuse;
+`readPreparedSpeech` only reads existing complete audio.
 `ready` rejects complete synthesis/storage failures or `AbortError` after
 cancellation; successful audio remains available for reuse. Malformed part,
 storage, or semantic metadata inputs throw `TypeError`; an invalid segment

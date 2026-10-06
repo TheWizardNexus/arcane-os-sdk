@@ -554,12 +554,13 @@ class DBOPFS {
 
     /**
      * Gets the directory handle for a table.
-     * Creates the table if it does not exist.
+     * Creates the table if it does not exist unless create is false.
      *
      * @param {string} tableName
+     * @param {{create?:boolean}} options A false create performs an existing-table lookup only.
      * @returns {Promise<FileSystemDirectoryHandle>}
      */
-    async getTableHandle(tableName=''){
+    async getTableHandle(tableName='',{create=true}={}){
         if(!this.ready){
             await this.readyPromise;
         }
@@ -580,6 +581,14 @@ class DBOPFS {
         if(existingHandle){
             this.#tableHandles[registeredTableName]=existingHandle;
             return existingHandle;
+        }
+
+        if(!create){
+            // A read-existing lookup must not wait for another caller to create the table.
+            return this.#db.getDirectoryHandle(
+                directoryName,
+                {create:false}
+            );
         }
 
         if(!this.#tableHandlePromises[registeredTableName]){
@@ -736,10 +745,14 @@ class DBOPFS {
      *
      * @param {string} tableName
      * @param {string} fileName
+     * @param {{createTable?:boolean}} options A false createTable preserves an absent table.
      * @returns {Promise<File>}
      */
-    async readFile(tableName='',fileName=''){
-        const table=await this.getTableHandle(tableName)
+    async readFile(tableName='',fileName='',{createTable=true}={}){
+        const table=await this.getTableHandle(
+            tableName,
+            {create:createTable}
+        )
         const handle=await table.getFileHandle(fileName,{create:false})
 
         if(is.function(handle.getFile)){
@@ -818,14 +831,19 @@ class DBOPFS {
      * @param {string} tableName
      * @param {string} fileName
      * @param {boolean} force
+     * @param {{createTable?:boolean}} options A false createTable preserves an absent table.
      * @returns {Promise<*>}
      */
-    async get(tableName='',fileName='',force=false){
+    async get(tableName='',fileName='',force=false,{createTable=true}={}){
         if(force||!this.#tables[tableName]?.[fileName]){
             const cacheState=this.#fileCacheState(tableName,fileName);
             const cacheRevision=cacheState.revision;
             try{
-                const file=await this.readFile(tableName,fileName)
+                const file=await this.readFile(
+                    tableName,
+                    fileName,
+                    {createTable}
+                )
                 const textContent=await file.text()
 
                 if(!this.#tables[tableName]){

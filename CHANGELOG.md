@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.78.0
+
+- Add `AI.readPreparedTTS()` and shared `readPreparedSpeech()` for complete
+  cache-only narration lookup. Return a ready playback handle or `null` without
+  loading a model, unmuting, synthesizing, writing storage or repairing partial
+  audio. Preserve complete semantic matching and genuine storage errors.
+- Keep lookup cancellation independent from a successfully returned handle.
+  Replay uses the existing prepared-playback owner and can borrow the caller's
+  silent reusable audio output; no autoplay permission is implied.
+- Add optional existing-only DBOPFS table/file reads while preserving ordinary
+  lazy-creation defaults. Cache-only lookup and later audio reads leave missing
+  tables absent.
+- Give Kokoro voice caching a real Worker-lifetime response cache after runtime
+  import, while DBOPFS remains the durable model/resource owner. Preserve saved
+  native caches and clear transient responses on unload.
+- Report a complete stored model resource as cached loading rather than a new
+  network download. This release changes no model selection, native engine or
+  physical-device routing and makes no live-model execution claim.
+
 ## 0.77.0
 
 - Add `AI.prepareAudioOutput()` for synchronous, silent preparation of a reusable

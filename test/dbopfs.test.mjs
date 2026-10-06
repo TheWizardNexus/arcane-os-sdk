@@ -226,6 +226,36 @@ test(
                     createdDirectories.push(directoryName);
                     return directory;
                 },
+                async getFileHandle(fileName,{create=false}={}){
+                    if(entries.has(fileName)){
+                        return entries.get(fileName);
+                    }
+                    if(!create){
+                        throw missingEntry(fileName);
+                    }
+
+                    let content=new Blob();
+                    const file={
+                        kind:'file',
+                        name:fileName,
+                        async getFile(){
+                            return new File([content],fileName);
+                        },
+                        async createWritable(){
+                            let written=content;
+                            return {
+                                async write(value){
+                                    written=new Blob([value]);
+                                },
+                                async close(){
+                                    content=written;
+                                }
+                            };
+                        }
+                    };
+                    entries.set(fileName,file);
+                    return file;
+                },
                 async removeEntry(entryName,{recursive=false}={}){
                     const entry=entries.get(entryName);
 
@@ -347,6 +377,13 @@ test(
             assert.equal(logicalMemory,memoryDirectory);
             assert.equal(physicalMemory,memoryDirectory);
             assert.equal(
+                await dbopfs.getTableHandle(
+                    'memories',
+                    {create:false}
+                ),
+                memoryDirectory
+            );
+            assert.equal(
                 applicationDirectory.directoryRequests.filter(
                     function requestedMemory(name){
                         return name==='memory';
@@ -426,6 +463,42 @@ test(
                 true
             );
 
+            await assert.rejects(
+                dbopfs.getTableHandle(
+                    'absent-cache',
+                    {create:false}
+                ),
+                {name:'NotFoundError'}
+            );
+            await assert.rejects(
+                dbopfs.readFile(
+                    'absent-cache',
+                    'voice.wav',
+                    {createTable:false}
+                ),
+                {name:'NotFoundError'}
+            );
+            assert.equal(
+                await dbopfs.get(
+                    'absent-cache',
+                    'manifest.json',
+                    true,
+                    {createTable:false}
+                ),
+                null
+            );
+            await assert.rejects(
+                dbopfs.get(
+                    'not-a-table',
+                    'manifest.json',
+                    true,
+                    {createTable:false}
+                ),
+                {name:'TypeMismatchError'}
+            );
+            assert.equal(applicationDirectory.entryNames().includes('absent-cache'),false);
+            assert.deepEqual(applicationDirectory.createdDirectories,[]);
+
             const [firstDocuments,secondDocuments]=await Promise.all([
                 dbopfs.getTableHandle('documents'),
                 dbopfs.getTableHandle('documents')
@@ -472,6 +545,60 @@ test(
             assert.deepEqual(applicationDirectory.entryNames(),[]);
             assert.equal(Object.hasOwn(dbopfs.tables,'memory'),false);
             assert.equal(Object.hasOwn(dbopfs.tables,'memories'),false);
+
+            const originalDirectoryRequest=applicationDirectory.getDirectoryHandle;
+            const createStarted=Promise.withResolvers();
+            const releaseCreate=Promise.withResolvers();
+            const pendingLookups=[];
+            applicationDirectory.getDirectoryHandle=async function heldDirectoryRequest(name,options){
+                if(name==='pending-cache'){
+                    pendingLookups.push(options.create);
+                    if(options.create){
+                        createStarted.resolve();
+                        await releaseCreate.promise;
+                    }
+                }
+                return originalDirectoryRequest.call(this,name,options);
+            };
+            const creating=dbopfs.getTableHandle('pending-cache');
+            await createStarted.promise;
+            const existingRead=dbopfs.getTableHandle(
+                'pending-cache',
+                {create:false}
+            ).then(
+                function existingTableFound(handle){return {handle};},
+                function existingTableMissing(error){return {error};}
+            );
+            try{
+                assert.deepEqual(pendingLookups,[true,false]);
+                assert.equal((await existingRead).error.name,'NotFoundError');
+                assert.equal(applicationDirectory.entryNames().includes('pending-cache'),false);
+            }finally{
+                releaseCreate.resolve();
+                await creating;
+                await existingRead;
+                applicationDirectory.getDirectoryHandle=originalDirectoryRequest;
+            }
+
+            const saved={content:'complete prepared speech manifest'};
+            await dbopfs.set('written-cache','manifest.json',saved);
+            assert.equal(applicationDirectory.entryNames().includes('written-cache'),true);
+            assert.deepEqual(
+                await dbopfs.get(
+                    'written-cache',
+                    'manifest.json',
+                    true,
+                    {createTable:false}
+                ),
+                saved
+            );
+            assert.equal(await dbopfs.get('ordinary-read','missing.json',true),null);
+            assert.equal(applicationDirectory.entryNames().includes('ordinary-read'),true);
+            await assert.rejects(
+                dbopfs.readFile('ordinary-raw-read','missing.json'),
+                {name:'NotFoundError'}
+            );
+            assert.equal(applicationDirectory.entryNames().includes('ordinary-raw-read'),true);
 
             const fileManagerSource=await readFile(
                 new URL(
