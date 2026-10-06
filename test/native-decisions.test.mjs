@@ -92,7 +92,7 @@ function pendingOperation(task, signal) {
     });
 }
 
-function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runError, runGate, exitGate} = {}) {
+function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runError, runGate, exitGate, beforeLoad} = {}) {
     const sessions = new Map();
     const listeners = new Set();
     const calls = {load: [], run: [], unload: []};
@@ -115,10 +115,14 @@ function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runError, r
             return function stopStateObservation() { listeners.delete(listener); };
         },
         async load(options) {
+            beforeLoad?.(options);
             calls.load.push(options);
             options.signal.throwIfAborted();
             if (loadError) throw loadError;
-            const session = {id: options.id, model: options.model, loaded: true, state: 'ready', error: null, stopping: false, exited: false};
+            const session = {
+                id: options.id, model: options.model, loaded: true, state: 'ready', error: null, stopping: false, exited: false,
+                execution: {requestedTarget: options.executionTarget, observedTarget: null}
+            };
             sessions.set(options.id, session);
             publish();
             return session;
@@ -248,6 +252,7 @@ test('native FP32 decisions preserve complete input framing, typed decisions and
     assert.equal(native.calls.load.length, 1);
     assert.equal(native.calls.load[0].model, files.paths.model);
     assert.equal(native.calls.load[0].executionPreference, 'gpu');
+    assert.equal(native.calls.load[0].executionTarget, undefined);
     assert.equal(native.calls.load[0].sessionOptions, sessionOptions);
     const originalRows = structuredClone(rows);
     const runOptions = {tag: 'complete moon charter'};
@@ -334,6 +339,151 @@ test('immediate Core load then unload cancels before dependency lookup without a
     assert.equal(service.current().loaded, false);
     assert.equal(service.current().busy, false);
 });
+
+for (const route of ['direct', 'Core']) {
+    test(`${route} decisions retain the selected target, distinguish automatic selection and coalesce equal targets`, async function selectedDecisionTarget(t) {
+        const files = await fixture(t);
+        const native = fakeONNX();
+        const assets = fakeAssets(files);
+        const executionTarget = {deviceId: 'fixture-moon-adapter'};
+        const sessionOptions = {graphOptimizationLevel: 'all'};
+        const configuration = {executionTarget, sessionOptions, workingDirectory: 'model-working'};
+        const decisions = files.own(route === 'direct'
+            ? createNativeDecisionModel({...configuration, onnx: native.owner, modelAssets: assets.owner})
+            : createNativeDecisionService(configuration, {appRoot: files.root}));
+        if (route === 'Core') decisions.start({
+            getService(name) {
+                return name === 'local-ai' ? {getONNXRuntime() { return native.owner; }} : assets.owner;
+            },
+            emit() {}
+        });
+        const first = decisions.load();
+        const same = decisions.load({executionTarget: {deviceId: executionTarget.deviceId}});
+        await Promise.all([first, same]);
+        assert.equal(native.calls.load.length, 1);
+        assert.equal(assets.calls.prepare.length, 1);
+        assert.equal(native.calls.load[0].executionTarget, executionTarget);
+        assert.equal(native.calls.load[0].sessionOptions, sessionOptions);
+        assert.equal(decisions.current().execution.execution.requestedTarget, executionTarget);
+        assert.equal(decisions.current().execution.execution.observedTarget, null);
+        assert.equal(decisions.current().pendingActivation, null);
+        const automatic = route === 'Core'
+            ? decisions.methods['decisions.load']({executionTarget: null}, {signal: t.signal})
+            : decisions.load({executionTarget: null});
+        await automatic;
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(native.calls.load[1].executionTarget, null);
+        assert.equal(native.calls.load[1].sessionOptions, sessionOptions);
+        const automaticId = decisions.current().execution.id;
+        await decisions.load({executionTarget: undefined});
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(decisions.current().execution.id, automaticId);
+        await decisions.unload();
+        await decisions.load();
+        assert.equal(native.calls.load.length, 3);
+        assert.equal(native.calls.load[2].executionTarget, null);
+        assert.equal(native.calls.load[2].sessionOptions, sessionOptions);
+        assert.equal(decisions.current().pendingActivation, null);
+    });
+
+    test(`${route} target replacement cancels prior work and joins actual exit before the latest target activates`, async function replaceDecisionTarget(t) {
+        const files = await fixture(t);
+        const runGate = files.gate();
+        const exitGate = files.gate();
+        const assets = fakeAssets(files);
+        const native = fakeONNX({runGate, exitGate, beforeLoad() {
+            for (const previous of native.owner.current().sessions) {
+                assert.equal(previous.exited, true, 'A successor may load only after the prior native exit.');
+                assert.equal(assets.records.get(previous.id).retained, false, 'The prior working projection must finish releasing first.');
+            }
+        }});
+        const firstTarget = {deviceId: 'fixture-first-adapter'};
+        const intermediateTarget = {deviceId: 'fixture-intermediate-adapter'};
+        const finalTarget = {deviceId: 'fixture-final-adapter'};
+        const configuration = {executionTarget: firstTarget, workingDirectory: 'model-working'};
+        const decisions = files.own(route === 'direct'
+            ? createNativeDecisionModel({...configuration, onnx: native.owner, modelAssets: assets.owner})
+            : createNativeDecisionService(configuration, {appRoot: files.root}));
+        if (route === 'Core') decisions.start({
+            getService(name) {
+                return name === 'local-ai' ? {getONNXRuntime() { return native.owner; }} : assets.owner;
+            },
+            emit() {}
+        });
+        await decisions.load();
+        const firstExecution = decisions.current().execution;
+        const evaluating = decisions.evaluate(rows);
+        const rejectedEvaluation = assert.rejects(evaluating, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        const run = await native.runStarted.promise;
+        const intermediate = decisions.load({executionTarget: intermediateTarget});
+        const rejectedIntermediate = assert.rejects(intermediate, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        assert.equal(decisions.current().execution, firstExecution);
+        assert.deepEqual(decisions.current().pendingActivation, {executionTarget: intermediateTarget});
+        await native.unloadStarted.promise;
+        await rejectedEvaluation;
+        assert.equal(run.signal.aborted, true);
+        assert.equal(decisions.current().loaded, false);
+        assert.equal(decisions.current().execution, firstExecution);
+        assert.equal(firstExecution.execution.requestedTarget, firstTarget);
+        assert.equal(firstExecution.loaded, true);
+        assert.equal(firstExecution.exited, false);
+        assert.equal(assets.records.get(firstExecution.id).retained, true);
+        assert.equal(assets.calls.releaseRetain.length, 0);
+        const final = decisions.load({executionTarget: finalTarget});
+        assert.deepEqual(decisions.current().pendingActivation, {executionTarget: finalTarget});
+        assert.equal(decisions.current().execution, firstExecution);
+        assert.equal(native.calls.load.length, 1);
+        assert.equal(assets.calls.prepare.length, 1);
+        exitGate.resolve();
+        const [, completed] = await Promise.all([rejectedIntermediate, final]);
+        assert.equal(firstExecution.exited, true);
+        assert.equal(assets.records.get(firstExecution.id).retained, false);
+        assert.deepEqual(assets.calls.releaseRetain, [firstExecution.id]);
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(native.calls.load[1].executionTarget, finalTarget);
+        assert.equal(assets.calls.prepare.length, 2);
+        assert.equal(completed.execution.id, native.calls.load[1].id);
+        assert.equal(completed.execution.execution.requestedTarget, finalTarget);
+        assert.equal(completed.loaded, true);
+        assert.equal(completed.pendingActivation, null);
+        assert.notEqual(completed.execution, firstExecution);
+    });
+
+    test(`${route} ready-state replacement cannot return the replaced target as a successful load`, async function reentrantDecisionTarget(t) {
+        const files = await fixture(t);
+        const native = fakeONNX();
+        const firstTarget = {deviceId: 'fixture-first-adapter'};
+        const replacementTarget = {deviceId: 'fixture-replacement-adapter'};
+        const configuration = {executionTarget: firstTarget, paths: files.paths};
+        const decisions = files.own(route === 'direct'
+            ? createNativeDecisionModel({...configuration, onnx: native.owner})
+            : createNativeDecisionService(configuration, {appRoot: files.root}));
+        if (route === 'Core') decisions.start({
+            getService(name) {
+                assert.equal(name, 'local-ai');
+                return {getONNXRuntime() { return native.owner; }};
+            },
+            emit() {}
+        });
+        let replacing = false;
+        let replacement;
+        const stop = decisions.subscribe(function replaceAtReady(snapshot) {
+            if (!replacing && snapshot.loaded) {
+                replacing = true;
+                replacement = decisions.load({executionTarget: replacementTarget});
+            }
+        });
+        await assert.rejects(decisions.load(), {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        assert.ok(replacement);
+        const completed = await replacement;
+        assert.equal(native.calls.load.length, 2);
+        assert.equal(native.calls.unload[0].id, native.calls.load[0].id);
+        assert.equal(completed.execution.id, native.calls.load[1].id);
+        assert.equal(completed.execution.execution.requestedTarget, replacementTarget);
+        assert.equal(completed.pendingActivation, null);
+        stop();
+    });
+}
 
 test('disposal revokes readiness synchronously and retains files until the native exit joins', async function retainUntilNativeExit(t) {
     const files = await fixture(t);

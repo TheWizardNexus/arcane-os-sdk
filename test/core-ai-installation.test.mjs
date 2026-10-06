@@ -378,3 +378,41 @@ test('released owned known models remain explicitly loadable while unavailable a
     assert.equal(local.status().loaded, true);
     assert.equal(injected.calls.filter(function loadCall(call) { return call.method === 'llama.load'; }).length, 2);
 });
+
+test('Core ONNX accessor preserves physical, automatic and omitted target selections and request cancellation', async function forwardONNXTargets(t) {
+    const injected = fixtureClient({installed: false, loaded: false});
+    const onnx = createCoreONNXRuntime({client: injected.client});
+    let retained;
+    t.after(function releaseTargetAccessor() {
+        retained?.result.resolve({});
+        onnx.close();
+        injected.client.close();
+    });
+    const sessionOptions = {graphOptimizationLevel: 'all', logId: '  Complete moon target\r\n🧀  '};
+    for (const executionTarget of [{deviceId: 'synthetic-gpu-five'}, null, undefined]) {
+        const id = `target-${injected.calls.length}`;
+        const result = await onnx.load({
+            id, model: 'models/moon cheese.onnx', sessionOptions,
+            executionPreference: 'gpu', executionTarget, timeoutMs: 4321
+        });
+        const call = injected.calls.at(-1);
+        assert.equal(call.method, 'onnx.load');
+        assert.deepEqual(call.parameters, {
+            id, model: 'models/moon cheese.onnx', sessionOptions, executionPreference: 'gpu', executionTarget
+        });
+        assert.equal(call.parameters.executionTarget, executionTarget);
+        assert.equal(call.parameters.sessionOptions, sessionOptions);
+        assert.equal(call.options.timeoutMs, 4321);
+        assert.ok(call.options.signal instanceof AbortSignal);
+        assert.deepEqual(result, injected.state.onnx);
+    }
+    retained = injected.hold('onnx.load');
+    const controller = new AbortController();
+    const loading = onnx.load({id: 'cancel-target', model: 'models/moon cheese.onnx', executionTarget: null, signal: controller.signal});
+    const rejected = assert.rejects(loading, {name: 'AbortError'});
+    await retained.started.promise;
+    controller.abort();
+    assert.equal(injected.calls.at(-1).options.signal.aborted, true);
+    retained.result.resolve({state: 'late-target-result'});
+    await rejected;
+});
