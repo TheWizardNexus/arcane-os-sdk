@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.70.0
+
+- Add app-scoped DBOPFS committed-change subscriptions through the existing
+  event owner, with targeted cache invalidation and same-origin/storage-partition
+  live document notifications. Preserve complete records, successful partial
+  batch outcomes, cancellation and existing storage without migration or polling.
+- Keep cold TTS activation owned by its pending preparation interests. Cancelling
+  the last pending interest cancels its activation; another preparation or direct
+  load retains shared work. Ready models and cache hits keep their existing lifetime.
+- Add explicit same-app shared Core hosts over named pipes or Unix sockets,
+  retaining default stdio and one runtime owner. Correlate per-connection requests,
+  cancellation and events without confusing equal caller IDs across connections;
+  replay current packaged-web state while preserving complete payloads and errors.
+- Store complete browser model/support resources as ordered DBOPFS parts and add
+  public model/speech-store `fetchResource()` support. Decision and speech Worker
+  resource fetches share the parent store, including nested module Workers, with
+  file/shard progress and cancellation that joins cleanup. Existing whole/range
+  cache formats remain readable; native ESM and unmapped classic Worker loading
+  remain platform-owned. No model/provider/default switch or cache migration.
+
 ## 0.69.0
 
 - Add explicit `textFormat:'plain'` speech input through prepared speech,
