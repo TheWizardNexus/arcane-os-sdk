@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.71.2
+
+- Preserve complete browser Kokoro synthesis input through the selected runtime's
+  phonemization and tokenizer. Process every token in ordered model-capacity
+  segments and retain all resulting audio, with one model owner and request-local
+  cancellation. Keep short-input behavior, voice, speed and the public API intact.
+- Include the browser decision runtime entry in an explicitly configured DBOPFS
+  model store. Retain the original resource URL across activations, import the
+  complete stored self-contained module, and join cancellation cleanup before
+  settling callers. Preserve direct loading when no store is configured.
+
 ## 0.71.1
 
 - Correct explicit disabled PWA lifecycle in standalone source development by
