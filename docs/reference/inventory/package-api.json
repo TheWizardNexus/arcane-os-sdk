@@ -1,17 +1,115 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.57.0",
+  "sdkVersion": "0.61.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 267,
+  "memberCount": 274,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "local-ai-image:createImageRuntime",
+      "name": "createImageRuntime",
+      "displayName": "createImageRuntime()",
+      "kind": "function",
+      "signature": "createImageRuntime({libraryPath,bindingModulePath,variants=[],models=[],backend='auto',signal,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/image"],
+      "primaryImport": "arcane-os/local-ai/image",
+      "group": "Core local images",
+      "summary": "Retains selected stable-diffusion.cpp model execution in a shared native worker and returns complete PNG results.",
+      "availability": "Node with prepared upstream image library, Koffi binding and caller-selected model resources",
+      "protocol": "Shared per-library worker/context lifetime with ordered native operations and replaying state",
+      "normalization": "Returns load/generate/unload/current/subscribe/close; preserves prompts and parameters; cancellation and close join native completion before resource release"
+    },
+    {
+      "id": "core-image:createCoreImageRuntime",
+      "name": "createCoreImageRuntime",
+      "displayName": "createCoreImageRuntime()",
+      "kind": "function",
+      "signature": "createCoreImageRuntime({client=getInstalledCoreClient(),signal,onEvent}={})",
+      "entrypoints": ["arcane-os/ai/core-image"],
+      "primaryImport": "arcane-os/ai/core-image",
+      "group": "Core local images",
+      "summary": "Uses an available Core image service with synchronous Thinking acknowledgement, lifecycle replay and complete PNG Blobs.",
+      "availability": "Browser/native WebView with an available Core image service; construction opens no connection or model",
+      "protocol": "arcane/1 image.status/load/generate/unload and image.state/progress",
+      "normalization": "Returns load/generate/unload/inspect/current/subscribe/close; timeoutMs is zero; close cancels this accessor while explicit unload owns the shared model"
+    },
+    {
+      "id": "core-image-service:createLocalImageService",
+      "name": "createLocalImageService",
+      "displayName": "createLocalImageService()",
+      "kind": "function",
+      "signature": "createLocalImageService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,modelAssets}={})",
+      "entrypoints": ["arcane-os/core/image"],
+      "primaryImport": "arcane-os/core/image",
+      "group": "Core local images",
+      "summary": "Composes independent image-runtime preparation, retained native model use and complete PNG transport as a Core service.",
+      "availability": "Node Core with selected stable-diffusion.cpp configuration and prepared runtime or preparation callback",
+      "protocol": "arcane/1 image lifecycle and progress; base64 framing only at the complete PNG transport boundary",
+      "normalization": "Status remains callable during preparation; shared model-assets handles remain retained through actual model unload, worker completion and disposal"
+    },
+    {
+      "id": "core-image-service:default",
+      "name": "default",
+      "displayName": "createLocalImageService default export",
+      "kind": "function",
+      "signature": "default as createLocalImageService",
+      "entrypoints": ["arcane-os/core/image"],
+      "primaryImport": "arcane-os/core/image",
+      "group": "Core local images",
+      "summary": "Default binding for the same native image service factory.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 service definition",
+      "normalization": "Binding identity equals the named createLocalImageService export"
+    },
+    {
+      "id": "core-model-assets:prepareCoreModelAssets",
+      "name": "prepareCoreModelAssets",
+      "displayName": "prepareCoreModelAssets()",
+      "kind": "function",
+      "signature": "async prepareCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,signal,onProgress}={})",
+      "entrypoints": ["arcane-os/ai/core-model-assets"],
+      "primaryImport": "arcane-os/ai/core-model-assets",
+      "group": "Core model assets",
+      "summary": "Projects complete caller-owned Blob/File members through Core into native working files without changing their durable store.",
+      "availability": "Browser with an available model-assets Core service and complete selected members",
+      "protocol": "arcane/1 modelAssets open/write/complete/release operations with transport-local base64",
+      "normalization": "Returns id/directory/ordered members/release; independent files transfer concurrently, each file writes in order, and cancellation joins cleanup"
+    },
+    {
+      "id": "core-model-assets-service:createModelAssetService",
+      "name": "createModelAssetService",
+      "displayName": "createModelAssetService()",
+      "kind": "function",
+      "signature": "createModelAssetService({appRoot=process.cwd()}={})",
+      "entrypoints": ["arcane-os/core/model-assets"],
+      "primaryImport": "arcane-os/core/model-assets",
+      "group": "Core model assets",
+      "summary": "Owns selected native working-file projections and engine retain handles while original stored model files remain unchanged.",
+      "availability": "Node Core with an application-selected working directory",
+      "protocol": "arcane/1 modelAssets.open/write/complete/release/status and modelAssets.state",
+      "normalization": "Returns current/retain/dispose and Core service lifecycle; final native release joins writes and closes before deleting only its working projection"
+    },
+    {
+      "id": "core-model-assets-service:default",
+      "name": "default",
+      "displayName": "createModelAssetService default export",
+      "kind": "function",
+      "signature": "default as createModelAssetService",
+      "entrypoints": ["arcane-os/core/model-assets"],
+      "primaryImport": "arcane-os/core/model-assets",
+      "group": "Core model assets",
+      "summary": "Default binding for the same native working-file service factory.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 service definition",
+      "normalization": "Binding identity equals the named createModelAssetService export"
+    },
     {
       "id": "local-ai-onnx:createONNXRuntime",
       "name": "createONNXRuntime",
@@ -129,14 +227,14 @@
       "name": "createLocalAIService",
       "displayName": "createLocalAIService()",
       "kind": "function",
-      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent}={})",
+      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})",
       "entrypoints": ["arcane-os/core/local-ai"],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
       "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
       "availability": "Node with selected upstream runtime distributions or available configured system services",
       "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE, Ollama native HTTP/NDJSON and ONNX tensor transport",
-      "normalization": "Application-owned runtime and model requirements; independent startup, complete responses and exact owned-process cleanup"
+      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup; independent services, complete responses and exact owned-process cleanup"
     },
     {
       "id": "core-local-ai:default",
@@ -161,10 +259,10 @@
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
-      "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp/Ollama distributions, ONNX npm runtime trees or NeMo libraries.",
+      "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp/Ollama/image distributions, ONNX npm runtime trees or NeMo libraries.",
       "availability": "Node; upstream platform and architecture assets determine runtime availability",
-      "protocol": "Official upstream release archives or selected ONNX npm installation",
-      "normalization": "Returns absolute runtime records; shares matching concurrent installs, preserves libraries and reports failures without changing global PATH or services"
+      "protocol": "Official upstream release archives and selected ONNX/Koffi npm runtime installations",
+      "normalization": "Returns absolute runtime records, including image library/binding/variant/model metadata; shares matching installs, preserves libraries, reports failures without changing global PATH or services and prepares no model files"
     },
     {
       "id": "local-ai:bundleLocalAIRuntimes",
@@ -178,7 +276,7 @@
       "summary": "Copies selected complete runtime distributions into a fresh native artifact staging root.",
       "availability": "Node; supports bundling published upstream platform assets independently of the build host",
       "protocol": "Artifact-relative runtime/local-ai layout",
-      "normalization": "Returns {runtimes,files} with relative runtime records and the complete emitted inventory; model resources remain application-owned"
+      "normalization": "Returns {runtimes,files} with artifact-relative runtime/variant paths and complete inventory; image URL descriptors remain for post-launch preparation and external model working paths report portability incompatibility"
     },
     {
       "id": "root:WS",

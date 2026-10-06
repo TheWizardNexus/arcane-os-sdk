@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The SDK&#39;s local image service runs selected stable-diffusion.cpp models in a retained native context. The browser uses Core for model lifecycle and complete PNG results. Applications own image prompts, style choices, character identity, associations and saved results.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-generation/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local image generation through Core · Arcane OS SDK"><meta property="og:description" content="The SDK&#39;s local image service runs selected stable-diffusion.cpp models in a retained native context. The browser uses Core for model lifecycle and complete PNG results. Applications own image prompts, style choices, character identity, associations and saved results."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-image-generation/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local image generation through Core · Arcane OS SDK"><meta name="twitter:description" content="The SDK&#39;s local image service runs selected stable-diffusion.cpp models in a retained native context. The browser uses Core for model lifecycle and complete PNG results. Applications own image prompts, style choices, character identity, associations and saved results."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Local image generation through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local image generation through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-image-generation-through-core">Local image generation through Core</h1><p class="doc-lead">The SDK&#39;s local image service runs selected stable-diffusion.cpp models in a retained native context. The browser uses Core for model lifecycle and complete PNG results. Applications own image prompts, style choices, character identity, associations and saved results.</p><div class="doc-meta"><span>SDK 0.61.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-image-generation.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#selection-and-model-assets">Selection and model assets</a><a href="#browser-accessor">Browser accessor</a><a href="#core-service-and-transport">Core service and transport</a></nav></details><p>The SDK&#39;s local image service runs selected stable-diffusion.cpp models in a
+retained native context. The browser uses Core for model lifecycle and complete
+PNG results. Applications own image prompts, style choices, character identity,
+associations and saved results.</p>
+<p>Runtime installation, model asset preparation, model loading and image
+generation are separate operations. The service starts promptly and retains
+runtime preparation in the background. <code>image.status</code> remains callable during
+preparation; rendering and unrelated Core services continue independently.</p>
+<h2 id="selection-and-model-assets">Selection and model assets</h2>
+<p>Select the runtime in <code>arcane-app.json</code> under <code>native.localAI</code>, or in the
+corresponding package projection&#39;s <code>localAI</code> record:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+    &quot;runtimes&quot;: [
+        {
+            &quot;id&quot;: &quot;stable-diffusion.cpp&quot;,
+            &quot;version&quot;: &quot;master-929-3f8527a&quot;,
+            &quot;backend&quot;: &quot;auto&quot;,
+            &quot;models&quot;: [&quot;sd14&quot;]
+        }
+    ]
+}
+</code></pre></div>
+<p><code>sd14</code> selects the Stable Diffusion 1.4 definition and its official
+<code>sd-v1-4.ckpt</code> resource. A model definition contains <code>id</code>, <code>name</code>, <code>family</code>,
+<code>resources</code>, <code>context</code>, <code>defaults</code> and <code>operations</code>. Selection supplies the
+model&#39;s resource metadata; runtime installation does not independently download
+or bundle model files. The shared model asset owner prepares selected browser
+assets and supplies a Core working projection for native path-based loading.</p>
+<p>The first published distribution path selects CPU on Windows and Linux.
+On macOS, <code>auto</code> selects the same upstream universal runtime&#39;s built-in Metal
+backend, with CPU fallback; explicit <code>cpu</code> remains available. A caller-supplied
+runtime archive with <code>backend: &#39;auto&#39;</code> uses its available accelerated device
+with CPU fallback. Built-in Windows CUDA distribution preparation is a separate
+pending addition. Actual backend/device availability and failures
+come from the runtime, separately from hardware metadata or an installed archive.
+Cancellation, invalid model input and inference failures retain their actual
+errors. Model loading has no native cancellation handle before its constructor
+returns; cancellation joins that call and releases its returned context before
+the operation settles.</p>
+<p>The complete prepared projection has an <code>id</code>, a <code>directory</code>, a <code>members</code> list
+and <code>release()</code>. <code>resourcePaths</code> maps native model resource roles to exact
+projection member paths. For the selected checkpoint, the role is <code>model</code>.
+The member name must match the preparation result. See
+<a href="../model-assets/">Model assets through Core</a> for the shared preparation
+lifecycle. Core acquires its own
+retain before loading. The caller can release its preparation ownership after
+successful <code>load()</code> acknowledgement: Core retains the files while its native
+context needs them. Release caller ownership when loading fails too; native
+cleanup keeps its own retain through actual completion. A later
+<code>generate({model: &#39;sd14&#39;, ...})</code> reuses that prepared selection. Replacing or
+unloading the context releases displaced projections
+after actual native operations settle. Core shutdown joins owned operations
+before releasing retained model files.</p>
+<p><code>model</code> also accepts a complete prepared model descriptor. Native callers can
+supply actual resource paths directly. The browser projection arguments supply
+the native paths through the shared asset service and preserve the remaining
+descriptor fields. The image service creates no second model downloader or
+durable model store.</p>
+<h2 id="browser-accessor">Browser accessor</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreImageRuntime} from &#39;arcane-os/ai/core-image&#39;;
+import {prepareCoreModelAssets} from &#39;arcane-os/ai/core-model-assets&#39;;
+import {createBrowserModelSource, createDbopfsModelStore} from &#39;arcane-os/ai/browser-wasm&#39;;
+
+const page = new AbortController();
+window.addEventListener(
+    &#39;pagehide&#39;,
+    function detachImagePage() {
+        page.abort();
+    },
+    {once: true}
+);
+
+const images = createCoreImageRuntime(
+    {signal: page.signal}
+);
+
+images.subscribe(
+    function showImageStatus(snapshot) {
+        statusElement.textContent = snapshot.status ?? snapshot.state;
+    }
+);
+
+const selected = (await images.inspect()).models.find(
+    function selectedCheckpoint(model) {
+        return model.id === &#39;sd14&#39;;
+    }
+);
+const resource = selected.resources.model;
+const source = createBrowserModelSource(
+    {
+        id: selected.id,
+        files: [
+            {name: resource.filename, url: resource.url}
+        ]
+    }
+);
+const store = createDbopfsModelStore(
+    {dbopfs, downloadConcurrency: 4}
+);
+const stored = await store.ensure(
+    source,
+    {signal: page.signal, offline: false}
+);
+const projection = await prepareCoreModelAssets(
+    {
+        workingDirectory: &#39;.arcane/model-working&#39;,
+        members: source.files.map(
+            function preparedCheckpoint(member, index) {
+                return {path: member.name, file: stored.files[index]};
+            }
+        ),
+        signal: page.signal
+    }
+);
+
+try {
+    await images.load(
+        {
+            model: &#39;sd14&#39;,
+            assetProjectionId: projection.id,
+            resourcePaths: {
+                model: &#39;sd-v1-4.ckpt&#39;
+            },
+            signal: page.signal
+        }
+    );
+} finally {
+    await projection.release();
+}
+
+const result = await images.generate(
+    {
+        model: &#39;sd14&#39;,
+        prompt: &#39;Portrait of a dignified raccoon astronaut holding a tiny moon cactus.&#39;,
+        signal: page.signal,
+        onProgress(progress) {
+            console.log(progress);
+        }
+    }
+);
+
+for (const image of result.images) {
+    const url = URL.createObjectURL(image.blob);
+    const preview = new Image();
+    preview.alt = &#39;Generated raccoon astronaut portrait&#39;;
+    function releasePreviewURL() {
+        URL.revokeObjectURL(url);
+    }
+    preview.addEventListener(
+        &#39;load&#39;,
+        releasePreviewURL,
+        {once: true}
+    );
+    preview.addEventListener(
+        &#39;error&#39;,
+        releasePreviewURL,
+        {once: true}
+    );
+    preview.src = url;
+    imageContainer.append(preview);
+}
+</code></pre></div>
+<p>The example uses the application&#39;s existing <code>dbopfs</code> instance and existing
+<code>statusElement</code> and <code>imageContainer</code> elements. The published model store accepts
+the selected checkpoint as an ordinary resource: <code>ensure()</code> returns complete
+ordered <code>Blob</code> or <code>File</code> members after its resumable download. Range support
+allows concurrent transfer within a member; those transfer parts remain the
+store&#39;s concern. Use <code>offline: true</code> to require an already complete stored model.
+The store does not select or run the image engine. In source development,
+load the development Core bootstrap described
+in <a href="../local-ai/#development">Local AI through Core</a> before constructing the
+accessor. Native hosts install their Core client through the existing host path.
+An ordinary browser without Core reports local image generation as unavailable.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>createCoreImageRuntime({client?, signal?, onEvent?})</code></td>
+<td>Uses the installed Core client by default, subscribes to lifecycle events and asynchronously reads one initial status snapshot. It returns immediately.</td>
+</tr>
+<tr>
+<td><code>load({model, context?, assetProjectionId?, resourcePaths?, signal?})</code></td>
+<td>Loads the selected model and returns authoritative service state after native completion. <code>context</code> supplies native context options.</td>
+</tr>
+<tr>
+<td><code>generate({model, prompt, parameters?, assetProjectionId?, resourcePaths?, signal?, onProgress?})</code></td>
+<td>Returns the complete result with <code>images: [{blob, mediaType, width, height}]</code>. Additional runtime result metadata remains present.</td>
+</tr>
+<tr>
+<td><code>unload({signal?})</code></td>
+<td>Explicitly unloads the shared selected native context and returns its resulting state.</td>
+</tr>
+<tr>
+<td><code>inspect({signal?})</code></td>
+<td>Reads current Core status without waiting for model or runtime preparation.</td>
+</tr>
+<tr>
+<td><code>current()</code></td>
+<td>Synchronously returns the retained lifecycle snapshot and this accessor&#39;s transient request status.</td>
+</tr>
+<tr>
+<td><code>subscribe(listener, {replay = true, signal?})</code></td>
+<td>Observes <code>image.state</code> and immediately replays the current snapshot by default; returns an unsubscribe function.</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Cancels this accessor&#39;s requests, removes subscriptions and joins its request promises. It leaves the shared Core client and selected model under their existing owners.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Generation publishes <code>status: &#39;Thinking&#39;</code> synchronously when accepted, before
+transport, preparation, model loading or inference waits. This remains transient
+status until the complete image result arrives. Native sampling progress is
+reported as progress, with no fabricated image chunks or conversation turns.
+The accessor&#39;s <code>requests</code> records contain method, stream ID, status and progress;
+they contain no saved prompt or image history.</p>
+<p>The authoritative lifecycle snapshot includes <code>selectedModel</code>, <code>loaded</code>,
+<code>state</code>, <code>backend</code>, <code>progress</code>, <code>error</code>, native resource paths and device state.
+Service metadata adds runtime <code>id</code>, installation/availability state and selected
+model definitions, including their resource metadata before engine preparation
+finishes. Installed files do not imply a loaded model. A late status
+response never overwrites a newer lifecycle event.</p>
+<p>Prompts and parameters pass unchanged to the native runtime. Native option
+names, supported model operations and defaults belong to that runtime and the
+selected model definition. A prompt containing U+0000 or an unpaired UTF-16
+surrogate cannot pass unchanged through the native UTF-8 C-string boundary and
+reports that incompatibility.</p>
+<p>The request signal propagates through Core to the owning native operation.
+Aborted requests produce no late image result or progress callback. Request
+invocations use <code>timeoutMs: 0</code>; there is no arbitrary image-generation timeout.
+Errors retain their actual details on rejected promises and diagnostic events.
+Applications choose concise ordinary status text and keep complete engineering
+details in their diagnostic surface, outside durable chat history.</p>
+<p><code>onEvent</code> observes <code>image.state</code>, <code>image.progress</code>, <code>image.request</code>,
+<code>image.result</code> and <code>image.error</code> records. Observer failures are reported to the
+developer console and do not replace inference results. Observers own their
+asynchronous callback lifetimes. The SDK persists no prompt, result, transcript
+or application-owned image association.</p>
+<h2 id="core-service-and-transport">Core service and transport</h2>
+<p><code>createLocalImageService(configuration, options)</code> is exported from
+<code>arcane-os/core/image</code>. <code>configuration</code> is the selected <code>localAI</code> record.
+Options are <code>appRoot</code>, installed <code>runtimes</code>, <code>signal</code>, <code>onEvent</code>, an optional
+<code>prepare</code> callback and the existing <code>modelAssets</code> service instance.</p>
+<p><code>prepare({appRoot, configuration, requirement, signal, onEvent})</code> returns one
+installed runtime record. Preparation runs once per service. That record carries
+<code>libraryPath</code>, <code>bindingModulePath</code>, <code>backend</code>, <code>variants</code> and model definitions.
+Runtime variants preserve their native backend, library path and runtime root.
+The service retains one native runtime and subscribes to its current-state
+replay. Expensive model execution belongs to that runtime&#39;s worker.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method/event</th>
+<th>Parameters or result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>image.status</code></td>
+<td>Immediate lifecycle snapshot.</td>
+</tr>
+<tr>
+<td><code>image.load</code></td>
+<td><code>{model, context?, assetProjectionId?, resourcePaths?}</code>; returns lifecycle snapshot.</td>
+</tr>
+<tr>
+<td><code>image.generate</code></td>
+<td><code>{model, prompt, parameters?, streamId?, assetProjectionId?, resourcePaths?}</code>; returns complete encoded images.</td>
+</tr>
+<tr>
+<td><code>image.unload</code></td>
+<td>Empty parameters; returns lifecycle snapshot after unload.</td>
+</tr>
+<tr>
+<td><code>image.state</code></td>
+<td>Complete service lifecycle snapshot. Service and browser <code>subscribe()</code> provide current-state replay.</td>
+</tr>
+<tr>
+<td><code>image.progress</code></td>
+<td><code>{streamId, requestId, status: &#39;Thinking&#39;, progress}</code> for the corresponding generation request.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Core&#39;s JSON transport represents each complete PNG as
+<code>{data, encoding: &#39;base64&#39;, mediaType: &#39;image/png&#39;, width, height}</code>. The browser
+decodes that complete representation into a <code>Blob</code> and preserves its metadata.
+There is no result resizing, clipping, storage write or application policy at
+this transport boundary.</p>
+<p>One service prepares one selected runtime, retains one selected native context
+and performs one native generation per request. The native owner serializes
+only competing operations on that context. Independent Core services and page
+rendering remain concurrent. Native platform execution evidence and package
+publication are separate from this source/API description.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#selection-and-model-assets">Selection and model assets</a><a href="#browser-accessor">Browser accessor</a><a href="#core-service-and-transport">Core service and transport</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.61.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

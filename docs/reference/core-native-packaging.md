@@ -248,8 +248,9 @@ to the artifact root. Only the explicitly configured entry imports
 `createLocalAIService` from `arcane-os/core/local-ai`. It resolves those bundled
 locations against the installed artifact and supplies them in the launch
 context's `runtimes` array, alongside `appRoot`, before applying explicit launch
-configuration. It passes the complete authored `native.localAI` record to the
-factory. Applications without that selection have no generated local-AI import
+configuration. It passes chat/ONNX requirements to that factory and routes
+selected image requirements to their separate service as described below.
+Applications without that selection have no generated local-AI import
 or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.
 
@@ -259,6 +260,25 @@ Its `modulePath` resolves against the artifact root just as a server runtime's
 service exposes retained worker sessions through `onnx.load/run/unload/status`;
 model files remain caller-selected application resources. See
 [native ONNX sessions](local-ai.md#native-onnx-sessions).
+
+Selected `stable-diffusion.cpp` additionally composes
+`createLocalImageService` from `arcane-os/core/image` and one shared
+`createModelAssetService` from `arcane-os/core/model-assets`. The image factory
+receives the full authored selection plus that same model-assets instance.
+Library, Koffi binding and variant paths resolve from the artifact root;
+ordinary browser imports use `arcane-os/ai/core-image` and
+`arcane-os/ai/core-model-assets` through the managed import map.
+
+The runtime bundle preserves the complete selected native distribution and
+binding tree. It does not load or download a model. Original model URL
+descriptors remain available for preparation after launch; runtime-contained
+model paths relocate with the artifact. An external native working path
+reports its portability incompatibility. Supply those files through the
+application's native resources or the shared
+[stored-model projection](model-assets.md). Native use retains that projection
+until actual unload or shutdown completes. See
+[local image generation](local-image-generation.md) for selection, complete
+results and CPU/Metal platform boundaries.
 
 ## Windows executable
 

@@ -63,9 +63,14 @@ runtime layouts.
 | `arcane-os/diarization` | Retained Nemotron model helper and independent caller-fed audio streams. |
 | `arcane-os/diarization/build` | First-party helper compilation against explicitly installed NeMo-Speech.cpp libraries. |
 | `arcane-os/core/local-ai` | Native llama.cpp, Ollama and ONNX Core service, model readiness, complete responses and owned lifecycle. See [local AI through Core](local-ai.md). |
-| `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX requirements and NeMo libraries. |
+| `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX/image requirements and NeMo libraries. |
 | `arcane-os/local-ai/onnx` | Retained native ONNX worker sessions with explicit graph loading and complete tensor inference. |
 | `arcane-os/ai/core-onnx` | Optional browser access to system ONNX through an existing Core connection. |
+| `arcane-os/local-ai/image` | Retained native stable-diffusion.cpp context, complete PNG generation and owned worker lifetime. |
+| `arcane-os/ai/core-image` | Browser image lifecycle and complete PNG Blobs through an available Core service. |
+| `arcane-os/core/image` | Native image Core service with independent runtime preparation and retained model ownership. |
+| `arcane-os/ai/core-model-assets` | Complete stored browser model members projected through Core into native working files. |
+| `arcane-os/core/model-assets` | Native working-file preparation, engine retain handles and joined cleanup. |
 | `arcane-os/integrated-provider` | Fixed integrated shared-development provider. |
 | `arcane-os/packager` | Low-level browser app packager. |
 | `arcane-os/release-bundle` | Deterministic external release bundles. |
@@ -403,6 +408,13 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama/ONNX runtimes |
 | `createONNXRuntime()` | function | `arcane-os/local-ai/onnx` | Core local AI | Node with prepared Microsoft ONNX runtime |
 | `createCoreONNXRuntime()` | function | `arcane-os/ai/core-onnx` | Core local AI | Browser with an available Core ONNX service |
+| `createImageRuntime()` | function | `arcane-os/local-ai/image` | Core local images | Node with a prepared native image runtime and caller-selected model |
+| `createCoreImageRuntime()` | function | `arcane-os/ai/core-image` | Core local images | Browser with an available Core image service |
+| `createLocalImageService()` | function | `arcane-os/core/image` | Core local images | Node Core with selected stable-diffusion.cpp requirements |
+| `createLocalImageService default export` | function | `arcane-os/core/image` | Core local images | Same native image service factory |
+| `prepareCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with complete Blob/File members and available Core service |
+| `createModelAssetService()` | function | `arcane-os/core/model-assets` | Core model assets | Node Core with an application-selected working directory |
+| `createModelAssetService default export` | function | `arcane-os/core/model-assets` | Core model assets | Same native working-file service factory |
 | `createLocalAIService default export` | function | `arcane-os/core/local-ai` | Core local AI | Same native service factory |
 | `ensureLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; selected upstream platform assets |
 | `bundleLocalAIRuntimes()` | function | `arcane-os/local-ai` | Core local AI | Node; complete native runtime assembly |
@@ -7708,7 +7720,7 @@ separate states; prompts, models and application policy remain caller-owned.
 ### Signature and result
 
 ```text
-createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent}={})
+createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})
 ```
 
 Import it from `arcane-os/core/local-ai`. `configuration` is the authored local-AI
@@ -7717,6 +7729,13 @@ resolved installed runtime records. It returns a Core service definition with
 `current()` and independent selected-engine startup. Compose it through the
 existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
 an already running external service remains under its external owner.
+
+Optional `prepare({signal,onEvent})` supplies resolved runtime records during
+this service's startup. Only operations depending on that service wait for its
+preparation; the development listener and independently composed image/model
+asset services keep their own lifetimes. Pass only llama.cpp/Ollama/ONNX
+requirements to this factory; `createLocalImageService()` owns selected image
+requirements. The managed development and native entrypoints separate them.
 
 The service provides `localai.status`, explicit `localai.services.recover`,
 `llama.status/models/load/unload/chat`, `onnx.status/load/run/unload`, and the documented native Ollama methods.
@@ -7761,6 +7780,116 @@ accessor's requests and subscriptions; unloading shared models is explicit.
 Construction installs no runtime and opens no transport. Existing browser
 ONNX/Wllama remain independent. See [Core and browser usage](local-ai.md#onnx-through-core-and-the-browser).
 
+## createImageRuntime()
+
+`createImageRuntime({libraryPath,bindingModulePath,variants=[],models=[],backend='auto',signal?,onEvent?})`
+from `arcane-os/local-ai/image` retains the native image owner for the selected
+library. Prepare the installed record through `ensureLocalAIRuntimes()` and
+supply complete model descriptors with actual native resource paths. The
+factory installs no software and starts its worker when an operation needs it.
+
+It returns `load({model,context?,signal?})`, `generate({model,prompt,parameters?,
+signal?,onProgress?})`, `unload({signal?})`, `current()`,
+`subscribe(listener,{replay=true})` and asynchronous `close()`. A model ID uses
+its supplied descriptor; a complete descriptor may be passed directly.
+Generation returns all PNG results as `images: [{data,mediaType,width,height}]`
+with native result metadata. Prompts and parameters remain complete.
+
+Accessors for the same library share its worker and selected context. Competing
+native operations are ordered at that owner; unrelated services remain
+concurrent. State observation replays synchronously by default. Cancellation
+joins the owning native operation; a model constructor may finish before its
+new context can be released. Native accessor `close()` cancels its requests,
+joins them and releases the shared selected context before its working files
+can be retired. The final reference closes the worker. This differs from the
+browser accessor's detach-only ownership below. See the
+[image lifecycle, backend and error contract](local-image-generation.md).
+
+## createCoreImageRuntime()
+
+`createCoreImageRuntime({client=getInstalledCoreClient(),signal?,onEvent?})`
+from `arcane-os/ai/core-image` returns immediately with `load`, `generate`,
+`unload`, `inspect`, `current`, `subscribe` and `close`. It subscribes before
+requesting an initial status snapshot so newer lifecycle events win. It opens
+no connection and installs or selects no model.
+
+`load({model,context?,assetProjectionId?,resourcePaths?,signal?})` and
+`generate({model,prompt,parameters?,assetProjectionId?,resourcePaths?,signal?,
+onProgress?})` use the selected Core service. Generation acknowledges with
+transient `Thinking` synchronously and returns complete
+`images: [{blob,mediaType,width,height}]` plus native result metadata.
+`unload({signal?})` explicitly releases the shared selected model;
+`inspect({signal?})` reads authoritative state without waiting for preparation.
+All request methods use `timeoutMs:0`. `current()` includes transient requests,
+status, busy and closed state; no prompt or image history is saved.
+
+`subscribe(listener,{replay=true,signal?})` returns an unsubscribe function.
+`close()` cancels and joins only this accessor's requests and subscriptions,
+leaving the shared Core client and selected model with their owners. Request
+errors retain complete details; an unavailable Core reports
+`ARCANE_IMAGE_CORE_UNAVAILABLE`. Aborted operations deliver no late result or
+progress. See the [complete browser example and events](local-image-generation.md#browser-accessor).
+
+## createLocalImageService()
+
+`createLocalImageService(configuration,{appRoot,runtimes=[],signal?,onEvent?,prepare?,modelAssets?})`
+from `arcane-os/core/image` returns a Core service with `current()`, replaying
+`subscribe(listener)`, native preparation, request methods and joined disposal.
+`configuration` is the selected `localAI` record. Optional
+`prepare({appRoot,configuration,requirement,signal,onEvent})` returns one
+installed image-runtime record. Startup retains this preparation in the
+background; `image.status` and unrelated services remain responsive.
+
+The service owns `image.status/load/generate/unload` and
+`image.state/progress`. Pass the same `createModelAssetService()` instance that
+Core exposes when using `assetProjectionId` and `resourcePaths`. It retains
+prepared model files through actual native completion, replacement, unload and
+shutdown. PNG base64 is transport-only framing; the complete result is decoded
+by the browser accessor. See [parameters, results and ownership](local-image-generation.md#core-service-and-transport).
+
+## createLocalImageService default export
+
+The default export from `arcane-os/core/image` is the same
+`createLocalImageService` factory and lifecycle described above.
+
+## prepareCoreModelAssets()
+
+`prepareCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,signal?,onProgress?})`
+from `arcane-os/ai/core-model-assets` projects ordered complete
+`members: [{path,file}]` through an available Core connection. Each `file` is a
+Blob or File. It returns `{id,directory,members:[{path,nativePath}],release}`
+after all members finish writing and close. Independent members transfer
+concurrently; each member's writes remain ordered.
+
+The caller releases preparation ownership with asynchronous idempotent
+`release()`. Native engines acquire their own retain handle before loading,
+and files remain until their actual native use ends. Cancellation and failure
+join transfers and uncancelled cleanup, preserving complete original errors.
+The helper downloads no model, changes no DBOPFS original and selects no
+engine. See [complete preparation and cleanup usage](model-assets.md).
+
+## createModelAssetService()
+
+`createModelAssetService({appRoot=process.cwd()}={})` from
+`arcane-os/core/model-assets` returns the Core service for
+`modelAssets.open/write/complete/release/status` and `modelAssets.state`.
+Relative working directories resolve from `appRoot`; explicit absolute
+directories remain caller-selected. Each projection has its own child
+directory and complete member files.
+
+`current()` returns `{closing,projections}`. `retain(id)` accepts a completed
+projection and returns `{id,directory,members,release}` for a native owner.
+`dispose()` releases preparation ownership and joins file writes, closes and
+all native retain lifetimes before cleanup. The native owner releases its
+handle only after its actual context/worker use ends. Original stored model
+files remain with their application owner. See
+[working-file service and wire operations](model-assets.md#native-ownership).
+
+## createModelAssetService default export
+
+The default export from `arcane-os/core/model-assets` is the same
+`createModelAssetService` factory and lifecycle described above.
+
 ## createLocalAIService default export
 
 The default binding from `arcane-os/core/local-ai` is exactly the named
@@ -7776,7 +7905,7 @@ import createLocalAIService from 'arcane-os/core/local-ai';
 ### Overview
 
 Reuses matching managed runtimes or installs complete selected official
-llama.cpp/Ollama/ONNX distributions or NeMo libraries in an explicitly supplied directory.
+llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly supplied directory.
 
 ### Signature and result
 
@@ -7787,7 +7916,11 @@ async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,arc
 Import it from `arcane-os/local-ai`. Runtime requirements accept IDs or
 `{id,version?,url?}` records. The result is an array of absolute
 `{id,version,platform,architecture,root}` records, with `executable` for servers,
-`modulePath` for ONNX, or NeMo library directories. Matching concurrent
+`modulePath` for ONNX, image `libraryPath`/`bindingModulePath`/`variants`/`models`,
+or NeMo library directories. Image requirements also accept `backend` and
+`models`; their pinned default runtime, CPU/Metal selection and separate model
+preparation are described in [local image generation](local-image-generation.md).
+Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
 Installation changes no global PATH or system service and loads no model.
@@ -7824,6 +7957,13 @@ runtime paths are artifact-relative under `runtime/local-ai/<id>`, and `files`
 contains the complete emitted inventory. Existing runtime destinations are
 preserved and reported as a conflict. Copying settles all started work and
 reports failures/cancellation without executing app services or models.
+
+Image records relocate the complete library, binding and variant paths. Model
+URL descriptors retain their original acquisition metadata for preparation
+after launch. Runtime-contained native model paths become artifact-relative;
+external working paths report their portability incompatibility rather than
+embedding this machine's path. Use the application-owned native-resource or
+post-launch model-assets workflow for those files.
 
 ```javascript
 import {bundleLocalAIRuntimes} from 'arcane-os/local-ai';

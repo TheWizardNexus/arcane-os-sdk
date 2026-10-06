@@ -2,21 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.">
+  <meta name="description" content="Core owns native llama.cpp and Ollama processes, ONNX worker sessions and selected local image generation. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local AI through Core · Arcane OS SDK"><meta property="og:description" content="Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local AI through Core · Arcane OS SDK"><meta name="twitter:description" content="Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Local AI through Core · Arcane OS SDK"><meta property="og:description" content="Core owns native llama.cpp and Ollama processes, ONNX worker sessions and selected local image generation. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Local AI through Core · Arcane OS SDK"><meta name="twitter:description" content="Core owns native llama.cpp and Ollama processes, ONNX worker sessions and selected local image generation. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Local AI through Core | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local AI through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-ai-through-core">Local AI through Core</h1><p class="doc-lead">Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.</p><div class="doc-meta"><span>SDK 0.60.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local AI through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-ai-through-core">Local AI through Core</h1><p class="doc-lead">Core owns native llama.cpp and Ollama processes, ONNX worker sessions and selected local image generation. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.</p><div class="doc-meta"><span>SDK 0.61.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="./" aria-current="page">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/local-ai.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-onnx-sessions">Native ONNX sessions</a><a href="#native-bundling">Native bundling</a></nav></details><p>Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own
+      <article class="prose reference-prose" data-reference-source="docs/reference/local-ai.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-onnx-sessions">Native ONNX sessions</a><a href="#native-bundling">Native bundling</a></nav></details><p>Core owns native llama.cpp and Ollama processes, ONNX worker sessions and
+selected local image generation. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
 when that system service is available. Runtime installation, model loading and
 inference are separate operations.</p>
@@ -31,7 +32,8 @@ Existing native fields remain alongside this record:</p>
   &quot;runtimes&quot;: [
     {&quot;id&quot;: &quot;llama.cpp&quot;},
     {&quot;id&quot;: &quot;ollama&quot;},
-    {&quot;id&quot;: &quot;onnx&quot;}
+    {&quot;id&quot;: &quot;onnx&quot;},
+    {&quot;id&quot;: &quot;stable-diffusion.cpp&quot;, &quot;backend&quot;: &quot;auto&quot;, &quot;models&quot;: [&quot;sd14&quot;]}
   ],
   &quot;llamaCpp&quot;: {
     &quot;modelsDirectory&quot;: &quot;models/llama&quot;
@@ -44,10 +46,20 @@ Existing native fields remain alongside this record:</p>
 <p>Each runtime requirement accepts <code>id</code>, optional upstream <code>version</code>, and an
 optional runtime archive <code>url</code>. ONNX resolves its official npm package or an
 explicitly supplied package archive. A string runtime ID is also accepted.
-Omitting the version allows reuse of an available runtime. Explicit versions
+For chat runtimes, omitting the version allows reuse of an available runtime. Explicit versions
 select that upstream distribution; an existing service must match the requested
 version before it is reused. A service occupying the selected address is
 preserved when its version cannot be established.</p>
+<p>Both public application/package schemas accept <code>stable-diffusion.cpp</code> as a
+string or runtime-record ID. Its record additionally accepts <code>backend</code>
+(<code>auto</code>, <code>cpu</code> or <code>metal</code>) and <code>models</code>, an array of <code>sd14</code> or complete model
+descriptors. Omitted image version selects <code>master-929-3f8527a</code>; omitted backend
+selects <code>auto</code>; omitted models leaves model selection empty. Windows/Linux
+distribution defaults use CPU; the selected universal Mac archive supports
+Metal with CPU fallback. Installation obtains the upstream library and its
+managed <code>koffi@3.3.2</code> binding, without installing a model. Complete model
+descriptors keep their resources, context, defaults and operations separate.
+See <a href="../local-image-generation/#selection-and-model-assets">image selection and model preparation</a>.</p>
 <p><code>llamaCpp</code> accepts <code>url</code>, <code>model</code>, <code>modelsDirectory</code>, and an <code>args</code> string array.
 <code>model</code> selects a single GGUF file; <code>modelsDirectory</code> selects llama.cpp router
 mode. Paths resolve from the application root. Ollama accepts <code>url</code>,
@@ -60,6 +72,10 @@ application. Applications choose and provision their models explicitly.</p>
 </code></pre></div>
 <p>The option adds those runtime requirements to the authored application
 configuration. Subsequent <code>arcane dev</code> runs reuse the saved requirements.
+<code>--local-ai stable-diffusion.cpp</code> also selects image runtime preparation; the
+application selects its <code>models</code> in the runtime record before requesting a
+load or generation. The development owner composes separate image and
+model-assets services alongside the existing chat/ONNX service.
 Development checks selected endpoints and existing executable paths, then
 installs missing runtimes under the application&#39;s <code>.arcane/local-ai/runtimes</code>.
 Runtime preparation runs alongside HTTP serving. Browser rendering continues
@@ -87,9 +103,12 @@ cancels that tab&#39;s requests; closing development stops its owned runtime
 processes. An already running external service remains running.</p>
 <p><code>developApplication()</code> returns its usual server handle and an optional <code>localAI</code>
 handle with <code>ready</code>, <code>current()</code>, <code>handler()</code> and <code>close()</code>. Its <code>ready</code> promise
-means installation and Core composition completed. Runtime/model readiness is
-reported separately by Core status and lifecycle events. Preparation failures
-remain on that promise and the operation event stream.</p>
+means Core composition has started, not that installation or a selected model
+is ready. Runtime preparation continues at each owning service. <code>current()</code>
+includes separate <code>core</code>, <code>localAI</code> and optional <code>image</code> state; image status
+remains callable during preparation. Composition failures reject <code>ready</code>;
+later service preparation failures remain on Core lifecycle and diagnostic
+events. Page rendering waits for neither.</p>
 <h2 id="core-service">Core service</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createLocalAIService} from &#39;arcane-os/core/local-ai&#39;;
 
@@ -105,6 +124,13 @@ runtime records; the native builder supplies them automatically for a selected
 application. <code>current()</code> returns the current snapshot without starting another
 process. The service starts each selected runtime independently, retains its
 process between requests, and joins cleanup during disposal.</p>
+<p>Optional <code>prepare({signal,onEvent})</code> returns resolved runtime records before
+this service starts its selected engines. The managed development owner uses
+that callback without delaying the HTTP listener or independent services.
+This factory accepts chat/ONNX requirements; the separate
+<a href="../local-image-generation/#core-service-and-transport"><code>createLocalImageService()</code></a>
+owns image requirements. The development and generated native composition
+split the shared application record accordingly.</p>
 <p><code>localai.status</code> returns <code>{runtimes}</code> and, when Ollama is selected, the existing
 <code>ollama</code> and <code>models.ollama</code> catalog fields. Runtime records distinguish
 <code>installed</code>, <code>available</code>, <code>state</code>, <code>models</code>, ownership and errors. A listening
@@ -318,10 +344,22 @@ runtime&#39;s published platform assets; Ollama has no official Android runtime
 archive in this installer.</p>
 <p>Ensure returns absolute <code>{id,version,platform,architecture,root}</code> records.
 Server runtimes also include <code>executable</code>; ONNX includes <code>modulePath</code> pointing
-to its public package entry. Bundle returns <code>{runtimes,files}</code>,
+to its public package entry. Image records include <code>libraryPath</code>,
+<code>bindingModulePath</code>, requested <code>backend</code>, installed <code>variants</code> and selected
+<code>models</code> metadata. Variant records carry backend, runtime root and library path.
+Bundle returns <code>{runtimes,files}</code>,
 with artifact-relative runtime paths and a complete emitted file inventory.
 Bundling requires a fresh native staging destination, preserving existing
 completed outputs.</p>
+<p>Image assembly preserves the complete runtime/binding tree and relocates
+library, binding and variant paths into the artifact. It retains original
+model URL descriptors for preparation after launch. A model file already
+inside the runtime tree becomes artifact-relative; an external native working
+path reports its portability incompatibility. Use the explicit native-resource
+workflow or <a href="../model-assets/">model-assets preparation</a> for those files.
+Model acquisition, context loading and inference remain separate from runtime
+assembly. Platform availability depends on the selected upstream archive;
+this contract does not establish execution on every supported host.</p>
 <h3 id="nemo-speech-library-runtime">NeMo Speech library runtime</h3>
 <p>The runtime helpers also accept <code>{id: &#39;nemo-speech&#39;, version: &#39;0.2.0&#39;}</code> to
 prepare NVIDIA&#39;s official CPU library distribution. An omitted NeMo version
@@ -342,6 +380,6 @@ integration.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-onnx-sessions">Native ONNX sessions</a><a href="#native-bundling">Native bundling</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.60.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.61.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

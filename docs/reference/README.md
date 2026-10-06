@@ -55,6 +55,8 @@ alone does not make bare module names resolve in a browser.
 | Cancel one Core speech synthesis request without changing its payload | [Speech request lifetime](core-client.md#events-and-request-lifetime) and [Core facade](sdk-api.md#createcorefacade) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
+| Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
+| Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
@@ -223,6 +225,8 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Run a caller-selected GGUF LLM locally | [`arcane-os/ai/browser-wasm`](ai/browser-wasm.md) | Browser secure context with WebAssembly and OPFS/DBOPFS; explicit CPU selection or WebGPU with full offload and no automatic CPU fallback. |
 | Run application-selected native llama.cpp/Ollama chat | [`arcane-os/ai/core-local`, `arcane-os/core/local-ai`](local-ai.md) | Explicit Core connection and selected native runtimes; installation, availability and loaded-model readiness remain distinct. |
 | Run a local ONNX graph with named tensors | [`arcane-os/local-ai/onnx`, `arcane-os/ai/core-onnx`](local-ai.md#native-onnx-sessions) | Retained native workers; browser access requires an available Core ONNX service. |
+| Generate local images from complete prompts and selected model resources | [`arcane-os/local-ai/image`, `arcane-os/ai/core-image`](local-image-generation.md) | Prepared native image runtime; browser access requires its Core service. CPU Windows/Linux and Mac Metal/CPU paths have distinct actual host requirements. |
+| Supply complete stored model members to a native engine | [`arcane-os/ai/core-model-assets`, `arcane-os/core/model-assets`](model-assets.md) | Available Core service; DBOPFS originals stay authoritative while native owners retain working files. |
 | Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend. |
 | Use native browser recognition/voices or selected cloud TTS | [Speech provider choices](ai/browser-speech.md) | Native APIs depend on the browser and may use remote services; cloud TTS requires the application key and endpoint access. |
 | Send complete chat, System One or image requests without retained history | [`arcane-os/ai/twin-cloud`](ai/twin-cloud.md) | Node or browser with Fetch and explicit model/credentials; image results contain every returned image as a Blob. |

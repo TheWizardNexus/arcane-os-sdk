@@ -1,6 +1,7 @@
 # Local AI through Core
 
-Core owns native llama.cpp and Ollama processes and ONNX worker sessions. The browser retains its own
+Core owns native llama.cpp and Ollama processes, ONNX worker sessions and
+selected local image generation. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
 when that system service is available. Runtime installation, model loading and
 inference are separate operations.
@@ -20,7 +21,8 @@ Existing native fields remain alongside this record:
   "runtimes": [
     {"id": "llama.cpp"},
     {"id": "ollama"},
-    {"id": "onnx"}
+    {"id": "onnx"},
+    {"id": "stable-diffusion.cpp", "backend": "auto", "models": ["sd14"]}
   ],
   "llamaCpp": {
     "modelsDirectory": "models/llama"
@@ -34,10 +36,21 @@ Existing native fields remain alongside this record:
 Each runtime requirement accepts `id`, optional upstream `version`, and an
 optional runtime archive `url`. ONNX resolves its official npm package or an
 explicitly supplied package archive. A string runtime ID is also accepted.
-Omitting the version allows reuse of an available runtime. Explicit versions
+For chat runtimes, omitting the version allows reuse of an available runtime. Explicit versions
 select that upstream distribution; an existing service must match the requested
 version before it is reused. A service occupying the selected address is
 preserved when its version cannot be established.
+
+Both public application/package schemas accept `stable-diffusion.cpp` as a
+string or runtime-record ID. Its record additionally accepts `backend`
+(`auto`, `cpu` or `metal`) and `models`, an array of `sd14` or complete model
+descriptors. Omitted image version selects `master-929-3f8527a`; omitted backend
+selects `auto`; omitted models leaves model selection empty. Windows/Linux
+distribution defaults use CPU; the selected universal Mac archive supports
+Metal with CPU fallback. Installation obtains the upstream library and its
+managed `koffi@3.3.2` binding, without installing a model. Complete model
+descriptors keep their resources, context, defaults and operations separate.
+See [image selection and model preparation](local-image-generation.md#selection-and-model-assets).
 
 `llamaCpp` accepts `url`, `model`, `modelsDirectory`, and an `args` string array.
 `model` selects a single GGUF file; `modelsDirectory` selects llama.cpp router
@@ -55,6 +68,10 @@ arcane dev --local-ai llama.cpp,ollama,onnx
 
 The option adds those runtime requirements to the authored application
 configuration. Subsequent `arcane dev` runs reuse the saved requirements.
+`--local-ai stable-diffusion.cpp` also selects image runtime preparation; the
+application selects its `models` in the runtime record before requesting a
+load or generation. The development owner composes separate image and
+model-assets services alongside the existing chat/ONNX service.
 Development checks selected endpoints and existing executable paths, then
 installs missing runtimes under the application's `.arcane/local-ai/runtimes`.
 Runtime preparation runs alongside HTTP serving. Browser rendering continues
@@ -89,9 +106,12 @@ processes. An already running external service remains running.
 
 `developApplication()` returns its usual server handle and an optional `localAI`
 handle with `ready`, `current()`, `handler()` and `close()`. Its `ready` promise
-means installation and Core composition completed. Runtime/model readiness is
-reported separately by Core status and lifecycle events. Preparation failures
-remain on that promise and the operation event stream.
+means Core composition has started, not that installation or a selected model
+is ready. Runtime preparation continues at each owning service. `current()`
+includes separate `core`, `localAI` and optional `image` state; image status
+remains callable during preparation. Composition failures reject `ready`;
+later service preparation failures remain on Core lifecycle and diagnostic
+events. Page rendering waits for neither.
 
 ## Core service
 
@@ -111,6 +131,14 @@ runtime records; the native builder supplies them automatically for a selected
 application. `current()` returns the current snapshot without starting another
 process. The service starts each selected runtime independently, retains its
 process between requests, and joins cleanup during disposal.
+
+Optional `prepare({signal,onEvent})` returns resolved runtime records before
+this service starts its selected engines. The managed development owner uses
+that callback without delaying the HTTP listener or independent services.
+This factory accepts chat/ONNX requirements; the separate
+[`createLocalImageService()`](local-image-generation.md#core-service-and-transport)
+owns image requirements. The development and generated native composition
+split the shared application record accordingly.
 
 `localai.status` returns `{runtimes}` and, when Ollama is selected, the existing
 `ollama` and `models.ollama` catalog fields. Runtime records distinguish
@@ -305,10 +333,23 @@ archive in this installer.
 
 Ensure returns absolute `{id,version,platform,architecture,root}` records.
 Server runtimes also include `executable`; ONNX includes `modulePath` pointing
-to its public package entry. Bundle returns `{runtimes,files}`,
+to its public package entry. Image records include `libraryPath`,
+`bindingModulePath`, requested `backend`, installed `variants` and selected
+`models` metadata. Variant records carry backend, runtime root and library path.
+Bundle returns `{runtimes,files}`,
 with artifact-relative runtime paths and a complete emitted file inventory.
 Bundling requires a fresh native staging destination, preserving existing
 completed outputs.
+
+Image assembly preserves the complete runtime/binding tree and relocates
+library, binding and variant paths into the artifact. It retains original
+model URL descriptors for preparation after launch. A model file already
+inside the runtime tree becomes artifact-relative; an external native working
+path reports its portability incompatibility. Use the explicit native-resource
+workflow or [model-assets preparation](model-assets.md) for those files.
+Model acquisition, context loading and inference remain separate from runtime
+assembly. Platform availability depends on the selected upstream archive;
+this contract does not establish execution on every supported host.
 
 ### NeMo Speech library runtime
 

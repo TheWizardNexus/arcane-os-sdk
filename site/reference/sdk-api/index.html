@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.60.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.61.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -154,7 +154,7 @@ runtime layouts.</p>
 </tr>
 <tr>
 <td><code>arcane-os/local-ai</code></td>
-<td>Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX requirements and NeMo libraries.</td>
+<td>Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX/image requirements and NeMo libraries.</td>
 </tr>
 <tr>
 <td><code>arcane-os/local-ai/onnx</code></td>
@@ -163,6 +163,26 @@ runtime layouts.</p>
 <tr>
 <td><code>arcane-os/ai/core-onnx</code></td>
 <td>Optional browser access to system ONNX through an existing Core connection.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/image</code></td>
+<td>Retained native stable-diffusion.cpp context, complete PNG generation and owned worker lifetime.</td>
+</tr>
+<tr>
+<td><code>arcane-os/ai/core-image</code></td>
+<td>Browser image lifecycle and complete PNG Blobs through an available Core service.</td>
+</tr>
+<tr>
+<td><code>arcane-os/core/image</code></td>
+<td>Native image Core service with independent runtime preparation and retained model ownership.</td>
+</tr>
+<tr>
+<td><code>arcane-os/ai/core-model-assets</code></td>
+<td>Complete stored browser model members projected through Core into native working files.</td>
+</tr>
+<tr>
+<td><code>arcane-os/core/model-assets</code></td>
+<td>Native working-file preparation, engine retain handles and joined cleanup.</td>
 </tr>
 <tr>
 <td><code>arcane-os/integrated-provider</code></td>
@@ -2101,6 +2121,55 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.</p
 <td><code>arcane-os/ai/core-onnx</code></td>
 <td>Core local AI</td>
 <td>Browser with an available Core ONNX service</td>
+</tr>
+<tr>
+<td><code>createImageRuntime()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/image</code></td>
+<td>Core local images</td>
+<td>Node with a prepared native image runtime and caller-selected model</td>
+</tr>
+<tr>
+<td><code>createCoreImageRuntime()</code></td>
+<td>function</td>
+<td><code>arcane-os/ai/core-image</code></td>
+<td>Core local images</td>
+<td>Browser with an available Core image service</td>
+</tr>
+<tr>
+<td><code>createLocalImageService()</code></td>
+<td>function</td>
+<td><code>arcane-os/core/image</code></td>
+<td>Core local images</td>
+<td>Node Core with selected stable-diffusion.cpp requirements</td>
+</tr>
+<tr>
+<td><code>createLocalImageService default export</code></td>
+<td>function</td>
+<td><code>arcane-os/core/image</code></td>
+<td>Core local images</td>
+<td>Same native image service factory</td>
+</tr>
+<tr>
+<td><code>prepareCoreModelAssets()</code></td>
+<td>function</td>
+<td><code>arcane-os/ai/core-model-assets</code></td>
+<td>Core model assets</td>
+<td>Browser with complete Blob/File members and available Core service</td>
+</tr>
+<tr>
+<td><code>createModelAssetService()</code></td>
+<td>function</td>
+<td><code>arcane-os/core/model-assets</code></td>
+<td>Core model assets</td>
+<td>Node Core with an application-selected working directory</td>
+</tr>
+<tr>
+<td><code>createModelAssetService default export</code></td>
+<td>function</td>
+<td><code>arcane-os/core/model-assets</code></td>
+<td>Core model assets</td>
+<td>Same native working-file service factory</td>
 </tr>
 <tr>
 <td><code>createLocalAIService default export</code></td>
@@ -7043,7 +7112,7 @@ selection, streaming, cancellation and primary-model reload behavior.</p>
 service. Runtime installation, process availability and model readiness remain
 separate states; prompts, models and application policy remain caller-owned.</p>
 <h4 id="signature-and-result-118">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/core/local-ai</code>. <code>configuration</code> is the authored local-AI
 record; <code>appRoot</code> resolves its relative model paths and <code>runtimes</code> supplies
@@ -7051,6 +7120,12 @@ resolved installed runtime records. It returns a Core service definition with
 <code>current()</code> and independent selected-engine startup. Compose it through the
 existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
 an already running external service remains under its external owner.</p>
+<p>Optional <code>prepare({signal,onEvent})</code> supplies resolved runtime records during
+this service&#39;s startup. Only operations depending on that service wait for its
+preparation; the development listener and independently composed image/model
+asset services keep their own lifetimes. Pass only llama.cpp/Ollama/ONNX
+requirements to this factory; <code>createLocalImageService()</code> owns selected image
+requirements. The managed development and native entrypoints separate them.</p>
 <p>The service provides <code>localai.status</code>, explicit <code>localai.services.recover</code>,
 <code>llama.status/models/load/unload/chat</code>, <code>onnx.status/load/run/unload</code>, and the documented native Ollama methods.
 <code>localai.state</code> reports runtime/model changes. <code>llama.chunk</code> and <code>ollama.chunk</code>
@@ -7084,6 +7159,93 @@ The accessor owns complete tensor transport encoding/decoding, <code>inspect()</
 accessor&#39;s requests and subscriptions; unloading shared models is explicit.
 Construction installs no runtime and opens no transport. Existing browser
 ONNX/Wllama remain independent. See <a href="../local-ai/#onnx-through-core-and-the-browser">Core and browser usage</a>.</p>
+<h3 id="createimageruntime">createImageRuntime()</h3>
+<p><code>createImageRuntime({libraryPath,bindingModulePath,variants=[],models=[],backend=&#39;auto&#39;,signal?,onEvent?})</code>
+from <code>arcane-os/local-ai/image</code> retains the native image owner for the selected
+library. Prepare the installed record through <code>ensureLocalAIRuntimes()</code> and
+supply complete model descriptors with actual native resource paths. The
+factory installs no software and starts its worker when an operation needs it.</p>
+<p>It returns <code>load({model,context?,signal?})</code>, <code>generate({model,prompt,parameters?, signal?,onProgress?})</code>, <code>unload({signal?})</code>, <code>current()</code>,
+<code>subscribe(listener,{replay=true})</code> and asynchronous <code>close()</code>. A model ID uses
+its supplied descriptor; a complete descriptor may be passed directly.
+Generation returns all PNG results as <code>images: [{data,mediaType,width,height}]</code>
+with native result metadata. Prompts and parameters remain complete.</p>
+<p>Accessors for the same library share its worker and selected context. Competing
+native operations are ordered at that owner; unrelated services remain
+concurrent. State observation replays synchronously by default. Cancellation
+joins the owning native operation; a model constructor may finish before its
+new context can be released. Native accessor <code>close()</code> cancels its requests,
+joins them and releases the shared selected context before its working files
+can be retired. The final reference closes the worker. This differs from the
+browser accessor&#39;s detach-only ownership below. See the
+<a href="../local-image-generation/">image lifecycle, backend and error contract</a>.</p>
+<h3 id="createcoreimageruntime">createCoreImageRuntime()</h3>
+<p><code>createCoreImageRuntime({client=getInstalledCoreClient(),signal?,onEvent?})</code>
+from <code>arcane-os/ai/core-image</code> returns immediately with <code>load</code>, <code>generate</code>,
+<code>unload</code>, <code>inspect</code>, <code>current</code>, <code>subscribe</code> and <code>close</code>. It subscribes before
+requesting an initial status snapshot so newer lifecycle events win. It opens
+no connection and installs or selects no model.</p>
+<p><code>load({model,context?,assetProjectionId?,resourcePaths?,signal?})</code> and
+<code>generate({model,prompt,parameters?,assetProjectionId?,resourcePaths?,signal?, onProgress?})</code> use the selected Core service. Generation acknowledges with
+transient <code>Thinking</code> synchronously and returns complete
+<code>images: [{blob,mediaType,width,height}]</code> plus native result metadata.
+<code>unload({signal?})</code> explicitly releases the shared selected model;
+<code>inspect({signal?})</code> reads authoritative state without waiting for preparation.
+All request methods use <code>timeoutMs:0</code>. <code>current()</code> includes transient requests,
+status, busy and closed state; no prompt or image history is saved.</p>
+<p><code>subscribe(listener,{replay=true,signal?})</code> returns an unsubscribe function.
+<code>close()</code> cancels and joins only this accessor&#39;s requests and subscriptions,
+leaving the shared Core client and selected model with their owners. Request
+errors retain complete details; an unavailable Core reports
+<code>ARCANE_IMAGE_CORE_UNAVAILABLE</code>. Aborted operations deliver no late result or
+progress. See the <a href="../local-image-generation/#browser-accessor">complete browser example and events</a>.</p>
+<h3 id="createlocalimageservice">createLocalImageService()</h3>
+<p><code>createLocalImageService(configuration,{appRoot,runtimes=[],signal?,onEvent?,prepare?,modelAssets?})</code>
+from <code>arcane-os/core/image</code> returns a Core service with <code>current()</code>, replaying
+<code>subscribe(listener)</code>, native preparation, request methods and joined disposal.
+<code>configuration</code> is the selected <code>localAI</code> record. Optional
+<code>prepare({appRoot,configuration,requirement,signal,onEvent})</code> returns one
+installed image-runtime record. Startup retains this preparation in the
+background; <code>image.status</code> and unrelated services remain responsive.</p>
+<p>The service owns <code>image.status/load/generate/unload</code> and
+<code>image.state/progress</code>. Pass the same <code>createModelAssetService()</code> instance that
+Core exposes when using <code>assetProjectionId</code> and <code>resourcePaths</code>. It retains
+prepared model files through actual native completion, replacement, unload and
+shutdown. PNG base64 is transport-only framing; the complete result is decoded
+by the browser accessor. See <a href="../local-image-generation/#core-service-and-transport">parameters, results and ownership</a>.</p>
+<h3 id="createlocalimageservice-default-export">createLocalImageService default export</h3>
+<p>The default export from <code>arcane-os/core/image</code> is the same
+<code>createLocalImageService</code> factory and lifecycle described above.</p>
+<h3 id="preparecoremodelassets">prepareCoreModelAssets()</h3>
+<p><code>prepareCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,signal?,onProgress?})</code>
+from <code>arcane-os/ai/core-model-assets</code> projects ordered complete
+<code>members: [{path,file}]</code> through an available Core connection. Each <code>file</code> is a
+Blob or File. It returns <code>{id,directory,members:[{path,nativePath}],release}</code>
+after all members finish writing and close. Independent members transfer
+concurrently; each member&#39;s writes remain ordered.</p>
+<p>The caller releases preparation ownership with asynchronous idempotent
+<code>release()</code>. Native engines acquire their own retain handle before loading,
+and files remain until their actual native use ends. Cancellation and failure
+join transfers and uncancelled cleanup, preserving complete original errors.
+The helper downloads no model, changes no DBOPFS original and selects no
+engine. See <a href="../model-assets/">complete preparation and cleanup usage</a>.</p>
+<h3 id="createmodelassetservice">createModelAssetService()</h3>
+<p><code>createModelAssetService({appRoot=process.cwd()}={})</code> from
+<code>arcane-os/core/model-assets</code> returns the Core service for
+<code>modelAssets.open/write/complete/release/status</code> and <code>modelAssets.state</code>.
+Relative working directories resolve from <code>appRoot</code>; explicit absolute
+directories remain caller-selected. Each projection has its own child
+directory and complete member files.</p>
+<p><code>current()</code> returns <code>{closing,projections}</code>. <code>retain(id)</code> accepts a completed
+projection and returns <code>{id,directory,members,release}</code> for a native owner.
+<code>dispose()</code> releases preparation ownership and joins file writes, closes and
+all native retain lifetimes before cleanup. The native owner releases its
+handle only after its actual context/worker use ends. Original stored model
+files remain with their application owner. See
+<a href="../model-assets/#native-ownership">working-file service and wire operations</a>.</p>
+<h3 id="createmodelassetservice-default-export">createModelAssetService default export</h3>
+<p>The default export from <code>arcane-os/core/model-assets</code> is the same
+<code>createModelAssetService</code> factory and lifecycle described above.</p>
 <h3 id="createlocalaiservice-default-export">createLocalAIService default export</h3>
 <p>The default binding from <code>arcane-os/core/local-ai</code> is exactly the named
 <code>createLocalAIService</code> factory above, with the same arguments, return value and
@@ -7093,14 +7255,18 @@ lifecycle:</p>
 <h3 id="ensurelocalairuntimes">ensureLocalAIRuntimes()</h3>
 <h4 id="overview-200">Overview</h4>
 <p>Reuses matching managed runtimes or installs complete selected official
-llama.cpp/Ollama/ONNX distributions or NeMo libraries in an explicitly supplied directory.</p>
+llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly supplied directory.</p>
 <h4 id="signature-and-result-119">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,architecture=process.arch,signal,onEvent}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/local-ai</code>. Runtime requirements accept IDs or
 <code>{id,version?,url?}</code> records. The result is an array of absolute
 <code>{id,version,platform,architecture,root}</code> records, with <code>executable</code> for servers,
-<code>modulePath</code> for ONNX, or NeMo library directories. Matching concurrent
+<code>modulePath</code> for ONNX, image <code>libraryPath</code>/<code>bindingModulePath</code>/<code>variants</code>/<code>models</code>,
+or NeMo library directories. Image requirements also accept <code>backend</code> and
+<code>models</code>; their pinned default runtime, CPU/Metal selection and separate model
+preparation are described in <a href="../local-image-generation/">local image generation</a>.
+Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
 Installation changes no global PATH or system service and loads no model.
@@ -7128,6 +7294,12 @@ runtime paths are artifact-relative under <code>runtime/local-ai/&lt;id&gt;</cod
 contains the complete emitted inventory. Existing runtime destinations are
 preserved and reported as a conflict. Copying settles all started work and
 reports failures/cancellation without executing app services or models.</p>
+<p>Image records relocate the complete library, binding and variant paths. Model
+URL descriptors retain their original acquisition metadata for preparation
+after launch. Runtime-contained native model paths become artifact-relative;
+external working paths report their portability incompatibility rather than
+embedding this machine&#39;s path. Use the application-owned native-resource or
+post-launch model-assets workflow for those files.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {bundleLocalAIRuntimes} from &#39;arcane-os/local-ai&#39;;
 
 // Call explicitly with a fresh output directory for this native assembly.
@@ -8859,6 +9031,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.60.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.61.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
