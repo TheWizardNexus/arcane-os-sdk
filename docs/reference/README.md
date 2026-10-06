@@ -42,6 +42,7 @@ alone does not make bare module names resolve in a browser.
 | Inspect complete AI and speech calls using the shared developer-mode preference | [Shared logger](sdk-api.md#arcanelogging) and [speech developer diagnostics](ai/browser-speech.md#developer-diagnostics) |
 | Use the `arcane` command | [CLI reference](cli.md) |
 | Install an app and cache selected resources offline | [Progressive web applications](pwa.md) |
+| Disable source PWA generation or explicitly retire confirmed generated output | [Source PWA retirement](pwa.md#disable-source-pwa-generation-and-retire-generated-output) |
 | Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Connect an application through the shared WebSocket transport | [Shared WebSocket clients](websocket-client.md) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
@@ -51,12 +52,14 @@ alone does not make bare module names resolve in a browser.
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
+| Cancel one Core speech synthesis request without changing its payload | [Speech request lifetime](core-client.md#events-and-request-lifetime) and [Core facade](sdk-api.md#createcorefacade) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
+| Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
 | Compose a Mac application with an architecture-matched host | [macOS application composition](core-native-packaging.md#macos-application-composition) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |

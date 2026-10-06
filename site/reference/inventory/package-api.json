@@ -4175,10 +4175,10 @@
       "entrypoints": ["arcane-os/core/host"],
       "primaryImport": "arcane-os/core/host",
       "group": "Native Core host composition",
-      "summary": "Reads the complete JSON object explicitly selected by --arcane-launch-config for native service launch context.",
+      "summary": "Reads explicit launch JSON with the separately supplied native host stateRoot default for service launch context.",
       "availability": "Node, including the selected external-entry SEA launcher",
       "protocol": "Explicit launch arguments and JSON configuration",
-      "normalization": "Returns an empty record without the flag; preserves every supplied field and value, surfaces file and JSON failures, and performs no configuration search, rewrite or environment mutation"
+      "normalization": "Optional --arcane-host-state-root <directory> supplies the stateRoot default; every explicit --arcane-launch-config JSON field takes precedence unchanged, including relative or null stateRoot and application-owned preferencesFile. Returns an empty record with neither argument; surfaces missing argument values, file and JSON failures; performs no directory selection, path resolution, configuration search, rewrite, migration or environment mutation"
     },
     {
       "id": "core-host:startCoreHost",

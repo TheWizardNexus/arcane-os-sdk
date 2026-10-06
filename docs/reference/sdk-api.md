@@ -4563,6 +4563,12 @@ The object includes `importMap(options)`, which merges defaults with explicit
 call options and refreshes every directly navigable descriptor-selected browser
 document for one selected app. The equivalent generic route is
 `execute('import-map', options)`.
+For a standalone root app with `pwa.enabled:false`, ordinary refresh removes
+marked SDK-generated PWA references from selected documents. An explicit
+`importMap({retireGeneratedPwa:true})` also retires the four standard root PWA
+outputs and matching older manifest references after the application owner
+confirms they are generated. See [disabled-PWA retirement](pwa.md#disable-source-pwa-generation-and-retire-generated-output)
+for the required source-selection adjustment and preserved content.
 It also includes `upgrade(options)`, which performs the explicit installed-SDK
 consumer upgrade described by `upgradeApplication()`, and
 `updateCheck(options)`, which invokes `checkSdkUpdate()` once. Constructing the
@@ -4684,6 +4690,25 @@ ordered `documentPaths`. This route mutates the map artifact and selected manage
 documents through sequential writes and has no supported dry-run or
 all-file transaction. An error or cancellation can leave completed writes in
 place; rerun the operation after resolving the cause.
+
+For a standalone `appsRoot:'.'` app with `pwa.enabled:false`, ordinary refresh
+removes active generated registration scripts and matching manifest relationships
+marked `data-arcane-manifest`. Unmarked references and existing PWA files remain.
+Set `retireGeneratedPwa:true` only after confirming generated ownership of the
+matching root manifest references and all four standard outputs:
+`arcane.webmanifest`, `arcane-offline.json`, `arcane-sw.js` and `arcane-pwa.mjs`.
+Remove those generated outputs from required `package.include` entries first,
+and confirm that unselected documents no longer need them. The operation writes
+selected reference changes before deleting these files; its
+`import-map.root-files.completed` event reports actual removed paths in
+`retiredPwa`. Repeated retirement accepts already-absent output.
+
+An omitted PWA record selects no retirement; an enabled record keeps normal
+generation. The option belongs only to this explicit import-map API route.
+Ordinary development refresh does not forward file-retirement authority, and
+there is no new CLI flag. Other files, unselected/inactive HTML, authored content
+and browser registrations, caches and saved data keep their existing ownership.
+See the complete [source PWA contract](pwa.md#disable-source-pwa-generation-and-retire-generated-output).
 
 The exact command `'upgrade'` dispatches `upgradeApplication(options)`. It is
 external-workspace-only and runs that application's ordinary `npm upgrade`
@@ -6899,6 +6924,14 @@ Import it from `arcane-os/core/client`. The result includes `runtime`, `events`,
 `Error` and the existing `ai`, `environment`, `mail`, `speech`, `localAI`,
 `ollama`, application, platform, storage and other host namespaces.
 
+`facade.speech.synthesize(request, {signal})` accepts an optional `AbortSignal`
+through the same correlated request lifetime. The complete request and existing
+180,000 ms timeout remain unchanged. A pre-aborted signal sends no synthesis
+request; an in-flight abort emits that request's `request.cancel`, rejects with
+`ARCANE_REQUEST_ABORTED` and leaves unrelated requests active. Late responses
+cannot settle the cancelled request. Actual native synthesis interruption belongs
+to the registered service and engine; this facade supplies no engine.
+
 ### Availability and normalization
 
 **Browser and native WebView JavaScript hosts with a Core client.** Creating the
@@ -7560,8 +7593,9 @@ import createDiarizationService from 'arcane-os/core/diarization';
 
 ### Overview
 
-Reads only the complete JSON object explicitly selected by
-`--arcane-launch-config <path>`; it does not search for application configuration.
+Reads the complete JSON object explicitly selected by
+`--arcane-launch-config <path>`, with an optional separately supplied native host
+state-directory default. It does not search for application configuration.
 
 ### Signature and result
 
@@ -7569,11 +7603,15 @@ Reads only the complete JSON object explicitly selected by
 async readCoreLaunchContext({argv=process.argv.slice(2)}={})
 ```
 
-Import it from `arcane-os/core/host`. The promise resolves to `{}` when the flag
-is absent, or the complete parsed object when present. A missing flag value,
-unreadable file, malformed JSON or non-object value rejects. Relative paths use
-the process working directory. The reader does not rewrite content or mutate
-the environment.
+Import it from `arcane-os/core/host`. `--arcane-host-state-root <directory>`
+supplies a `stateRoot` default; every field from the explicit launch JSON object
+then takes precedence unchanged, including a relative, null or other explicitly
+present `stateRoot`. With neither argument, the promise resolves to `{}`.
+A missing argument value, unreadable launch file, malformed JSON or non-object
+value rejects. Relative launch-file paths use the process working directory.
+The reader does not choose, resolve or validate the state directory, rewrite
+content, discover or migrate stored data, or mutate the environment. An
+application-selected `preferencesFile` remains a separate unchanged field.
 
 ```javascript
 import {readCoreLaunchContext} from 'arcane-os/core/host';
@@ -7584,7 +7622,10 @@ const launchContext = await readCoreLaunchContext();
 The generated entry supplies artifact-derived `appRoot`, then applies the whole
 explicit context and passes the same object as every service factory's second
 argument. Authored service options remain the first argument. Workspace/state
-locations and additional fields belong to the launcher/application. See
+locations and additional fields belong to the launcher/application. Windows and
+Mac launchers forward their actual host-selected state directory through the
+separate argument; other composing hosts may use the same seam. This JavaScript
+contract does not establish a compiled host or matching release archive. See
 [launch-time locations](core-native-packaging.md#launch-time-locations).
 
 ## createCoreLocalAIProvider()
