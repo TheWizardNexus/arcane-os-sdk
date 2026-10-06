@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.77.0
+
+- Add `AI.prepareAudioOutput()` for synchronous, silent preparation of a reusable
+  WebAudio output. Observe its actual context state through immediate subscription
+  replay and `AI_AUDIO_OUTPUT_STATE_EVENT`; resume and dispose explicitly.
+- Add optional `audioOutput` to `playPreparedTTS()` so prepared narration borrows
+  that same output across plays. Completion and stop leave the borrowed context
+  open; omission preserves the existing per-playback context lifecycle.
+- Keep replacement, pending suspension, decoding, cancellation and disposal tied
+  to their actual output and playback owners. Cleanup failures remain observable
+  and failed context closure can be retried. Independent native speech, saved
+  audio and detached preparation retain their existing ownership.
+- Preparation plays no sound, creates no audio source, resumes no context,
+  changes no mute setting and loads no model. A running WebAudio context is not
+  a guarantee of future autoplay, native speech or HTML audio readiness. No
+  physical-GPU placement or native-engine change is included.
+
 ## 0.76.0
 
 - Add public `textFormat:'plain'` to the `SpeechPlayback` constructor and
