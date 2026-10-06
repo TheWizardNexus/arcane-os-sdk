@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.65.0
+
+- Add optional precompiled Windows x64 Intel NPU encoding for native Whisper
+  with `encoder: "openvino-npu"`, paired small-model resources, separate
+  encoder/decoder state, and existing GPU-first decoding with CPU recovery.
+  Preserve ordinary Whisper, complete transcripts and joined cancellation.
+- Add `createRepositoryWorkspace(...).write({files, message, signal})` for
+  complete selected text, literal-path staging/commit and ordinary push, with
+  complete diagnostics and explicit confirmed or uncertain partial outcomes.
+- Add retained native Codex App Server sessions and an explicit MCP STDIO
+  server through `arcane-os/codex/app-server` and `arcane-os/mcp/stdio`.
+  Preserve complete native payloads, origin-bound server-request replies,
+  ordered live results, cooperative cancellation and owned write settlement.
+- Add application Core composition during source development without requiring
+  local AI, `/arcane-core.js`, and replayed client installation/retirement
+  observation. Preserve the existing local-AI bootstrap, early-close cleanup
+  and ordered reentrant installation notifications.
+- Tie Ollama readiness to actual selected-model residency observations, with
+  ordinary model-name alias comparison, operation cancellation and stale
+  observation/engine ownership. Preserve original outbound model names and
+  complete payloads; no background polling or atomic residency claim.
+- Keep the npm dependency tree unchanged. Native runtime producers and
+  consumers use the documented upstream resources and compatible helper
+  assets attached to this numeric release. Git identity selection and native
+  Laya fp32 integration remain separate subsequent work.
+
 ## 0.64.0
 
 - Add retained native Whisper transcription through the existing Core speech
