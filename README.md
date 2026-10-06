@@ -20,11 +20,16 @@ selected SDK projection or an explicit live SDK source mount. Both profiles
 share the theme, packaging, event, cancellation,
 and browser run contracts while retaining their selected application layout.
 
-This checkout defines the `0.78.0` SDK contract. Development applications declare
+This checkout defines the `0.79.0` SDK contract. Development applications declare
 `arcane-os` as `latest` and retain their lockfile. Exact SDK pins begin when Roshi
 designates a production build. Follow [Consumer updates](docs/consumer-updates.md)
 to refresh and compare the installed SDK and lockfile with the published channel;
 registry state is deliberately not baked into application artifacts.
+
+[Physical execution devices](docs/reference/execution-devices.md) exposes Windows
+CPU/GPU/NPU discovery and native ONNX/Laya target selection through the existing
+Core host, independently of model loading. Device presence, configured provider
+placement and observed model execution remain separate facts.
 
 Standalone browser apps use their repository root and installed npm package directly, without a
 generated workspace `arcane/` directory or `arcane.lock.json`. Select the

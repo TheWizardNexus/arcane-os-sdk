@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.79.0
+
+- Add public `createExecutionDeviceCatalog()` and `createExecutionDeviceService()`
+  with lazy Windows CPU/GPU/NPU discovery, stable host-local identities,
+  complete discovery issues, explicit refresh, cancellation and disposal.
+  `localai.devices` and `localai.resolveTarget` use the existing Core transport
+  without loading models or changing saved preferences.
+- Share one catalog per local-AI Core lifetime. Native ONNX and Laya accept
+  `executionTarget` for a physical CPU or mapped DirectML GPU. Automatic GPU
+  selection can use the largest reported dedicated capacity among addressable
+  hardware GPUs; integrated GPUs remain eligible. Unsupported or unavailable
+  selections are reported without silently choosing another physical device.
+- Preserve caller options and complete execution diagnostics. Distinguish the
+  requested, resolved and configured target from observed execution; successful
+  configuration is not GPU/NPU execution proof. Laya target replacement cancels
+  and drains only its retiring activation before the successor starts.
+- Keep discovery independent from model readiness and preserve existing engine
+  behavior when a target is omitted. Browser Wllama, native llama.cpp, image and
+  Whisper device routing are unchanged; this release adds no driver, model or
+  native runtime dependency.
+
 ## 0.78.0
 
 - Add `AI.readPreparedTTS()` and shared `readPreparedSpeech()` for complete
