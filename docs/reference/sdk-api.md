@@ -60,7 +60,7 @@ runtime layouts.
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/codex/app-server` | Explicit native Codex App Server session, complete live turns, server requests and recovery. |
 | `arcane-os/mcp/stdio` | Node MCP STDIO server for app-owned tools and static resources. |
-| `arcane-os/core/repositories` | Native persistent ArcaneData paths and explicitly selected connected working repositories. |
+| `arcane-os/core/repositories` | Native persistent ArcaneData paths, connected working repositories and scoped non-secret Git identity configuration. |
 | `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
 | `arcane-os/core/preferences` | Existing preference RPC methods with an application-selected file, ordered writes and owned drain. |
 | `arcane-os/core/diarization` | Lazy native speaker-diarization service, explicit stream methods and lifecycle/result events. |
@@ -405,6 +405,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `readCoreLaunchContext()` | function | `arcane-os/core/host` | Native Core host composition | Node; reads explicitly selected launch JSON |
 | `resolveArcaneDataPaths()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node on Windows, Linux and macOS; Android supplies its data root |
 | `createRepositoryWorkspace()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
+| `readGitIdentity()` | function | `arcane-os/core/repositories` | Native repository workspaces | Node with Git; Android requires host process adaptation |
 | `createWindowsNativeProvider()` | function | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/windows-provider` | Windows native provider | Node assembly; Windows x64/WebView2 execution |
@@ -5209,7 +5210,7 @@ a dedicated bare Git cache. It does not create or alter a working checkout.
 ### Signature, lifecycle, and result
 
 ```text
-createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,onEvent,run=runProcess}={})
+createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Import from `arcane-os`. The application owns the cache location, remote, ref,
@@ -5220,6 +5221,11 @@ ends only that wait. `close()`, `drain()` and `dispose()` stop acceptance and
 await accepted refresh/process cleanup. Errors remain observable instead of
 returning stale or partial success. See [Git text snapshots](git-text-snapshot.md)
 for complete inputs, text semantics, errors, events and Core service composition.
+
+Optional `gitIdentity:{name?,email?,username?}` captures a child-process-only
+selection for init/fetch and subsequent Git commands, preserving shared refresh
+cancellation and complete content. See [Git identity configuration](core-repositories.md#git-identity-configuration)
+for author precedence, scoped defaults and credential username semantics.
 
 ### Example
 
@@ -7881,7 +7887,7 @@ explicit existing path. The application owns the remote, branch and Core API.
 ### Signature and result
 
 ```text
-createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run=runProcess}={})
+createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Returns `{directory,open,status,pull,push,write,close,drain,dispose}`. Construction does
@@ -7891,6 +7897,12 @@ Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the [complete inputs, results,
 errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+Optional `gitIdentity:{name?,email?,username?}` captures explicit non-secret
+settings for child Git operations without writing global/local configuration.
+Selected author fields override inherited child author/committer fields;
+omitted fields remain inherited. Username remains a credential hint, with
+authentication owned by ordinary Git and its configured helper.
 
 `write({files:[{path,content}],message,signal})` snapshots the exact selected
 strings, writes those repository-relative files, commits only their literal
@@ -7910,6 +7922,33 @@ const repository = createRepositoryWorkspace({
 await repository.open({signal});
 await repository.close();
 ```
+
+## readGitIdentity()
+
+### Overview
+
+Reads non-secret global, repository-local and effective Git configuration
+without changing files or querying credentials.
+
+### Signature and result
+
+```text
+readGitIdentity({directory,signal,onEvent,run=runProcess}={})
+```
+
+Import from `arcane-os/core/repositories`. Returns a promise for
+`{global,local,effective}`, each observed scope containing `{name,email,githubUser}`.
+Fields preserve complete strings, including empty values; unset fields are
+`null`. With no directory, only global configuration is read and local/effective
+are `null`. Existing repository directories, including bare caches, select the
+context for all three observations. Configured includes and ordinary Git
+precedence remain in effect. These are config observations, not authenticated
+accounts or environment-resolved commit identities.
+
+Independent scope queries run concurrently and join cleanup before settlement.
+Errors retain complete process diagnostics; one failure is rethrown unchanged
+and multiple failures use `AggregateError`. See the [complete contract and
+per-process selection example](core-repositories.md#git-identity-configuration).
 
 ## createCoreLocalAIProvider()
 

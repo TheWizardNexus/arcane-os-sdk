@@ -5,6 +5,9 @@ import Is from 'strong-type';
 import {ArcaneError, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
 import {repositoryPull, repositoryPush, repositoryStatus} from '../repository.mjs';
+import {createGitIdentityRunner} from '../git-identity.mjs';
+
+export {readGitIdentity} from '../git-identity.mjs';
 
 const is = new Is(false);
 const directoryOperations = new Map();
@@ -41,7 +44,7 @@ export function resolveArcaneDataPaths({dataRoot} = {}) {
 
 /** One connected checkout, composed into an application's own Core service. */
 export function createRepositoryWorkspace(
-    {name, directory, dataRoot, remote, branch, onEvent, run = runProcess} = {}
+    {name, directory, dataRoot, remote, branch, gitIdentity, onEvent, run = runProcess} = {}
 ) {
     let selected = directory;
     if (selected === undefined) {
@@ -55,12 +58,13 @@ export function createRepositoryWorkspace(
     if (remote !== undefined) requireString(remote, 'remote');
     if (branch !== undefined) requireString(branch, 'branch');
     if (!is.function(run)) throw new TypeError('run must implement the SDK process adapter.');
+    const execute = createGitIdentityRunner(run, gitIdentity);
     const repositoryDirectory = path.resolve(selected);
     const pending = new Set();
     let opened = false;
     let closing = null;
 
-    async function prepare(signal, execute = run) {
+    async function prepare(signal, prepareRun = execute) {
         throwIfAborted(signal);
         if (opened) return {directory: repositoryDirectory, cloned: false};
         let entries;
@@ -74,7 +78,7 @@ export function createRepositoryWorkspace(
         if (entries.length) {
             // A parent checkout or a bare object cache is not this connection's
             // working root. Inspection never changes an existing destination.
-            const result = await execute(
+            const result = await prepareRun(
                 'git',
                 ['rev-parse', '--is-inside-work-tree', '--show-prefix'],
                 {cwd: repositoryDirectory, signal, onEvent}
@@ -97,7 +101,7 @@ export function createRepositoryWorkspace(
         const arguments_ = ['clone', '--progress'];
         if (branch !== undefined) arguments_.push('--branch', branch);
         arguments_.push('--', remote, repositoryDirectory);
-        const result = await execute(
+        const result = await prepareRun(
             'git',
             arguments_,
             {cwd: path.dirname(repositoryDirectory), signal, onEvent}
@@ -142,7 +146,7 @@ export function createRepositoryWorkspace(
         return accept(
             async function readRepositoryStatus() {
                 await prepare(signal);
-                return repositoryStatus({workspaceRoot: repositoryDirectory, signal, onEvent, run});
+                return repositoryStatus({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
             },
             signal
         );
@@ -152,7 +156,7 @@ export function createRepositoryWorkspace(
         return accept(
             async function pullRepository() {
                 await prepare(signal);
-                return repositoryPull({workspaceRoot: repositoryDirectory, signal, onEvent, run});
+                return repositoryPull({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
             },
             signal
         );
@@ -162,7 +166,7 @@ export function createRepositoryWorkspace(
         return accept(
             async function pushRepository() {
                 await prepare(signal);
-                return repositoryPush({workspaceRoot: repositoryDirectory, signal, onEvent, run});
+                return repositoryPush({workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
             },
             signal
         );
@@ -260,7 +264,7 @@ export function createRepositoryWorkspace(
                     }
 
                     try {
-                        const result = await run(
+                        const result = await execute(
                             'git',
                             args,
                             {cwd: options.cwd ?? repositoryDirectory, signal, onEvent: observeEvent,

@@ -4,6 +4,7 @@ import path from 'node:path';
 import {runProcess} from './process.mjs';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
+import {createGitIdentityRunner} from './git-identity.mjs';
 
 const is = new Is(false);
 const snapshotRef = 'refs/arcane/text-snapshot';
@@ -13,11 +14,12 @@ const snapshotRef = 'refs/arcane/text-snapshot';
  * One application service owns each dedicated cache directory. Construction
  * performs no I/O; refresh coalesces callers and close drains accepted work.
  */
-export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, onEvent, run = runProcess} = {}) {
+export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, gitIdentity, onEvent, run = runProcess} = {}) {
     for (const [name, value] of Object.entries({cacheDirectory, remote, ref})) {
         if (!is.string(value) || value === '') throw new TypeError(`${name} must be a nonempty string.`);
     }
     if (!is.function(selectPath)) throw new TypeError('selectPath must be a function.');
+    const execute = createGitIdentityRunner(run, gitIdentity);
     const directory = path.resolve(cacheDirectory);
     let prepared = false;
     let retained = null;
@@ -34,7 +36,7 @@ export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, 
             };
         }
         try {
-            return await run('git', ['--git-dir', directory, ...args], execution);
+            return await execute('git', ['--git-dir', directory, ...args], execution);
         } catch (error) {
             // runProcess first drains its child and preserves complete transport
             // failures. Keep the Git parser's public code with that full cause.
@@ -50,7 +52,7 @@ export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, 
         if (prepared) return;
         await mkdir(directory, {recursive: true});
         if ((await readdir(directory)).length === 0) {
-            await run('git', ['init', '--bare', directory], {onEvent: events.send});
+            await execute('git', ['init', '--bare', directory], {onEvent: events.send});
         }
         const result = await git(['rev-parse', '--is-bare-repository'], {onEvent: events.send});
         // This is the selected cache's functional role: never reinterpret an

@@ -46,7 +46,7 @@ const status = await repository.status({signal});
 await repository.close();
 ```
 
-`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run}={})`
+`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run}={})`
 returns `{directory,open,status,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
@@ -87,6 +87,105 @@ A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.
 
+## Git identity configuration
+
+```javascript
+import {readGitIdentity, createRepositoryWorkspace} from 'arcane-os/core/repositories';
+
+const defaults = await readGitIdentity({signal});
+const observations = await readGitIdentity({directory: existingRepositoryDirectory, signal});
+const repository = createRepositoryWorkspace({
+    name: 'moon-cheese-dispatches',
+    remote: applicationConnection.remote,
+    gitIdentity: {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'}
+});
+```
+
+`readGitIdentity({directory,signal,onEvent,run=runProcess}={})` reads only
+`user.name`, `user.email` and `github.user`. It returns:
+
+```text
+{
+    global: {name, email, githubUser},
+    local: {name, email, githubUser} | null,
+    effective: {name, email, githubUser} | null
+}
+```
+
+Every observed field is the complete Git configuration string, including an
+empty string, or `null` when unset. Global and local observations select Git's
+corresponding file scopes and honor configured includes. With an existing
+repository `directory`, `effective` reads ordinary Git configuration in that
+repository context, including system, global, local, worktree and command
+configuration where applicable. Equal local and global values remain separate
+observations; the SDK does not infer who wrote or owns a setting. The last
+configured scalar value wins within each observation.
+
+Without `directory`, only global configuration is read and `local`/`effective`
+are `null`. Relative directories resolve from the process working directory.
+Git retains its normal environment and conditional-include context; when no
+directory is supplied, that context is the process working directory. These
+are independent configuration observations, not a transaction or a claim about
+the identity of a prior commit, environment-derived author, or authenticated
+GitHub account. `github.user` is a non-secret configured default, not proof of
+authentication.
+
+One targeted Git command reads each requested scope. Independent observations
+start concurrently and all accepted commands finish their process cleanup
+before the reader settles. `signal` uses the existing process owner; the shared
+SDK event queue serializes `onEvent` delivery with its usual backpressure.
+Git's no-match result produces unset fields; other process,
+configuration, observer and cancellation failures remain complete. A single
+failure is rethrown unchanged; concurrent failures use `AggregateError.errors`.
+No configuration file is written and no credential helper is queried by this
+reader. The application owns any saved non-secret defaults and repository
+overrides through its existing preferences.
+
+Both this workspace factory and
+[`createGitTextSnapshot`](git-text-snapshot.md) accept optional
+`gitIdentity:{name?,email?,username?}`. They capture supplied strings once during
+I/O-free construction. Later edits to that object or a UI selection do not
+change accepted work. Omitted or `undefined` fields preserve ordinary inherited
+behavior; removing an application override means omitting that field on the
+next owner, not changing unmanaged repository configuration. Empty strings are
+passed explicitly to Git. Non-string values, NUL and text that cannot be
+represented by the native process transport report `TypeError` without silently
+rewriting the input.
+
+An application's explicit "global author" choice differs from ordinary Git
+inheritance. Pass the observed global `name` and `email` as selected strings to
+override repository-local author values for those fields. A global `null` means
+that field is unset, not a selected value: passing `null` reports `TypeError`,
+and omitting the field allows normal inheritance, including repository-local
+configuration. The application must describe that partial/inherited choice
+accurately or obtain the missing value before presenting an all-global author
+selection. An empty string is a distinct explicit value that Git may reject.
+Changed application choices apply to future owners; accepted operations retain
+their original selection and may finish without being discarded.
+
+Each supplied name/email becomes command-local `-c user.name=...` or
+`-c user.email=...` and the corresponding child-only `GIT_AUTHOR_*` and
+`GIT_COMMITTER_*` fields. Those selected fields take precedence over inherited
+author/committer settings and environment values; omitted fields, dates and
+unrelated environment remain inherited. Git retains its ordinary commit
+identity formatting and may reject an unusable identity. The SDK changes
+neither `process.env` nor global/local Git files.
+
+`username` supplies only command-local `credential.username`. Git's existing
+credential helper and remote protocol still own actual authentication. A
+URL-embedded username or helper behavior can affect the selected credential;
+this option neither rewrites the remote nor selects an SSH account or proves a
+GitHub login. No account enumeration, secret storage or `gh` dependency is added.
+See Git's [configuration](https://git-scm.com/docs/git-config),
+[author environment](https://git-scm.com/docs/git#_git_commits) and
+[credential username](https://git-scm.com/docs/gitcredentials) contracts.
+
+The selected settings accompany every workspace Git command, including clone,
+pull, commit and push, and every bare-snapshot Git command, including init and
+fetch. Existing arguments, content, output, errors, queue and cancellation
+semantics remain unchanged. Other repository helpers and CLI cwd defaults keep
+their existing behavior.
+
 ## Write, commit and push selected text
 
 ```javascript
@@ -122,8 +221,9 @@ One `git --literal-pathspecs add -- <paths>` stages only those exact names.
 One `git --literal-pathspecs commit --only --cleanup=verbatim --file - -- <paths>`
 commits only those paths, leaving unrelated staged paths staged. The original
 message is streamed unchanged through standard input. One ordinary `git push`
-then uses that repository's existing remote/ref configuration, identity,
-credentials and hooks. There is no implicit pull, branch switch, forced push,
+then uses that repository's existing remote/ref configuration, the optional
+process-local identity selection above, existing credentials and hooks.
+There is no implicit pull, branch switch, forced push,
 hook bypass, automatic retry, rollback or reset. If Git reports no changes to
 commit, that actual failure is returned; the SDK creates no empty commit.
 These are Git's documented [selected-path commit](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---only)

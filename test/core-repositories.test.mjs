@@ -4,7 +4,8 @@ import {homedir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
-import {createRepositoryWorkspace, resolveArcaneDataPaths} from '../src/core/repositories.mjs';
+import {createRepositoryWorkspace, readGitIdentity, resolveArcaneDataPaths} from '../src/core/repositories.mjs';
+import {createGitIdentityRunner} from '../src/git-identity.mjs';
 
 const fixtures = fileURLToPath(new URL('../.arcane/core-repositories-fixtures/', import.meta.url));
 
@@ -34,6 +35,114 @@ function deferred() {
 function processResult(stdout = '', stderr = '') {
     return {code: 0, stdout, stderr};
 }
+
+test('Git identity observations distinguish global, local, effective, empty and unset configuration', async function scopedIdentity() {
+    const directory = path.resolve('moon-cheese-repository');
+    const name = '  Moon Cheese\nDispatcher 🧀  ';
+    const signal = new AbortController().signal;
+    let observing = false;
+    const events = [];
+    async function onEvent(event) {
+        assert.equal(observing, false);
+        observing = true;
+        events.push(event);
+        await Promise.resolve();
+        observing = false;
+    }
+    const calls = [];
+    async function run(command, args, options) {
+        calls.push(args);
+        assert.equal(command, 'git');
+        assert.equal(options.cwd, directory);
+        assert.equal(options.signal, signal);
+        assert.equal(options.allowNonzero, true);
+        assert.deepEqual(args.slice(-4), ['--includes', '--null', '--get-regexp', '^(user[.](name|email)|github[.]user)$']);
+        await options.onEvent({type: 'process.completed', message: 'Complete scope observation.', data: {scope: args[1]}});
+        if (args.includes('--global')) return processResult(`user.name\nEarlier value\0user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`);
+        if (args.includes('--local')) return processResult(`user.name\n${name}\0`);
+        return processResult(`user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`);
+    }
+    assert.deepEqual(await readGitIdentity({directory, signal, onEvent, run}), {
+        global: {name, email: '', githubUser: 'moon-account'},
+        local: {name, email: null, githubUser: null},
+        effective: {name, email: '', githubUser: 'moon-account'}
+    });
+    assert.equal(calls.length, 3);
+    assert.equal(events.length, 3);
+    assert.equal(observing, false);
+});
+
+test('global-only identity reads preserve unset values and complete rejected failures', async function identityFailures() {
+    let calls = 0;
+    const empty = await readGitIdentity({run: async function absent(command, args, options) {
+        calls += 1;
+        assert.equal(options.cwd, undefined);
+        assert.ok(args.includes('--global'));
+        return {code: 1, stdout: '', stderr: ''};
+    }});
+    assert.equal(calls, 1);
+    assert.deepEqual(empty, {global: {name: null, email: null, githubUser: null}, local: null, effective: null});
+    const failure = new Error('Complete observer failure\nwith original diagnostics.');
+    failure.details = {code: 1, stdout: 'Complete output.', stderr: 'Complete diagnostic.'};
+    await assert.rejects(readGitIdentity({run: async function rejected() { throw failure; }}),
+        function original(error) { return error === failure; });
+    const result = {code: 3, stdout: '  Entire output\n', stderr: 'Entire configuration failure\n'};
+    await assert.rejects(readGitIdentity({run: async function invalidConfig() { return result; }}),
+        function complete(error) { return error.code === 'ARCANE_OPERATION_FAILED' && error.details === result; });
+    const controller = new AbortController();
+    controller.abort('Caller cancelled.');
+    await assert.rejects(readGitIdentity({signal: controller.signal, run: function never() { assert.fail('No process may start.'); }}),
+        {code: 'ARCANE_CANCELLED'});
+});
+
+test('identity discovery joins each accepted observation and preserves sibling failures', async function joinedIdentity() {
+    const gate = deferred();
+    const failure = new Error('Complete global failure.');
+    const localFailure = new Error('Complete local failure.');
+    let effectiveFinished = false;
+    const reading = readGitIdentity({directory: path.resolve('moon-repository'), run: async function observe(command, args) {
+        if (args.includes('--global')) throw failure;
+        if (args.includes('--local')) throw localFailure;
+        await gate.promise;
+        effectiveFinished = true;
+        return processResult();
+    }});
+    const rejected = assert.rejects(reading, function everyFailure(error) {
+        assert.equal(effectiveFinished, true);
+        assert.deepEqual(error.errors, [failure, localFailure]);
+        return true;
+    });
+    gate.resolve();
+    await rejected;
+});
+
+test('Git identity selection captures strings and preserves runner controls and inherited fields', function selectedIdentity() {
+    const calls = [];
+    const result = Promise.resolve(processResult('Complete result.'));
+    function run(command, args, options) { calls.push({command, args, options}); return result; }
+    assert.equal(createGitIdentityRunner(run), run);
+    assert.equal(createGitIdentityRunner(run, {}), run);
+    const identity = {name: '  Moon Dispatcher 🧀  ', username: ''};
+    const selected = createGitIdentityRunner(run, identity);
+    identity.name = 'Another connection';
+    const options = {
+        env: {GIT_AUTHOR_NAME: 'old author', GIT_COMMITTER_NAME: 'old committer',
+            GIT_AUTHOR_EMAIL: 'retained@example.invalid', GIT_AUTHOR_DATE: 'retained date', EXTRA: 'complete'},
+        signal: new AbortController().signal, onOutput() {}, onEvent() {},
+        input: {complete: 'original'}, captureOutput: false, emitOutputEvents: false, outputEncoding: {stdout: null}
+    };
+    assert.equal(selected('git', ['commit'], options), result);
+    assert.deepEqual(calls[0].args, ['-c', 'user.name=  Moon Dispatcher 🧀  ', '-c', 'credential.username=', 'commit']);
+    assert.deepEqual(calls[0].options, {...options, env: {...options.env,
+        GIT_AUTHOR_NAME: '  Moon Dispatcher 🧀  ', GIT_COMMITTER_NAME: '  Moon Dispatcher 🧀  '}});
+    assert.equal(calls[0].options.input, options.input);
+    assert.equal(calls[0].options.onOutput, options.onOutput);
+    assert.equal(options.env.GIT_AUTHOR_NAME, 'old author');
+    const usernameOnly = createGitIdentityRunner(run, {username: 'moon-account'});
+    usernameOnly('git', ['fetch'], options);
+    assert.equal(calls[1].options, options);
+    assert.throws(function nulArgument() { createGitIdentityRunner(run, {name: 'Moon\0Cheese'}); }, TypeError);
+});
 
 test('native data paths preserve explicit roots and use the current platform convention without I/O', function dataPaths() {
     const explicit = path.resolve('selected moon cheese data');
@@ -266,6 +375,55 @@ test('writer snapshots exact text and selected paths, retains clone output and s
     assert.deepEqual(result.outputs.map(function stage(output) { return output.stage; }), ['prepare', 'stage', 'commit', 'push']);
     assert.equal(result.outputs[0].stdout, 'Complete clone output 🦑\r\n');
     assert.ok(result.outputs.every(function complete(output) { return output.stderr === 'Complete diagnostic.\n' && output.code === 0; }));
+    await repository.close();
+});
+
+test('workspace identity reaches clone, status, pull, commit and push without changing accepted content', async function workspaceIdentity(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'selected checkout');
+    const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};
+    const prefix = ['-c', 'user.name=Moon Dispatcher', '-c', 'user.email=moon@example.invalid', '-c', 'credential.username=moon-account'];
+    const operations = [];
+    const content = '  Entire authored dispatch 🧀\r\n';
+    const message = '  Entire commit message\n';
+    async function run(command, args, options) {
+        assert.equal(command, 'git');
+        assert.deepEqual(args.slice(0, 6), prefix);
+        assert.deepEqual(options.env, {GIT_AUTHOR_NAME: 'Moon Dispatcher', GIT_COMMITTER_NAME: 'Moon Dispatcher',
+            GIT_AUTHOR_EMAIL: 'moon@example.invalid', GIT_COMMITTER_EMAIL: 'moon@example.invalid'});
+        const selected = args.slice(6);
+        operations.push(selected);
+        let stdout = 'Complete Git output.\n';
+        if (selected[0] === 'clone') {
+            assert.deepEqual(selected, ['clone', '--progress', '--', 'https://example.invalid/moon.git', directory]);
+            await mkdir(directory);
+        } else if (selected[0] === 'rev-parse') stdout = `${directory}\n`;
+        else if (selected[0] === 'branch') stdout = 'moon-main\n';
+        else if (selected[0] === 'status') stdout = '## moon-main\n';
+        if (selected.includes('commit')) {
+            const chunks = [];
+            for await (const part of options.input) chunks.push(part);
+            assert.deepEqual(chunks, [message]);
+        }
+        await options.onOutput?.({stream: 'stdout', chunk: stdout});
+        return processResult(stdout, 'Complete diagnostics.\n');
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'https://example.invalid/moon.git', gitIdentity, run});
+    gitIdentity.name = 'Later UI selection';
+    gitIdentity.email = 'later@example.invalid';
+    gitIdentity.username = 'later-account';
+    assert.equal(operations.length, 0);
+    await repository.open();
+    await repository.status();
+    await repository.pull();
+    await repository.push();
+    const result = await repository.write({files: [{path: 'message.md', content}], message});
+    assert.equal(result.state, 'pushed');
+    assert.equal(await readFile(path.join(directory, 'message.md'), 'utf8'), content);
+    assert.equal(operations.filter(function cloned(args) { return args[0] === 'clone'; }).length, 1);
+    assert.ok(operations.some(function pulled(args) { return args[0] === 'pull'; }));
+    assert.ok(operations.some(function committed(args) { return args.includes('commit'); }));
+    assert.ok(result.outputs.every(function diagnostics(output) { return output.stderr === 'Complete diagnostics.\n'; }));
     await repository.close();
 });
 

@@ -10,10 +10,11 @@ function deferred() {
     return {promise, resolve};
 }
 
-async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, blobOutput} = {}) {
+async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, blobOutput, gitIdentity} = {}) {
     const parent = path.resolve('.arcane/test/git-text-snapshot');
     await mkdir(parent, {recursive: true});
     const cacheDirectory = await mkdtemp(path.join(parent, 'case-'));
+    const selectedIdentity = gitIdentity ? {...gitIdentity} : undefined;
     t.after(async function removeOwnedCache() { await rm(cacheDirectory, {recursive: true, force: true}); });
     const state = {
         revision: 'a'.repeat(40), calls: [], fetchStarted: deferred(), events: [],
@@ -41,6 +42,13 @@ async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, b
     async function run(command, args, options = {}) {
         assert.equal(command, 'git');
         state.calls.push({args, options});
+        if (selectedIdentity) {
+            assert.deepEqual(args.slice(0, 6), ['-c', `user.name=${selectedIdentity.name}`,
+                '-c', `user.email=${selectedIdentity.email}`, '-c', `credential.username=${selectedIdentity.username}`]);
+            assert.deepEqual(options.env, {GIT_AUTHOR_NAME: selectedIdentity.name, GIT_COMMITTER_NAME: selectedIdentity.name,
+                GIT_AUTHOR_EMAIL: selectedIdentity.email, GIT_COMMITTER_EMAIL: selectedIdentity.email});
+            args = args.slice(6);
+        }
         let stdout = '';
         if (args[0] === 'init') {
             assert.deepEqual(args, ['init', '--bare', cacheDirectory]);
@@ -77,7 +85,7 @@ async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, b
         return {code: 0, stdout, stderr: ''};
     }
     const owner = createGitTextSnapshot({
-        cacheDirectory, remote: 'example-remote', ref: 'main',
+        cacheDirectory, remote: 'example-remote', ref: 'main', gitIdentity,
         selectPath: selectPath ?? function selectAll() { return true; },
         run, onEvent: function observe(event) { state.events.push(event); }
     });
@@ -97,6 +105,27 @@ test('Git snapshot preserves complete ordered text, paths, BOM, CRLF, NUL and sp
     })});
     assert.equal(state.calls.filter(function batch(call) { return call.args[2] === 'cat-file'; }).length, 1);
     assert.equal(state.calls.some(function checkout(call) { return call.args.includes('checkout'); }), false);
+});
+
+test('snapshot identity covers bare initialization and fetch while retaining shared acquisition', async function snapshotIdentity(t) {
+    const gate = deferred();
+    const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};
+    const {owner, state} = await fixture(t, {fetchGate: gate, gitIdentity});
+    gitIdentity.name = 'Later connection';
+    gitIdentity.username = 'later-account';
+    assert.equal(state.calls.length, 0);
+    const controller = new AbortController();
+    const first = owner.refresh({signal: controller.signal});
+    const second = owner.refresh();
+    await state.fetchStarted.promise;
+    controller.abort('This caller left.');
+    await assert.rejects(first, {code: 'ARCANE_CANCELLED'});
+    gate.resolve();
+    const result = await second;
+    assert.deepEqual(result.files, state.files.map(function complete(file) { return {path: file.path, content: file.content}; }));
+    assert.equal(state.calls[0].args[6], 'init');
+    assert.equal(state.calls.filter(function fetch(call) { return call.args[8] === 'fetch'; }).length, 1);
+    assert.ok(state.calls.every(function sharedLifetime(call) { return call.options.signal === undefined; }));
 });
 
 test('concurrent refresh shares one fetch and one cancelled caller does not stop another', async function sharedRefresh(t) {

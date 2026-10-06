@@ -33,11 +33,25 @@ policy stable for the lifetime of its snapshot owner.
 
 ## API and lifecycle
 
-`createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,onEvent,run})`
+`createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run})`
 returns `{refresh,close,drain,dispose}`. `run` defaults to the SDK's existing
 `runProcess`; applications normally omit it. It is the same process adapter
 contract, not a second process supervisor. `onEvent` is the ordinary SDK event
 callback and follows its asynchronous completion/error contract.
+
+Optional `gitIdentity:{name?,email?,username?}` uses the shared
+[Git identity configuration contract](core-repositories.md#git-identity-configuration).
+Supplied strings are captured during construction and accompany every Git
+command, including bare initialization and fetch, without changing the remote,
+ref, config files or process environment. Explicit name/email use command-local
+configuration and child-only author/committer fields; omitted fields remain
+inherited. `username` is only Git's credential username hint, not authenticated
+account proof or SSH account selection. Read separate global/local/effective
+configuration through `readGitIdentity` from `arcane-os/core/repositories`;
+the reader also accepts an existing bare cache directory. Applications retain
+saved non-secret choices and per-connection overrides. Identity selection adds
+no process or query to refresh and does not attach a caller's abort to shared
+acquisition.
 
 - `refresh({signal}={})` fetches the selected ref and returns
   `{revision,files:[{path,content}]}`. `revision` is Git's opaque selected commit
