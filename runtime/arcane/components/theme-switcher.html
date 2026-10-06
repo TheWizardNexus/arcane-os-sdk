@@ -1,11 +1,62 @@
 <style>
-    :host{display:inline-block;color:inherit}
-    .switcher{align-items:center;display:flex;gap:.15rem;padding:.2rem;border:1px solid var(--app-bar-border,var(--border-color,rgba(255,255,255,.25)));border-radius:999px;background:color-mix(in srgb,currentColor 8%,transparent)}
-    button{appearance:none;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;font:700 .68rem/1 system-ui,sans-serif;min-height:1.85rem;padding:.42rem .58rem}
-    button:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
-    button[aria-pressed="true"]{background:var(--app-bar-accent,var(--secondary-color,#c49a52));color:var(--app-bar-active-text,var(--primary-color,#172238))}
-    button:focus-visible{outline:.18rem solid var(--focus-color,currentColor);outline-offset:.12rem}
-    @media(max-width:32rem){button{font-size:0;padding-inline:.5rem}button::first-letter{font-size:.72rem}}
+    :host {
+        display:inline-block;
+        min-inline-size:0;
+        max-inline-size:100%;
+        color:inherit;
+    }
+
+    .switcher {
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:.15rem;
+        box-sizing:border-box;
+        max-inline-size:100%;
+        padding:.2rem;
+        border:1px solid var(--app-bar-border,var(--border-color,rgba(255,255,255,.25)));
+        border-radius:1.6rem;
+        background:color-mix(in srgb,currentColor 8%,transparent);
+    }
+
+    button {
+        appearance:none;
+        flex:1 0 auto;
+        box-sizing:border-box;
+        min-inline-size:2.75rem;
+        max-inline-size:100%;
+        min-block-size:2.75rem;
+        padding:.5rem .75rem;
+        border:0;
+        border-radius:1.4rem;
+        background:transparent;
+        color:inherit;
+        cursor:pointer;
+        font:700 .875rem/1.25 system-ui,sans-serif;
+        text-align:center;
+        white-space:normal;
+        overflow-wrap:anywhere;
+    }
+
+    button:hover:not(:disabled) {
+        background:color-mix(in srgb,currentColor 14%,transparent);
+    }
+
+    button[aria-pressed="true"] {
+        background:var(--app-bar-accent,var(--secondary-color,rgb(196,154,82)));
+        color:var(--app-bar-active-text,var(--primary-color,rgb(23,34,56)));
+        box-shadow:inset 0 0 0 .1rem currentColor;
+    }
+
+    button:disabled {
+        cursor:not-allowed;
+        opacity:.55;
+    }
+
+    button:focus-visible {
+        outline:.18rem solid var(--focus-color,currentColor);
+        outline-offset:.12rem;
+    }
 </style>
 <div class="switcher" role="group" aria-label="Color scheme">
     <button type="button" data-scheme="system" aria-pressed="false" title="Use device theme">Auto</button>
@@ -16,31 +67,79 @@
 <script type="module">
     const host=this;
     const root=host.shadowRoot;
+    const group=root.querySelector('.switcher');
     const buttons=Array.from(root.querySelectorAll('[data-scheme]'));
+    let modes=buttons.map(function scheme(button){return button.dataset.scheme;});
+    let labels=Object.fromEntries(buttons.map(function label(button){
+        return [button.dataset.scheme,button.textContent];
+    }));
+    let busy=false;
+
+    host.configure=configure;
+    configure({
+        modes:host.dataset.modes===undefined?modes:host.dataset.modes.split(/\s+/u).filter(Boolean),
+        labels:host.dataset.systemLabel===undefined?{}:{system:host.dataset.systemLabel}
+    });
+
     const {default:ThemeManager}=await import('../modules/ThemeManager.js');
     const manager=new ThemeManager();
 
     host.setMode=setMode;
     host.refresh=refresh;
-    root.querySelector('.switcher').addEventListener('click',async event=>{
+    group.addEventListener('click',async function selectScheme(event){
         const button=event.target.closest('[data-scheme]');
-        if(!button) return;
+        if(!button||button.disabled) return;
         setBusy(true);
         try{
             const state=button.dataset.scheme==='custom'?await manager.activateCustom():await manager.setScheme(button.dataset.scheme);
             setMode(state.mode);setCustomAvailable(Boolean(state.theme));
         }finally{setBusy(false);setCustomAvailable(Boolean(manager.customTheme));}
     });
-    globalThis.addEventListener('arcane-theme-change',()=>refresh().catch(()=>{}));
+    globalThis.addEventListener('arcane-theme-change',function themeChanged(){
+        refresh().catch(function refreshRejected(){});
+    });
+
+    function configure(options={}){
+        const nextModes=options.modes===undefined?modes:[...options.modes];
+        const nextLabels={...labels,...options.labels};
+        const visible=[];
+        for(const mode of nextModes){
+            const button=buttons.find(function matchingScheme(candidate){return candidate.dataset.scheme===mode;});
+            if(!button) throw new TypeError(`Unknown theme-switcher mode: ${mode}`);
+            if(visible.includes(button)) throw new TypeError(`Repeated theme-switcher mode: ${mode}`);
+            visible.push(button);
+        }
+        for(const button of buttons){
+            const label=nextLabels[button.dataset.scheme];
+            if(typeof label!=='string') throw new TypeError('Theme-switcher labels must be strings.');
+        }
+        modes=nextModes;
+        labels=nextLabels;
+        for(const button of buttons) button.textContent=labels[button.dataset.scheme];
+        const reordered=group.children.length!==visible.length||visible.some(function moved(button,index){
+            return group.children[index]!==button;
+        });
+        if(reordered){
+            const focused=root.activeElement;
+            group.replaceChildren(...visible);
+            if(visible.includes(focused)&&!focused.disabled) focused.focus({preventScroll:true});
+        }
+        return {modes:[...modes],labels:{...labels}};
+    }
 
     function setMode(mode='system'){
         for(const button of buttons) button.setAttribute('aria-pressed',String(button.dataset.scheme===mode));
         host.dataset.mode=mode;
         return mode;
     }
-    function setBusy(value){for(const button of buttons) button.disabled=Boolean(value);}
-    function setCustomAvailable(value){root.querySelector('[data-scheme="custom"]').disabled=!value;}
+    function setBusy(value){
+        busy=Boolean(value);
+        for(const button of buttons) button.disabled=busy;
+    }
+    function setCustomAvailable(value){
+        buttons.find(function customScheme(button){return button.dataset.scheme==='custom';}).disabled=busy||!value;
+    }
     async function refresh(){const state=await manager.load();setMode(state.mode);setCustomAvailable(Boolean(state.theme));return state;}
 
-    refresh().catch(()=>setMode('system'));
+    refresh().catch(function refreshRejected(){setMode('system');});
 </script>

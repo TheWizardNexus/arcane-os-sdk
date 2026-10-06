@@ -718,3 +718,153 @@ test('theme public extraction includes the classic owner and named module skin e
         entry.name === 'applyUserSkin' && entry.targetKind === 'exported-function'
     ));
 });
+
+async function themeSwitcherFixture(dataset={}) {
+    const source=await readFile(new URL('components/theme-switcher.html',runtime),'utf8');
+    const buttons=[];
+    for(const match of source.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gu)){
+        const attributes=new Map();
+        for(const attribute of match[1].matchAll(/([\w-]+)="([^"]*)"/gu)){
+            attributes.set(attribute[1],attribute[2]);
+        }
+        const button={
+            dataset:{scheme:attributes.get('data-scheme')},
+            textContent:match[2],
+            disabled:/\sdisabled(?:\s|$)/u.test(match[1]),
+            setAttribute(name,value){attributes.set(name,value);},
+            getAttribute(name){return attributes.get(name)??null;},
+            closest(selector){assert.equal(selector,'[data-scheme]');return this;},
+            focus(options){this.focusOptions=options;host.shadowRoot.activeElement=this;}
+        };
+        buttons.push(button);
+    }
+    const listeners=new Map();
+    const group={
+        children:[...buttons],
+        replacements:0,
+        replaceChildren(...children){
+            this.children=children;
+            this.replacements+=1;
+            host.shadowRoot.activeElement=null;
+        },
+        addEventListener(name,callback){listeners.set(name,callback);}
+    };
+    const host={
+        dataset:{...dataset},
+        shadowRoot:{
+            activeElement:null,
+            querySelector(selector){assert.equal(selector,'.switcher');return group;},
+            querySelectorAll(selector){assert.equal(selector,'[data-scheme]');return buttons;}
+        }
+    };
+    const scope=new EventTarget();
+    const loaded=deferred();
+    const calls=[];
+    let state={mode:'system',theme:null};
+    let loadTask=loaded.promise;
+    let selection;
+    class FakeThemeManager {
+        get customTheme(){return state.theme;}
+        load(){calls.push({method:'load'});return loadTask;}
+        setScheme(mode){calls.push({method:'setScheme',mode});return selection;}
+        activateCustom(){calls.push({method:'activateCustom'});return selection;}
+    }
+    const script=source.match(/<script type="module">([\s\S]*?)<\/script>/u)[1]
+        .replace("const {default:ThemeManager}=await import('../modules/ThemeManager.js');",'');
+    const AsyncFunction=Object.getPrototypeOf(async function fixtureScript(){}).constructor;
+    await new AsyncFunction('ThemeManager','globalThis',script).call(host,FakeThemeManager,scope);
+    function button(mode){return buttons.find(function matching(item){return item.dataset.scheme===mode;});}
+    function completeLoad(value){state=value;loadTask=Promise.resolve(state);loaded.resolve(state);}
+    function selectWith(promise){
+        selection=promise.then(function selected(value){state=value;return value;});
+    }
+    async function click(mode){return listeners.get('click')({target:button(mode)});}
+    return {source,host,buttons,group,scope,calls,button,completeLoad,selectWith,click};
+}
+
+test('theme switcher configures full labels and visible DOM order without changing the selected theme', async function switcherPresentation() {
+    const current=await themeSwitcherFixture();
+    assert.deepEqual(current.group.children.map(function mode(button){return button.dataset.scheme;}),[
+        'system','light','dark','custom'
+    ]);
+    assert.deepEqual(current.group.children.map(function label(button){return button.textContent;}),[
+        'Auto','Light','Dark','Skin'
+    ]);
+    assert.equal(current.button('custom').disabled,true);
+    assert.equal(typeof current.host.configure,'function','Presentation is installed without waiting for preferences.');
+    assert.deepEqual(current.calls,[{method:'load'}]);
+    current.completeLoad({mode:'custom',theme:{name:'Moon garden'}});
+    await current.host.refresh();
+    const options={modes:['light','dark','system'],labels:{system:'System'}};
+    const configured=current.host.configure(options);
+    assert.deepEqual(current.group.children.map(function mode(button){return button.dataset.scheme;}),options.modes);
+    assert.deepEqual(current.group.children.map(function label(button){return button.textContent;}),[
+        'Light','Dark','System'
+    ]);
+    assert.equal(current.host.dataset.mode,'custom','Hiding a choice does not replace the persisted mode.');
+    assert.equal(current.button('custom').getAttribute('aria-pressed'),'true');
+    assert.equal(current.group.children.includes(current.button('custom')),false);
+    assert.equal(current.calls.every(function onlyReads(call){return call.method==='load';}),true);
+    options.modes.reverse();
+    configured.modes.reverse();
+    configured.labels.system='Changed outside the component';
+    current.button('system').focus();
+    const replacements=current.group.replacements;
+    const fullLabel='System\nwith the complete application label 🌒';
+    current.host.configure({labels:{system:fullLabel}});
+    current.host.configure();
+    assert.equal(current.group.replacements,replacements,'Label-only and unchanged configuration retain the existing DOM.');
+    assert.equal(current.host.shadowRoot.activeElement,current.button('system'));
+    assert.deepEqual(current.group.children.map(function mode(button){return button.dataset.scheme;}),[
+        'light','dark','system'
+    ]);
+    assert.equal(current.button('system').textContent,fullLabel);
+    current.host.configure({modes:['custom','system','light','dark']});
+    assert.equal(current.host.shadowRoot.activeElement,current.button('system'));
+    assert.deepEqual(current.button('system').focusOptions,{preventScroll:true});
+    assert.equal(current.group.children[0],current.button('custom'));
+    assert.equal(current.button('custom').disabled,false);
+    assert.throws(function unknownMode(){current.host.configure({modes:['moon']});},TypeError);
+    assert.equal(current.group.children[0],current.button('custom'),'A malformed configuration leaves the prior presentation intact.');
+    assert.match(current.source,/flex-wrap:wrap/u);
+    assert.match(current.source,/min-block-size:2\.75rem/u);
+    assert.match(current.source,/button:focus-visible/u);
+    assert.match(current.source,/button:disabled/u);
+    assert.doesNotMatch(current.source,/@media|max-width:32rem|first-letter|font-size:0/u);
+});
+
+test('theme switcher initial options and later configuration preserve pending selection and Skin behavior', async function switcherSelection() {
+    const current=await themeSwitcherFixture({modes:'light dark system',systemLabel:'System'});
+    assert.deepEqual(current.group.children.map(function label(button){return button.textContent;}),[
+        'Light','Dark','System'
+    ]);
+    current.completeLoad({mode:'light',theme:{name:'Moon garden'}});
+    await current.host.refresh();
+    assert.equal(current.button('light').getAttribute('aria-pressed'),'true');
+    const selected=deferred();
+    current.selectWith(selected.promise);
+    const selecting=current.click('dark');
+    assert.equal(current.buttons.every(function disabled(button){return button.disabled;}),true);
+    assert.deepEqual(current.calls.at(-1),{method:'setScheme',mode:'dark'});
+    current.host.configure({modes:['dark','system','light','custom']});
+    assert.equal(current.buttons.every(function disabled(button){return button.disabled;}),true);
+    await current.host.refresh();
+    assert.equal(current.button('custom').disabled,true,'A refresh cannot enable Skin during a pending selection.');
+    await current.click('light');
+    assert.equal(current.calls.filter(function selection(call){return call.method==='setScheme';}).length,1);
+    selected.resolve({mode:'dark',theme:{name:'Moon garden'}});
+    await selecting;
+    assert.equal(current.host.dataset.mode,'dark');
+    assert.equal(current.button('dark').getAttribute('aria-pressed'),'true');
+    assert.equal(current.button('light').getAttribute('aria-pressed'),'false');
+    assert.equal(current.buttons.every(function enabled(button){return !button.disabled;}),true);
+    current.selectWith(Promise.resolve({mode:'custom',theme:{name:'Moon garden'}}));
+    await current.click('custom');
+    assert.deepEqual(current.calls.at(-1),{method:'activateCustom'});
+    assert.equal(current.host.dataset.mode,'custom');
+    const failure=new Error('Original preference failure');
+    current.selectWith(Promise.reject(failure));
+    await assert.rejects(current.click('light'),function original(error){return error===failure;});
+    assert.equal(current.host.dataset.mode,'custom');
+    assert.equal(current.buttons.every(function enabled(button){return !button.disabled;}),true);
+});

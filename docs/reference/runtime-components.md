@@ -112,7 +112,7 @@ snapshot remains owned until the browser's `afterprint` event.
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
 | [`terminal-workspace.html`](#terminal-workspacehtml) | Presents multiple terminal sessions, output, active selection, theme, and terminal actions. | `configure()`<br>`addSession()`<br>`removeSession()`<br>`activateSession()`<br>`append()`<br>`clear()`<br>`setState()`<br>`setTheme()`<br>`focus()`<br>`destroy()` | `terminal-workspace-ready`<br>`terminal-submit`<br>`terminal-interrupt`<br>`terminal-clear`<br>`terminal-session-new`<br>`terminal-session-close`<br>`terminal-session-select`<br>`terminal-settings` | UI/session state normalized; native command results supplied externally |
 | [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
-| [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode. | `setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
+| [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode with per-instance choices and labels. | `configure()`<br>`setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
 | [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()`<br>`destroy()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
 | [`voice-transcription.html`](#voice-transcriptionhtml) | Records manual clips or optional continuous microphone audio with pause/periodic segments, ordered transcription and saves, retained failures, and complete transcript delivery. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`retryTranscription()`<br>`cancelRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-empty`<br>`voice-transcription-error`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky STT readiness, capture/queue lifecycle, retry, cancellation, and complete state/text are normalized; media/provider behavior remains external |
 | [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()`<br>`destroy()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
@@ -2015,11 +2015,61 @@ Shared dependencies: [`Theme.js`](runtime-entities.md#themejs).
 
 ### Overview
 
-Selects and refreshes system, light, dark, or custom theme mode.
+Selects and refreshes system, light, dark, or custom theme mode. Native buttons
+retain complete readable labels and wrap when their component runs out of room,
+independently of viewport width. Each button has a `2.75rem` minimum target in
+both dimensions. Selected buttons retain `aria-pressed` and an inset outline;
+disabled choices and keyboard focus have distinct presentation.
 
 ### Public surface
 
-Methods/properties: `setMode()`, `refresh()`.
+Methods/properties: `configure(options)`, `setMode(mode='system')`, `refresh()`.
+
+`configure({modes,labels})` changes only this component's presentation:
+
+- `modes` is an ordered array of the available identifiers `system`, `light`,
+  `dark`, and `custom`. It selects both visible choices and DOM/keyboard order.
+  Omitted `modes` retains the current presentation; an empty array displays no
+  choices. Unknown or repeated identifiers throw `TypeError` before changing
+  the presentation.
+- `labels` is a partial record of complete string labels keyed by those mode
+  identifiers. Omitted labels keep their current text. Text is assigned through
+  `textContent`, never interpreted as markup or reduced to initials. A label for
+  a built-in mode that is not a string throws `TypeError`.
+- The return value is `{modes,labels}` containing independent mutable copies of
+  the current presentation. Later changes to supplied/returned records do not
+  reconfigure the component.
+
+Label-only and unchanged-order configuration retain the existing buttons in
+place. An actual reorder restores keyboard focus to the previously focused
+button when that choice remains visible and enabled, without scrolling.
+
+The default remains Auto / Light / Dark / Skin, using identifiers
+`system`, `light`, `dark`, and `custom`. A caller may omit Skin or change Auto's
+label to System without removing custom-theme support from other instances.
+Configuration never changes preferences, activates a theme, or replaces the
+current selected mode. If the active mode is omitted, no visible button claims
+to be selected. Restoring that choice restores its existing pressed and disabled
+state. Skin remains disabled until the manager has a saved custom theme.
+
+For the initial presentation, `data-modes` accepts whitespace-separated mode
+identifiers and `data-system-label` supplies the complete system-mode label.
+These attributes are read once before the asynchronous ThemeManager import and
+preference refresh, so initial choices do not wait for `html-import-ready`.
+Use `configure()` after that event for subsequent presentation changes;
+changing these attributes later does not reconfigure an existing instance.
+
+`setMode()` updates pressed state and the host's `data-mode` only. `refresh()`
+loads the existing ThemeManager state, updates selection and Skin availability,
+and resolves with the complete manager state. Clicking a choice uses the same
+manager persistence/activation operation; buttons remain disabled while that
+operation is pending. Presentation configuration preserves that pending state.
+
+The host inherits text color. Existing `--app-bar-border` (falling back to
+`--border-color`), `--app-bar-accent` (then `--secondary-color`),
+`--app-bar-active-text` (then `--primary-color`), and `--focus-color` overrides
+remain supported. Applications own their palette and surrounding placement;
+the component adds no application-specific palette or settings section.
 
 This fragment declares no component-specific readiness or action event; use the loader's `html-import-ready` only to know that import execution completed.
 
@@ -2033,10 +2083,17 @@ Shared dependencies: [`ThemeManager.js`](runtime-modules.md#thememanagerjs).
 
 ```html
 <html-import
-  id="theme-switcher.html"
-  href="/arcane/components/theme-switcher.html">
+  id="theme-switcher"
+  href="/node_modules/arcane-os/runtime/arcane/components/theme-switcher.html"
+  data-modes="light dark system"
+  data-system-label="System">
 </html-import>
 ```
+
+This instance displays Light / Dark / System in that order. An instance without
+the two configuration attributes retains all four default choices. Both use
+the existing shared preference owner; presentation does not create a new store
+or migrate saved themes.
 
 ## unified-inbox.html
 
