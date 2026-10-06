@@ -295,6 +295,7 @@
     const aiModuleImport = import('../modules/AI.js');
     const providerRuntimeImport = import('../modules/AIProviderRuntime.js');
     const {
+        continuesAIRuntimeOperation,
         requestAIRuntimeIntent,
         subscribeAIRuntimeState
     } = await import('../modules/AIRuntimeState.js');
@@ -366,6 +367,7 @@
     let ttsIntentGeneration = 0;
     let eventOperationSequence = 0;
     let transcriptionOperationId = null;
+    let transcriptionRuntimeOperationId = null;
     let ttsOperationId = null;
     let destroyed = false;
     let recognitionLanguage = is.string(host.recognitionLanguage)
@@ -826,8 +828,10 @@
 
     function applyRoleTransitions(previousSTTRole, previousTTSRole) {
         sttActivationController?.synchronize(sttRole);
-        const sttBecameUnready = previousSTTRole.state === 'ready'
-            && sttRole.state !== 'ready';
+        const continuingTranscription = transcriptionActive && !nativeCaptureSession
+            && continuesAIRuntimeOperation(previousSTTRole, sttRole, transcriptionRuntimeOperationId);
+        const sttBecameUnready = ['ready', 'recovering'].includes(previousSTTRole.state)
+            && sttRole.state !== 'ready' && !continuingTranscription;
         const ttsBecameUnready = previousTTSRole.state === 'ready'
             && ttsRole.state !== 'ready';
 
@@ -2011,10 +2015,16 @@
                 throw error;
             }
 
-            const transcription = await aiRuntime.fetchSTT(
+            const previousRuntimeOperationId = providerRuntime.status('stt').operationId;
+            const pendingTranscription = aiRuntime.fetchSTT(
                 audioFile,
                 controller.signal
             );
+            const activeRole = providerRuntime.status('stt');
+            transcriptionRuntimeOperationId = activeRole.busy
+                && activeRole.operationId !== previousRuntimeOperationId
+                ? activeRole.operationId : null;
+            const transcription = await pendingTranscription;
             if (
                 generation !== transcriptionGeneration
                 || sttRole.state !== 'ready'
@@ -2044,6 +2054,7 @@
         } finally {
             if (transcriptionAbortController === controller) {
                 transcriptionAbortController = null;
+                transcriptionRuntimeOperationId = null;
             }
             if (generation === transcriptionGeneration) {
                 transcriptionActive = false;
@@ -2144,6 +2155,7 @@
         transcriptionGeneration += 1;
         transcriptionAbortController?.abort();
         transcriptionAbortController = null;
+        transcriptionRuntimeOperationId = null;
         recordingRequested = false;
         transcriptionActive = false;
         clearSilenceTimer();

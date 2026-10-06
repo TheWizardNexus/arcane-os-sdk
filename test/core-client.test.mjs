@@ -73,6 +73,35 @@ test('Core cancellation sends the existing control frame and ignores late comple
     assert.deepEqual(frames.at(-1),{protocol:CORE_PROTOCOL,type:'control',control:'requests.cancelAll'});
 });
 
+test('Core request observer exposes the real ID before send without changing the payload',async t=>{
+    let observed;
+    let receive;
+    const frames=[];
+    const transport={name:'fixture',subscribe(listener){receive=listener;},send(frame){
+        frames.push(frame);
+        assert.equal(observed,frame.id);
+    }};
+    const {client}=fixture(t,{transport});
+    const facade=createCoreFacade(client);
+    const payload={audioBase64:'YWJj',model:'whisper-small',complete:'  keep\nall  '};
+    const operation=facade.speech.transcribe(payload,{onRequest({requestId}){observed=requestId;}});
+    assert.equal(frames[0].parameters,payload);
+    receive({protocol:CORE_PROTOCOL,type:'response',id:observed,ok:true,result:{text:'Complete transcript'}});
+    assert.deepEqual(await operation,{text:'Complete transcript'});
+    const observerFailure=new Error('Observer rejected before dispatch.');
+    observerFailure.code='OBSERVER_FAILED';
+    await assert.rejects(client.invoke('speech.transcribe',payload,{onRequest(){throw observerFailure;}}),{
+        code:'OBSERVER_FAILED'
+    });
+    assert.equal(frames.length,1);
+    const controller=new AbortController();
+    controller.abort();
+    await assert.rejects(facade.speech.transcribe(payload,{
+        signal:controller.signal,onRequest(){assert.fail('Pre-aborted request must not be observed.');}
+    }),{code:'ARCANE_REQUEST_ABORTED'});
+    assert.equal(frames.length,1);
+});
+
 test('Core current ready state is synchronous and replays once with unsubscribe',async t=>{
     const {client,receive}=fixture(t);
     const ready={service:'dispatcher',nested:{complete:'state'}};

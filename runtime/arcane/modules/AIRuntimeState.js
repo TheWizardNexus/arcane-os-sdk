@@ -21,11 +21,21 @@ export const AI_RUNTIME_STATES = completeValue([
     'unavailable',
     'unloaded',
     'loading',
+    'recovering',
     'ready',
     'unloading',
     'error',
     'disposed'
 ]);
+
+/** Keep only an already-owned operation through its truthful recovery/error state. */
+export function continuesAIRuntimeOperation(previous, current, operationId) {
+    return is.string(operationId) && operationId.length > 0
+        && previous?.operationId === operationId && current?.operationId === operationId
+        && previous.providerId === current.providerId && previous.modelId === current.modelId
+        && current.loaded === false && current.busy === true
+        && ['recovering', 'error'].includes(current.state);
+}
 
 const ROLE_KEYS = completeValue([
     'role',
@@ -77,6 +87,7 @@ const MUST_BE_UNLOADED = new Set([
     'unavailable',
     'unloaded',
     'loading',
+    'recovering',
     'disposed'
 ]);
 const STARTUP_TERMINAL_STATES = new Set([
@@ -291,8 +302,10 @@ function copyRoleRecord(role, record) {
         && (record.providerId === null || record.modelId === null)) {
         fail('a loaded role must identify its provider and model.');
     }
-    if (record.busy && (record.state !== 'ready' || !record.loaded)) {
-        fail('a busy role must be ready and loaded.');
+    const pendingRecovery = ['recovering', 'error'].includes(record.state)
+        && record.operationId !== null;
+    if (record.busy && !pendingRecovery && (record.state !== 'ready' || !record.loaded)) {
+        fail('a busy role must be ready and loaded or retain its recovering/error operation.');
     }
     if (record.state === 'error' && error === null) {
         fail('an error role state must include error details.');

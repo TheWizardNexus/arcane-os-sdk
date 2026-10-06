@@ -82,8 +82,9 @@ Each supplied engine implements:
   function.
 - `load({signal})`, resolving only after the constructor-selected model has
   loaded. Independent engines may load concurrently.
-- `transcribe(request, {signal, onProgress})` for STT, or
-  `synthesize(request, {signal, onProgress})` for TTS.
+- `transcribe(request, {signal, onProgress, requestId})` for STT, or
+  `synthesize(request, {signal, onProgress, requestId})` for TTS. `requestId` is
+  the actual Core request's control metadata, separate from the unchanged payload.
 - `close()`, cancelling and joining its native work and releasing its resources.
 
 The service forwards each complete request and result unchanged. It applies
@@ -127,6 +128,27 @@ An engine error, unavailable role, or different selected model rejects the
 adapter load. Later readiness loss or engine/model replacement invalidates the
 AI role and cancels its queued and active requests through the existing provider
 runtime. A new explicit role load or unmute can observe the next ready state.
+
+An engine can report `state: 'recovering'`, `loaded: false`, `busy: true`, and
+the continuing Core `requestId` while retrying an already accepted request on
+the same selected provider and model. Availability remains false. The built-in
+STT adapter preserves only its own correlated pending request through this
+state; another caller's recovery supplies no continuation authority. The real
+RPC ID comes from `Arcane.speech.transcribe`'s optional `onRequest` observer.
+The engine retains that ID on a terminal error snapshot until the snapshot is
+superseded, allowing the pending RPC to deliver its actual complete failure
+rather than converting it into cancellation. True unload, close, replacement,
+transport loss and caller cancellation retain their existing ownership.
+
+The shared AI observation becomes `recovering` with `loaded: false`, `busy:
+true`, and its existing runtime `operationId`. An error may likewise retain
+`busy: true` until the actual operation settles. New inference still requires
+genuine loaded readiness. The STT provider request context includes a
+`refreshState()` callback which rereads that provider's status only while the
+exact request remains owned; it changes observation, not execution authority.
+Shared speech components retain their own real runtime operation through this
+recovery, keep new dispatch readiness-gated, and preserve native microphone
+capture's separate cancellation and final/interim lifetime.
 
 Older fixed-model hosts expose the published aggregate-only `SpeechStatus`
 contract instead of per-model lifecycle. The adapter preserves their independent

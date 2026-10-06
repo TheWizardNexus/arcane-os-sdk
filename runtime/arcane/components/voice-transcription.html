@@ -135,7 +135,7 @@
     const [
         {default:MD},
         {appendTranscription,createSTTActivationController,normalizeVoiceOptions},
-        {requestAIRuntimeIntent,subscribeAIRuntimeState},
+        {continuesAIRuntimeOperation,requestAIRuntimeIntent,subscribeAIRuntimeState},
         {default:ContinuousVoiceCapture},
         {getAIProviderRuntime}
     ]=await Promise.all([
@@ -165,6 +165,7 @@
     let recorder=null;
     let state='idle';
     let stateMessage='';
+    let transcriptionRuntimeOperationId=null;
     let sttRole=unavailableRole('stt');
     let transcript='';
     let sessionGeneration=0;
@@ -1121,7 +1122,17 @@
             error.code='ARCANE_VOICE_TRANSCRIPTION_STT_RUNTIME_METHOD_UNAVAILABLE';
             throw error;
         }
-        return globalThis.ai.fetchSTT(file,signal);
+        const previousOperationId=providerRuntime.status('stt').operationId;
+        const pending=globalThis.ai.fetchSTT(file,signal);
+        const activeRole=providerRuntime.status('stt');
+        const operationId=activeRole.busy&&activeRole.operationId!==previousOperationId
+            ?activeRole.operationId:null;
+        transcriptionRuntimeOperationId=operationId;
+        try{
+            return await pending;
+        }finally{
+            if(transcriptionRuntimeOperationId===operationId)transcriptionRuntimeOperationId=null;
+        }
     }
 
     function isTranscriptionCancellation(error,controller){
@@ -1417,6 +1428,9 @@
     function synchronizeAIRuntimeState(snapshot){
         const previousRole=sttRole;
         sttRole=snapshot.roles.stt;
+        const continuingTranscription=continuesAIRuntimeOperation(
+            previousRole,sttRole,transcriptionRuntimeOperationId
+        );
         if(sttRole.state==='error'&&previousRole.state!=='error'){
             arcaneLogging.error('Arcane transcription runtime failed.',sttRole.error);
         }
@@ -1438,6 +1452,7 @@
                 return;
             }
             if(session.processing==='transcribing'
+                &&!continuingTranscription
                 &&(sttRole.state!=='ready'
                     ||previousRole.providerId!==sttRole.providerId
                     ||previousRole.modelId!==sttRole.modelId)){
@@ -1447,7 +1462,8 @@
             renderContinuousState(session);
             return;
         }
-        if(previousRole.state==='ready'&&sttRole.state!=='ready'){
+        if(['ready','recovering'].includes(previousRole.state)
+            &&sttRole.state!=='ready'&&!continuingTranscription){
             if(cancelSTTOperation('runtime-unready')){
                 return;
             }

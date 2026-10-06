@@ -196,6 +196,7 @@ export function createSpeechService({stt, tts, signal} = {}) {
                 parameters,
                 {
                     signal: operationSignal,
+                    requestId: request.requestId,
                     onProgress(progress) {
                         if (!operationSignal.aborted) {
                             request.emit?.(

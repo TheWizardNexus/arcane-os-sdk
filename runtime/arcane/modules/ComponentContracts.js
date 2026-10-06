@@ -607,6 +607,9 @@ function createSTTActivationController({
         if(role?.state==='loading'){
             return `Transcription ${formatAIRuntimeProgress(role.progress,'loading')}; Cancel is available.`;
         }
+        if(role?.state==='recovering'){
+            return 'Transcription is recovering the current request.';
+        }
         if(role?.state==='unloading'){
             return `Transcription ${formatAIRuntimeProgress(role.progress,'releasing')}.`;
         }

@@ -4037,6 +4037,15 @@ export class AIProviderRuntime {
                     payload: options.payload,
                     signal: controller.signal
                 };
+                if (role === 'stt') {
+                    providerRequest.refreshState = function refreshActiveProviderState() {
+                        if (slot.generation === generation && !slot.unloadPromise
+                            && !slot.disposePromise && !controller.signal.aborted
+                            && slot.activeRequests.get(requestSequence) === requestRecord) {
+                            runtime.#publishRoleRequestState(slot);
+                        }
+                    };
+                }
                 if (SPEECH_ROLES.includes(role)) {
                     arcaneLogging.debug('[Arcane speech runtime] provider.request', {generation, requestSequence, operationId}, providerRequest);
                 }
@@ -4579,16 +4588,24 @@ export class AIProviderRuntime {
         if (!requestRecord && slot.requestQueue.length === 0) {
             return false;
         }
+        const provider = this.#providerFor(slot);
+        const providerState = slot.role === 'stt' && provider
+            ? validateProviderStatus(provider.status()) : null;
+        const pendingRecovery = requestRecord && providerState?.loaded === false
+            && ['recovering', 'error'].includes(providerState.state);
         publishAIRuntimeRoleState(
             slot.role,
             roleRecord(
                 slot.role,
                 slot.selection,
                 {
-                    state: 'ready',
-                    loaded: true,
+                    state: pendingRecovery ? providerState.state : 'ready',
+                    loaded: !pendingRecovery,
                     busy: true,
-                    operationId: requestRecord?.operationId ?? null
+                    operationId: requestRecord?.operationId ?? null,
+                    ...(pendingRecovery && providerState.state === 'error'
+                        ? {error: stateError(providerState.error, 'ARCANE_AI_PROVIDER_REQUEST_FAILED')}
+                        : {})
                 }
             )
         );

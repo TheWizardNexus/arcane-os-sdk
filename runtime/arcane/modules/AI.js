@@ -1616,6 +1616,22 @@ class AI {
         let state='unloaded';
         let busy=false;
         let nativeWatch=null;
+        let nativeRequest=null;
+
+        function continuingNativeSpeechRequest(){
+            const selected=nativeWatch?.snapshot?.roles?.[role];
+            return role==='stt'&&busy&&nativeRequest?.requestId
+                &&nativeRequest.watch===nativeWatch&&!nativeRequest.signal?.aborted
+                &&nativeWatch.speech===runtime.#nativeSpeech(providerId,role)
+                &&nativeWatch.modelId===runtime.#builtInSpeechModel(role)
+                &&nativeWatch.snapshot.status==='ok'&&!nativeWatch.snapshot.closed
+                &&selected?.modelId===nativeWatch.modelId
+                &&selected.providerId===nativeWatch.engineId
+                &&selected.requestId===nativeRequest.requestId
+                &&selected.loaded===false
+                &&((selected.state==='recovering'&&selected.busy===true)
+                    ||selected.state==='error');
+        }
 
         function nativeSpeechReady(){
             if(!nativeWatch
@@ -1727,6 +1743,9 @@ class AI {
                         cancel();
                     }else if(nativeSpeechReady()){
                         finish();
+                        nativeRequest?.refreshState?.();
+                    }else if(continuingNativeSpeechRequest()){
+                        nativeRequest.refreshState?.();
                     }else{
                         const failure=nativeSpeechReadinessError();
                         if(failure){
@@ -1785,11 +1804,16 @@ class AI {
         }
 
         function statusBuiltInSpeechProvider(){
-            const current=state==='ready'&&!nativeSpeechReady()?'unloaded':state;
+            const requestPending=Boolean(continuingNativeSpeechRequest());
+            const selected=nativeWatch?.snapshot?.roles?.[role];
+            const current=state==='ready'&&!nativeSpeechReady()
+                ?requestPending?selected.state:'unloaded':state;
             return completeValue({
                 state:current,
                 loaded:current==='ready',
-                busy
+                busy,
+                requestPending,
+                ...(current==='error'?{error:selected.error}:{})
             });
         }
 
@@ -1810,6 +1834,11 @@ class AI {
 
         function releaseBuiltInSpeechRequest(){
             busy=false;
+            nativeRequest=null;
+            if(state==='ready'&&!nativeSpeechReady()){
+                state='unloaded';
+                stopNativeSpeechWatch();
+            }
         }
 
         return completeValue({
@@ -1925,10 +1954,18 @@ class AI {
                     );
                 }
                 busy=true;
+                const operation=role==='stt'?{
+                    requestId:null,watch:nativeWatch,signal:context.signal,
+                    refreshState:context.refreshState
+                }:null;
+                nativeRequest=operation;
                 const request=role==='stt'
                     ?runtime.#requestBuiltInSpeechTranscription(
                         context.payload,
-                        context.signal
+                        context.signal,
+                        function ownNativeSpeechRequest({requestId}){
+                            if(nativeRequest===operation)operation.requestId=requestId;
+                        }
                     )
                     :runtime.#requestBuiltInSpeechSynthesis(
                         context.payload,
@@ -2099,9 +2136,10 @@ class AI {
             const record=runtime.#builtInSpeechProviders.get(
                 runtime.#builtInSpeechProviderKey(role,selection.providerId)
             );
+            const providerStatus=record?.provider.status();
             if(runtime.#builtInSpeechCapability(role,selection.providerId)
                 &&(!(status.loaded===true||status.busy===true)
-                    ||record.provider.status().loaded===true)){
+                    ||providerStatus?.loaded===true||providerStatus?.requestPending===true)){
                 return status;
             }
             if(status.loaded===true
@@ -4253,7 +4291,7 @@ class AI {
         return null;
     }
 
-    async #requestBuiltInSpeechTranscription(payload={},signal=null){
+    async #requestBuiltInSpeechTranscription(payload={},signal=null,onRequest=undefined){
         const audio=payload?.audio;
         if(!audio||!is.function(audio.arrayBuffer)){
             throw new TypeError('Speech transcription requires an audio Blob or File.');
@@ -4275,7 +4313,7 @@ class AI {
                     audioBase64:this.#arrayBufferToBase64(audioBytes),
                     mimeType,
                     model
-                },{signal});
+                },{signal,onRequest});
             }catch(error){
                 if(isAIRequestAbort(error,signal)){
                     throw normalizeAIRequestAbort(error);

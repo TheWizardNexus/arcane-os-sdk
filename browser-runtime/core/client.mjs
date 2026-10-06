@@ -459,7 +459,10 @@ export function createCoreClient({
         if(eventOwnerFailure)return Promise.reject(eventOwnerFailure);
         let selected;
         try{selected=connect();}catch(error){return Promise.reject(error);}
-        const {signal,timeoutMs=10*60*1000}=options??{};
+        const {signal,timeoutMs=10*60*1000,onRequest}=options??{};
+        if(onRequest!==undefined&&typeof onRequest!=='function'){
+            return Promise.reject(new TypeError('Arcane request observer must be a function.'));
+        }
         if(signal&&(typeof signal.aborted!=='boolean'
             ||typeof signal.addEventListener!=='function'
             ||typeof signal.removeEventListener!=='function')){
@@ -483,6 +486,8 @@ export function createCoreClient({
             if(!settle(id,failure))report(failure);
         }
         try{
+            if(onRequest)Promise.resolve(onRequest({requestId:id})).catch(report);
+            if(!pending.has(id))return promise;
             Promise.resolve(selected.send(frame)).catch(sendFailed);
         }catch(error){sendFailed(error);}
         return promise;
@@ -569,7 +574,7 @@ export function createCoreFacade(client){
         mail:{send:request=>invoke('mail.send',request??{},{timeoutMs:450000})},
         speech:{status:()=>invoke('speech.status',{},{timeoutMs:10000}),
             synthesize:(request,options)=>invoke('speech.synthesize',request??{},{timeoutMs:180000,signal:options?.signal}),
-            transcribe:(request,options)=>invoke('speech.transcribe',request??{},{timeoutMs:180000,signal:options?.signal})},
+            transcribe:(request,options)=>invoke('speech.transcribe',request??{},{timeoutMs:180000,signal:options?.signal,onRequest:options?.onRequest})},
         localAI:{status:()=>invoke('localai.status',{},{timeoutMs:15000}),
             ensurePlatform:()=>invoke('localai.platform.ensure',{},long),recover:request=>invoke('localai.services.recover',request??{},long),
             setParallelRequests:request=>invoke('localai.parallel.requests.set',request??{},long),

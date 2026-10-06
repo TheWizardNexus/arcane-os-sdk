@@ -44,6 +44,9 @@ test('AI native speech follows independent authoritative role readiness', async 
     let transcriptionRequested;
     let transcriptionSignal;
     let transcriptionPayload;
+    let transcriptionResult;
+    let transcriptionRequestId;
+    let transcriptionSequence = 0;
     const events = {
         on(name, listener) {
             assert.equal(name, 'speech.state');
@@ -60,17 +63,23 @@ test('AI native speech follows independent authoritative role readiness', async 
                 return statusResponse;
             },
             synthesize() { throw new Error('This fixture never requests synthesis.'); },
-            transcribe(payload, {signal}) {
+            transcribe(payload, {signal, onRequest}) {
                 transcriptionPayload = payload;
                 transcriptionSignal = signal;
+                transcriptionRequestId = `native-request-${++transcriptionSequence}`;
+                onRequest?.({requestId: transcriptionRequestId});
+                const result = deferred();
+                transcriptionResult = result;
                 transcriptionRequested.resolve();
-                return new Promise(function awaitNativeCancellation(resolve, reject) {
-                    signal.addEventListener('abort', function cancelNativeTranscription() {
-                        const error = new Error('The native request was cancelled.');
-                        error.name = 'AbortError';
-                        error.code = 'ARCANE_REQUEST_ABORTED';
-                        reject(error);
-                    }, {once: true});
+                function cancelNativeTranscription() {
+                    const error = new Error('The native request was cancelled.');
+                    error.name = 'AbortError';
+                    error.code = 'ARCANE_REQUEST_ABORTED';
+                    result.reject(error);
+                }
+                signal.addEventListener('abort', cancelNativeTranscription, {once: true});
+                return result.promise.finally(function releaseNativeSignal() {
+                    signal.removeEventListener('abort', cancelNativeTranscription);
                 });
             }
         }
@@ -126,16 +135,98 @@ test('AI native speech follows independent authoritative role readiness', async 
         assert.equal(ai.providerRuntime.status('stt').state, 'ready');
 
         const audio = '  Moon raccoons\nkeep every sandwich.  ';
-        transcriptionRequested = deferred();
-        const transcribing = ai.providerRuntime.transcribe({
+        const payload = {
             audio: new Blob([audio], {type: 'audio/webm'}),
             mimeType: 'audio/webm', model: 'whisper-small'
-        });
+        };
+        function recovering(requestId = transcriptionRequestId) {
+            return snapshot({...roleState('stt', 'recovering'), busy: true, requestId}, roleState('tts', 'ready'));
+        }
+
+        transcriptionRequested = deferred();
+        const recovered = ai.providerRuntime.transcribe(payload);
+        await transcriptionRequested.promise;
+        const firstResult = transcriptionResult;
+        const firstSignal = transcriptionSignal;
+        const firstSequence = transcriptionSequence;
+        const operationId = ai.providerRuntime.status('stt').operationId;
+        publish(recovering());
+        assert.equal(firstSignal.aborted, false);
+        assert.equal(ai.providerRuntime.status('stt').state, 'recovering');
+        assert.equal(ai.providerRuntime.status('stt').loaded, false);
+        assert.equal(ai.providerRuntime.status('stt').busy, true);
+        assert.equal(ai.providerRuntime.status('stt').operationId, operationId);
+        transcriptionRequested = deferred();
+        const queued = ai.providerRuntime.transcribe(payload);
+        assert.equal(transcriptionSequence, firstSequence);
+        assert.equal(ai.providerRuntime.status('stt').state, 'recovering');
+        publish(bothReady);
+        firstResult.resolve({text: audio});
+        assert.equal(await recovered, audio);
+        await transcriptionRequested.promise;
+        transcriptionResult.resolve({text: audio});
+        assert.equal(await queued, audio);
+        assert.equal(ai.providerRuntime.status('stt').loaded, true);
+
+        transcriptionRequested = deferred();
+        const failed = ai.providerRuntime.transcribe(payload);
+        const actualFailure = new Error('CPU helper failed with complete diagnostic.');
+        actualFailure.code = 'WHISPER_NATIVE_FAILURE';
+        const rejected = assert.rejects(failed, error => error === actualFailure);
+        await transcriptionRequested.promise;
+        publish(recovering());
+        publish(snapshot({
+            ...roleState('stt', 'error'), requestId: transcriptionRequestId,
+            busy: false, error: {code: actualFailure.code, message: actualFailure.message}
+        }, roleState('tts', 'ready')));
+        assert.equal(transcriptionSignal.aborted, false);
+        assert.equal(ai.providerRuntime.status('stt').state, 'error');
+        assert.equal(ai.providerRuntime.status('stt').loaded, false);
+        assert.equal(ai.providerRuntime.status('stt').busy, true);
+        transcriptionResult.reject(actualFailure);
+        await rejected;
+        assert.equal(ai.providerRuntime.status('stt').busy, false);
+        await ai.providerRuntime.unload('stt');
+        nextStatus(bothReady);
+        await ai.providerRuntime.load('stt');
+
+        for (const cancellation of ['caller', 'unload']) {
+            transcriptionRequested = deferred();
+            const recoveryController = new AbortController();
+            const pendingRecovery = ai.providerRuntime.transcribe(payload, {signal: recoveryController.signal});
+            const recoveryCancelled = assert.rejects(pendingRecovery, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+            await transcriptionRequested.promise;
+            publish(recovering());
+            assert.equal(transcriptionSignal.aborted, false);
+            if (cancellation === 'caller') recoveryController.abort();
+            else await ai.providerRuntime.unload('stt');
+            assert.equal(transcriptionSignal.aborted, true);
+            await recoveryCancelled;
+            await ai.providerRuntime.unload('stt');
+            nextStatus(bothReady);
+            await ai.providerRuntime.load('stt');
+        }
+
+        transcriptionRequested = deferred();
+        const foreign = ai.providerRuntime.transcribe(payload);
+        const foreignCancelled = assert.rejects(foreign, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+        await transcriptionRequested.promise;
+        publish(recovering('another-native-request'));
+        assert.equal(transcriptionSignal.aborted, true);
+        await foreignCancelled;
+        await ai.providerRuntime.unload('stt');
+        nextStatus(bothReady);
+        await ai.providerRuntime.load('stt');
+
+        transcriptionRequested = deferred();
+        const transcribing = ai.providerRuntime.transcribe(payload);
         const cancelledTranscription = assert.rejects(transcribing, {code: 'ARCANE_AI_REQUEST_ABORTED'});
         await transcriptionRequested.promise;
         assert.deepEqual(transcriptionPayload, {
             audioBase64: btoa(audio), mimeType: 'audio/webm', model: 'whisper-small'
         });
+        publish(recovering());
+        assert.equal(transcriptionSignal.aborted, false);
         publish(snapshot(roleState('stt', 'ready', 'replacement-model'), roleState('tts', 'ready')));
         assert.equal(transcriptionSignal.aborted, true);
         await cancelledTranscription;

@@ -1121,6 +1121,14 @@ work. Promise settlement proves only that the provider's exposed request promise
 completed; provider-specific cancellation acknowledgement remains the selected
 provider's boundary.
 
+An STT provider's request context also supplies `refreshState()`. An engine
+lifecycle observer may call it to reread `provider.status()` while that exact
+request remains active. A recovering or failed pending request is observed as
+`loaded: false`, `busy: true`, with its existing runtime operation ID; the
+callback does not make a new request ready or change its supplied payload.
+After cancellation, unload, disposal, replacement, or settlement it has no
+effect on the retired request.
+
 Direct LLM `request()`, `chat()`, and `stream()` use the same message history,
 tool-declaration, emitted-call, all-choice, and ordered parallel-call contracts
 as the high-level AI API module, including one nonblank matching result for
@@ -1229,13 +1237,17 @@ observable without exposing provider transports in application code.
 
 Exact exports: `AI_RUNTIME_INTENT_EVENT`, `AI_RUNTIME_PROTOCOL`,
 `AI_RUNTIME_ROLES`, `AI_RUNTIME_STARTUP_EVENT`, `AI_RUNTIME_STATES`,
-`AI_RUNTIME_STATE_EVENT`, `getAIRuntimeState`,
+`AI_RUNTIME_STATE_EVENT`, `continuesAIRuntimeOperation`, `getAIRuntimeState`,
 `publishAIRuntimeRoleState`, `publishAIRuntimeRolesState`,
 `requestAIRuntimeIntent`, `startAIRuntime`, `subscribeAIRuntimeIntents`, and
 `subscribeAIRuntimeState`.
 
 Each role record is exactly `{role,state,providerId,modelId,localOnly,loaded,
 busy,operationId,progress,error}`.
+`continuesAIRuntimeOperation(previous,current,operationId)` identifies the same
+already-owned provider/model/runtime operation in a busy, unloaded `recovering`
+or `error` observation. Pass the actual runtime operation ID, not a component's
+local counter. It grants neither readiness nor permission to start new work.
 `subscribeAIRuntimeState(listener,{signal=null,emitCurrent=true})` installs its
 subscription and synchronously replays the current mutable snapshot by default;
 `subscribeAIRuntimeIntents(listener,{signal=null})` is future-only. Both return
@@ -1251,7 +1263,9 @@ transcription-model load.
 ### Availability and normalization
 
 **Cross-host state contract.** States are `unavailable`, `unloaded`, `loading`,
-`ready`, `unloading`, `error`, and `disposed`. Revisions increase monotonically.
+`recovering`, `ready`, `unloading`, `error`, and `disposed`. Recovery remains
+`loaded: false`; `recovering` and `error` may retain `busy: true` with an actual
+`operationId` until the pending request settles. Revisions increase monotonically.
 The events `arcane-ai-runtime-state`, `arcane-ai-runtime-intent`, and
 `arcane-ai-runtime-startup-settled` normalize observation only: receiving one
 does not grant a native capability, prove browser support, or load a provider.

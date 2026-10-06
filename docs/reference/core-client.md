@@ -67,7 +67,7 @@ current dispatcher and service state for a newly connected document, without
 restarting services. Repeated `connect()` calls on the same connection do not
 send another replay. See [runtime replay](core-runtime.md#state-and-frames).
 
-`client.invoke(method, parameters, {signal, timeoutMs})` returns the actual
+`client.invoke(method, parameters, {signal, timeoutMs, onRequest})` returns the actual
 response result or rejects with `CoreError`. Parameters, result fields and
 event data retain their complete supplied content. JSON encoding belongs only
 to transports that require it; values crossing those transports must be
@@ -76,6 +76,14 @@ The default request timeout is ten minutes; `timeoutMs:0` disables that timer.
 The compatibility facade retains its operation-specific timeouts and streaming
 callbacks. Streaming IDs and isolated-operation IDs are separate protocol
 correlation fields alongside the supplied request fields.
+
+The optional `onRequest({requestId})` observer runs synchronously after the
+client owns the request and before transport dispatch. It exposes the actual
+Core correlation ID without adding fields to the supplied payload. A
+pre-aborted request never calls the observer. A synchronous observer failure
+rejects the request before sending; a returned promise is observed for errors
+without delaying dispatch. If the observer cancels or closes the request,
+the client does not subsequently send it.
 
 `Arcane.speech.synthesize(request, {signal})` forwards the optional cancellation
 signal through the same request lifetime. Existing one-argument calls retain
@@ -87,12 +95,13 @@ registered speech service and its engine; the facade supplies no speech engine.
 call and normalizes cancellation to `AbortError` with
 `ARCANE_AI_REQUEST_ABORTED`, preserving the original error as its cause.
 
-`Arcane.speech.transcribe(request, {signal})` forwards cancellation through the
+`Arcane.speech.transcribe(request, {signal, onRequest})` forwards cancellation through the
 same request lifetime and retains its 180,000 ms timeout and complete request.
 `AI.fetchSTT(audio, signal)` carries that signal into the native call. A
 pre-aborted signal sends no transcription request; an in-flight abort sends
 `request.cancel` and suppresses late responses. The registered transcription
 service owns interruption and release of its actual engine operation.
+Its optional request observer uses the same pre-dispatch correlation contract.
 
 ## Current-window theme
 
