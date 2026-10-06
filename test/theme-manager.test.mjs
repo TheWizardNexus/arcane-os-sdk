@@ -828,6 +828,8 @@ test('theme switcher configures full labels and visible DOM order without changi
     assert.equal(current.group.children[0],current.button('custom'),'A malformed configuration leaves the prior presentation intact.');
     assert.match(current.source,/flex-wrap:wrap/u);
     assert.match(current.source,/min-block-size:2\.75rem/u);
+    assert.match(current.source,/button:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)/u);
+    assert.doesNotMatch(current.source,/button:hover:not\(:disabled\)\s*\{/u);
     assert.match(current.source,/button:focus-visible/u);
     assert.match(current.source,/button:disabled/u);
     assert.doesNotMatch(current.source,/@media|max-width:32rem|first-letter|font-size:0/u);

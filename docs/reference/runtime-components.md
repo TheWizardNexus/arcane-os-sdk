@@ -2018,8 +2018,10 @@ Shared dependencies: [`Theme.js`](runtime-entities.md#themejs).
 Selects and refreshes system, light, dark, or custom theme mode. Native buttons
 retain complete readable labels and wrap when their component runs out of room,
 independently of viewport width. Each button has a `2.75rem` minimum target in
-both dimensions. Selected buttons retain `aria-pressed` and an inset outline;
-disabled choices and keyboard focus have distinct presentation.
+both dimensions. Selected buttons retain `aria-pressed`, their selected colors
+and an inset outline while hovered; ordinary hover fill applies only to
+unselected, enabled choices. Disabled choices and keyboard focus have distinct
+presentation.
 
 ### Public surface
 
