@@ -827,6 +827,11 @@ test('theme switcher configures full labels and visible DOM order without changi
     assert.throws(function unknownMode(){current.host.configure({modes:['moon']});},TypeError);
     assert.equal(current.group.children[0],current.button('custom'),'A malformed configuration leaves the prior presentation intact.');
     assert.match(current.source,/flex-wrap:wrap/u);
+    assert.match(current.source,/border-radius:var\(--theme-switcher-radius,1\.6rem\)/u);
+    assert.match(current.source,/border-radius:var\(--theme-switcher-option-radius,1\.4rem\)/u);
+    assert.match(current.source,/font:var\(--theme-switcher-font,700 \.875rem\/1\.25 system-ui,sans-serif\)/u);
+    assert.match(current.source,/background:var\(--theme-switcher-background,color-mix\(in srgb,currentColor 8%,transparent\)\)/u);
+    assert.match(current.source,/min-inline-size:2\.75rem/u);
     assert.match(current.source,/min-block-size:2\.75rem/u);
     assert.match(current.source,/button:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)/u);
     assert.doesNotMatch(current.source,/button:hover:not\(:disabled\)\s*\{/u);

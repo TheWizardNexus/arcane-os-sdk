@@ -15,8 +15,8 @@
         max-inline-size:100%;
         padding:.2rem;
         border:1px solid var(--app-bar-border,var(--border-color,rgba(255,255,255,.25)));
-        border-radius:1.6rem;
-        background:color-mix(in srgb,currentColor 8%,transparent);
+        border-radius:var(--theme-switcher-radius,1.6rem);
+        background:var(--theme-switcher-background,color-mix(in srgb,currentColor 8%,transparent));
     }
 
     button {
@@ -28,11 +28,11 @@
         min-block-size:2.75rem;
         padding:.5rem .75rem;
         border:0;
-        border-radius:1.4rem;
+        border-radius:var(--theme-switcher-option-radius,1.4rem);
         background:transparent;
         color:inherit;
         cursor:pointer;
-        font:700 .875rem/1.25 system-ui,sans-serif;
+        font:var(--theme-switcher-font,700 .875rem/1.25 system-ui,sans-serif);
         text-align:center;
         white-space:normal;
         overflow-wrap:anywhere;

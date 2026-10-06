@@ -112,7 +112,7 @@ snapshot remains owned until the browser's `afterprint` event.
 | [`task-progress.html`](#task-progresshtml) | Runs and displays a task list with started/change/complete/error state. | `configure()`<br>`setTasks()`<br>`updateTask()`<br>`runTasks()`<br>`clear()`<br>`destroy()` | `task-progress-ready`<br>`task-progress-started`<br>`task-progress-change`<br>`task-progress-complete`<br>`task-progress-error` | Task state normalized; injected task results mixed |
 | [`terminal-workspace.html`](#terminal-workspacehtml) | Presents multiple terminal sessions, output, active selection, theme, and terminal actions. | `configure()`<br>`addSession()`<br>`removeSession()`<br>`activateSession()`<br>`append()`<br>`clear()`<br>`setState()`<br>`setTheme()`<br>`focus()`<br>`destroy()` | `terminal-workspace-ready`<br>`terminal-submit`<br>`terminal-interrupt`<br>`terminal-clear`<br>`terminal-session-new`<br>`terminal-session-close`<br>`terminal-session-select`<br>`terminal-settings` | UI/session state normalized; native command results supplied externally |
 | [`theme-editor.html`](#theme-editorhtml) | Edits, previews, saves, and resets semantic custom theme tokens. | `configure()`<br>`getTheme()`<br>`setTheme()`<br>`setBusy()`<br>`setStatus()`<br>`destroy()` | `theme-editor-ready`<br>`theme-preview`<br>`theme-save`<br>`theme-reset` | Fully normalized Theme values |
-| [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode with per-instance choices and labels. | `configure()`<br>`setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
+| [`theme-switcher.html`](#theme-switcherhtml) | Selects and refreshes system, light, dark, or custom theme mode with per-instance choices, labels, and CSS-configurable group/option radii, option font and group background. | `configure()`<br>`setMode()`<br>`refresh()` | No component-specific event | Preference/native appearance behavior mixed; no component-ready contract |
 | [`unified-inbox.html`](#unified-inboxhtml) | Displays provider-neutral communication threads with active/loading state. | `configure()`<br>`setThreads()`<br>`setActive()`<br>`setLoading()`<br>`destroy()` | `unified-inbox-ready`<br>`inbox-refresh`<br>`thread-select` | DOM-normalized |
 | [`voice-transcription.html`](#voice-transcriptionhtml) | Records manual clips or optional continuous microphone audio with pause/periodic segments, ordered transcription and saves, retained failures, and complete transcript delivery. | `configure()`<br>`requestSTTActivation()`<br>`startRecording()`<br>`stopRecording()`<br>`retryTranscription()`<br>`cancelRecording()`<br>`save()`<br>`completeTranscription()/complete()`<br>`clear()`<br>`reset()`<br>`destroy()` | `voice-transcription-ready`<br>`voice-transcription-state`<br>`voice-transcription-segment`<br>`voice-transcription-empty`<br>`voice-transcription-error`<br>`voice-transcription-change`<br>`voice-transcription-complete`<br>`speech-transcription-complete`<br>`speech-transcription-cancelled`<br>`speech-stt-activation-request`<br>`speech-stt-activation-error` | Sticky STT readiness, capture/queue lifecycle, retry, cancellation, and complete state/text are normalized; media/provider behavior remains external |
 | [`weather-widget.html`](#weather-widgethtml) | Displays normalized current and daily weather with refresh intent. | `setWeather()`<br>`clear()`<br>`destroy()` | `weather-widget-ready`<br>`weather-refresh` | Display normalized; provider supplied externally |
@@ -2073,6 +2073,24 @@ The host inherits text color. Existing `--app-bar-border` (falling back to
 remain supported. Applications own their palette and surrounding placement;
 the component adds no application-specific palette or settings section.
 
+Set these public CSS custom properties on the `html-import` host or an ancestor
+to style one instance through the ordinary cascade. Omitting them preserves the
+existing presentation:
+
+| Property | Controls | Default |
+| --- | --- | --- |
+| `--theme-switcher-radius` | Outer group border radius | `1.6rem` |
+| `--theme-switcher-option-radius` | Each option's border radius | `1.4rem` |
+| `--theme-switcher-font` | Complete option `font` shorthand | `700 .875rem/1.25 system-ui,sans-serif` |
+| `--theme-switcher-background` | Group background, independent of option state | `color-mix(in srgb,currentColor 8%,transparent)` |
+
+The font value includes its size and family, plus any weight and line height.
+Use an application-owned complete font token or value, rather than the
+CSS-wide keyword `inherit` as the custom-property value. The host still inherits
+text color. These properties do not alter the `2.75rem` minimum targets,
+full-label wrapping, selected/hover/focus/disabled states, or theme persistence.
+Applications retain responsibility for readable font and color choices.
+
 This fragment declares no component-specific readiness or action event; use the loader's `html-import-ready` only to know that import execution completed.
 
 Shared dependencies: [`ThemeManager.js`](runtime-modules.md#thememanagerjs).
@@ -2096,6 +2114,22 @@ This instance displays Light / Dark / System in that order. An instance without
 the two configuration attributes retains all four default choices. Both use
 the existing shared preference owner; presentation does not create a new store
 or migrate saved themes.
+
+An application can give that instance modest rounded corners and its own
+ordinary label font without accessing the shadow root:
+
+```css
+#theme-switcher {
+  --theme-switcher-radius: .65rem;
+  --theme-switcher-option-radius: .5rem;
+  --theme-switcher-font: 400 1rem/1.25 var(--app-font-family, system-ui, sans-serif);
+  --theme-switcher-background: transparent;
+  --app-bar-border: var(--border-color);
+}
+```
+
+These are example application values, not new component defaults. Other
+instances retain the defaults unless the application cascades overrides to them.
 
 ## unified-inbox.html
 
