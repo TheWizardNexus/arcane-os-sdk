@@ -120,7 +120,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
 | [`OpenMeteoWeatherProvider.js`](#openmeteoweatherproviderjs) | esm | Searches and loads Open-Meteo data into complete mutable Arcane weather entities. | Browser / native WebView / server with fetch + cloud | Provider data normalized to mutable entities; transport errors mixed. |
 | [`PersistentAIChatSession.js`](#persistentaichatsessionjs) | esm | Adds explicit retained-history/memory policy to complete configured chat without changing DBOPFS or ChatEntity semantics. | Browser / native WebView with DBOPFS and configured chat | Retained context commits atomically; `persist:false` turns are one-operation-only. |
-| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise performs complete ordered serial writes, and only exact unsupported native capability changes future operations to the browser fallback. |
+| [`PreferenceStore.js`](#preferencestorejs) | esm | Loads and updates schema-defined app preferences through native storage with a narrow browser fallback. | Browser/native hybrid | Complete values and operation context retained; exact optional namespace absence or existing Android unsupported capability selects the existing local adapter; partial-service and genuine failures remain errors; an advertised rejected batch is never retried serially. |
 | [`PreparedSpeech.js`](#preparedspeechjs) | esm | Owns detached ordered preparation, semantic audio reuse, and per-caller cancellation behind AI.prepareTTS. | Browser / native WebView with injected synthesis and optional DBOPFS | Complete original inputs, ordered audio metadata, durable reuse, and observable preparation results. |
 | [`PrintView.js`](#printviewjs) | esm | Prints current rendered content and title through one document-owned print lifecycle. | Browser / supported native WebView print implementation | Complete rendered snapshot, preparation cancellation, resource lifetime, and honest request result. |
 | [`QRCode.min.js`](#qrcodeminjs) | classic-script | Vendored QRCode generator for DOM, canvas, SVG, and image output. | Browser vendor script | Vendor-native. |
@@ -134,7 +134,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
 | [`SpeechPlayback.js`](#speechplaybackjs) | esm | Admits complete speech segments to a capacity-advertising provider immediately, retains serialized native/custom lookahead, and plays every result in exact indexed order. | Browser + native bridge | Stored part text stays exact; the outbound speech-input copy receives automatic formatting-mark cleanup; provider/media failures remain mixed. |
 | [`StaticDocumentCatalog.js`](#staticdocumentcatalogjs) | esm | Loads a positive static document inventory with cache, search, and complete context. | Browser / native WebView / server with fetch | Mutable complete catalog/content normalization; malformed data and transport failures remain visible. |
-| [`SystemAppearance.js`](#systemappearancejs) | esm | Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists. | Browser/native hybrid | Absent bridge normalized; native result/error preserved. |
+| [`SystemAppearance.js`](#systemappearancejs) | esm | Reads or applies native appearance, returning an explicit unsupported result when the bridge or optional namespace is absent. | Browser/native hybrid | Exact absent optional namespace normalized with its complete error; partial-method and genuine native errors preserved. |
 | [`SystemPlatformPresentation.js`](#systemplatformpresentationjs) | classic-script | Maps kernel names to presentation labels/classes without granting platform authority. | Browser / native WebView classic script | Fully normalized presentation only. |
 | [`SystemToolRegistry.js`](#systemtoolregistryjs) | esm | Registers validated command builders and constructs command strings without executing them. | Cross-host | Fully normalized definitions/quoting. |
 | [`TerminalClient.js`](#terminalclientjs) | esm | Maps native terminal sessions and Arcane events into an EventTarget client. | Native bridge | Client events/state normalized; native result/error mixed. |
@@ -3475,9 +3475,31 @@ Exact exports: `PREFERENCE_STORE_ERROR_CODES`,
 
 **Browser/native hybrid.** Complete ordinary values and returned snapshots remain
 mutable after schema normalization. Non-Android
-`Arcane.preferences.setMany()` supplies the optional atomic batch. Only exact
-unsupported native capability changes future operations to app-scoped
-localStorage; an in-flight advertised batch is never downgraded after rejection.
+`Arcane.preferences.setMany()` supplies the optional atomic batch. The default
+adapter uses the existing app-scoped localStorage owner when there is no native
+preferences facade, on the existing Android route, or after either the existing
+`ANDROID_CAPABILITY_UNSUPPORTED` error or an exact Core lookup error:
+`code:'METHOD_NOT_ALLOWED'`, `reason:'core-namespace-unavailable'`,
+`namespace:'preferences'`, and `method:'preferences.<current operation>'`.
+This marker proves the entire optional namespace was absent before dispatch.
+A missing method in a partial/read-only service, an older unmarked error,
+permission denial, persistence failure, transport error, or cancellation never
+selects local storage. Explicit caller adapters retain their own behavior.
+
+For `get`, `set`, and `delete`, that positively absent namespace retries the
+same operation once through the existing local adapter, then keeps that adapter
+for the store's later operations. Complete arguments and the existing
+`{operationId,signal}` context are retained. Disposal and caller cancellation
+are checked before selecting or invoking the local adapter, so a late native
+absence result cannot start a cancelled local write. No data location, schema,
+saved value, or migration is introduced.
+
+An in-flight advertised `setMany` batch is never downgraded to serial writes
+after rejection. Exact namespace absence selects the local adapter for later
+operations and preserves that batch's original rejection with no local write.
+ThemeManager's first Light/Dark/System choice uses two ordinary `set` calls,
+not a batch: both may complete through the existing local owner before the
+selected theme is applied. Its persistence-first ordering is unchanged.
 If cancellation settles after a native batch was dispatched, reload the store to
 reconcile any atomic host commit that completed before cancellation. Transport:
 Arcane.preferences or app-scoped localStorage. [Deep protocol details](protocols.md).
@@ -4064,7 +4086,8 @@ console.log(Object.keys(module));
 
 ### Overview
 
-Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists.
+Reads or applies native appearance, returning an explicit unsupported result
+when the bridge or its optional namespace is absent.
 
 ### Public surface
 
@@ -4074,7 +4097,21 @@ Exact exports: `default`.
 
 ### Availability and normalization
 
-**Browser/native hybrid.** Absent bridge normalized; native result/error preserved. Transport: Arcane.appearance. [Deep protocol details](protocols.md).
+**Browser/native hybrid.** No bridge or callable method retains the existing
+`{supported:false,platform:'browser'}` result. A callable facade is not proof of
+an installed service: `available()` reports callable `apply` presence only.
+`current()` and `apply()` recognize only a matching Core
+`METHOD_NOT_ALLOWED` error with `reason:'core-namespace-unavailable'`,
+`namespace:'appearance'`, and the exact requested method. They return
+`{supported:false,reason:'core-namespace-unavailable',error}`, retaining the
+complete original error for diagnostics and making no platform or native
+application claim. Absence is not cached, so later service registration can
+serve the next operation. Partial-method absence, unmarked permission errors,
+transport/cancellation failures and all other native errors reject unchanged.
+Native success values and existing appearance input normalization remain
+unchanged. ThemeManager may therefore complete a browser color-scheme change
+when native appearance is explicitly unsupported, while genuine failures stay
+observable. Transport: Arcane.appearance. [Deep protocol details](protocols.md).
 
 ### Example
 

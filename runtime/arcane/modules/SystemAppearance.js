@@ -8,16 +8,34 @@ export default class SystemAppearance{
 
     async current(){
         if(!this.api||!is.function(this.api.current)) return {supported:false,platform:'browser'};
-        return this.api.current();
+        try{
+            return await this.api.current();
+        }catch(error){
+            return unsupportedNamespace(error,'current');
+        }
     }
 
     async apply(input={}){
         if(!this.available()) return {supported:false,platform:'browser'};
         const scheme=['system','light','dark'].includes(input.scheme)?input.scheme:'system';
-        return this.api.apply({
-            scheme,
-            captionColor:scheme==='system'?null:input.captionColor||null,
-            textColor:scheme==='system'?null:input.textColor||null
-        });
+        try{
+            return await this.api.apply({
+                scheme,
+                captionColor:scheme==='system'?null:input.captionColor||null,
+                textColor:scheme==='system'?null:input.textColor||null
+            });
+        }catch(error){
+            return unsupportedNamespace(error,'apply');
+        }
     }
+}
+
+function unsupportedNamespace(error,method){
+    if(error?.code==='METHOD_NOT_ALLOWED'
+        &&error.reason==='core-namespace-unavailable'
+        &&error.namespace==='appearance'
+        &&error.method===`appearance.${method}`){
+        return {supported:false,reason:'core-namespace-unavailable',error};
+    }
+    throw error;
 }

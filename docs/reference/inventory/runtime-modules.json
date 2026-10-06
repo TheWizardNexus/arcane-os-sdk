@@ -1083,7 +1083,7 @@
       "summary": "Loads and updates schema-defined app preferences through native storage with a narrow browser fallback.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.preferences or app-scoped localStorage + per-realm globalThis.arcaneEvents authority",
-      "normalization": "Complete ordinary values remain mutable; setAll uses one optional atomic adapter batch for every selected value when advertised, otherwise retains complete serial per-key compatibility, never retries a rejected dispatched batch serially, and only exact unsupported native capability changes future operations to the browser fallback.",
+      "normalization": "Complete values and operation context retained; the default adapter recognizes only exact missing preferences namespace/matching method or existing Android unsupported capability before selecting existing app-scoped localStorage. Single operations retry once after disposal/cancellation checks; partial-service and genuine failures reject unchanged. An advertised rejected batch is never retried serially, and its original rejection is preserved before later local operations.",
       "surface": "Event/error constants, default `PreferenceStore`, re-exported `Preference`/schema; load/set/setAll/reset APIs, required adapter get/set/delete plus optional setMany, state-free EventTarget/on compatibility, and `dispose()`."
     },
     {
@@ -1291,10 +1291,10 @@
       "exports": [
         "default"
       ],
-      "summary": "Reads or applies native appearance, returning an explicit unsupported browser state when no bridge exists.",
+      "summary": "Reads or applies native appearance, returning an explicit unsupported result when the bridge or optional namespace is absent.",
       "availability": "Browser/native hybrid",
       "protocol": "Arcane.appearance",
-      "normalization": "Absent bridge normalized; native result/error preserved.",
+      "normalization": "Absent bridge keeps its browser result. Exact missing appearance namespace/matching method returns supported:false with the complete original diagnostic; no platform guess or cached absence. Partial-method, permission, transport, cancellation and other genuine errors reject unchanged; available() is callable bridge presence only.",
       "surface": "default `SystemAppearance`; `available()`, `current()`, `apply()`."
     },
     {

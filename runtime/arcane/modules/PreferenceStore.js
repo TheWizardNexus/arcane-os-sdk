@@ -153,21 +153,26 @@ function nativeAdapter(){
     return preferences;
 }
 
-function isUnsupportedNativeAdapter(error){
-    return error?.code==='ANDROID_CAPABILITY_UNSUPPORTED';
+function isUnsupportedNativeAdapter(error,method){
+    return error?.code==='ANDROID_CAPABILITY_UNSUPPORTED'
+        ||(error?.code==='METHOD_NOT_ALLOWED'
+            &&error.reason==='core-namespace-unavailable'
+            &&error.namespace==='preferences'
+            &&error.method===`preferences.${method}`);
 }
 
-function preferenceAdapter(){
+function preferenceAdapter(assertActive){
     const local=localAdapter('arcane.preferences');
     if(is.function(globalThis.arcaneAndroid?.postMessage)) return local;
     const native=nativeAdapter();
     if(!native) return local;
     let active=native;
-    async function call(method,args){
+    async function call(method,args,context){
         try{
             return await active[method](...args);
         }catch(error){
-            if(active!==native||!isUnsupportedNativeAdapter(error)) throw error;
+            if(active!==native||!isUnsupportedNativeAdapter(error,method)) throw error;
+            assertActive(context?.signal);
             active=local;
             delete adapter.setMany;
             if(!is.function(active[method])) throw error;
@@ -175,19 +180,19 @@ function preferenceAdapter(){
         }
     }
     const adapter={
-        async get(key){
-            return call('get',[key]);
+        async get(key,context){
+            return call('get',[key,context],context);
         },
-        async set(key,value){
-            return call('set',[key,value]);
+        async set(key,value,context){
+            return call('set',[key,value,context],context);
         },
-        async delete(key){
-            return call('delete',[key]);
+        async delete(key,context){
+            return call('delete',[key,context],context);
         }
     };
     if(is.function(native.setMany)){
         adapter.setMany=async function setMany(entries,context){
-            return call('setMany',[entries,context]);
+            return call('setMany',[entries,context],context);
         };
     }
     return adapter;
@@ -204,7 +209,7 @@ export default class PreferenceStore extends EventTarget{
         super();
         this.namespace=String(namespace||'arcane');
         this.schema=preferenceSchema(schema);
-        this.adapter=validateAdapter(adapter||preferenceAdapter());
+        this.adapter=validateAdapter(adapter||preferenceAdapter(this.#assertOperationActive.bind(this)));
         this.values=this.defaults();
         this.#events=createArcaneEventSource(
             this,

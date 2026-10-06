@@ -59,6 +59,10 @@ import {
 } from '../runtime/arcane/modules/DirectoryPicker.js';
 import {normalizeContentAdvisory} from '../runtime/arcane/modules/MessageAdvisory.js';
 import PreferenceStore from '../runtime/arcane/modules/PreferenceStore.js';
+import SystemAppearance from '../runtime/arcane/modules/SystemAppearance.js';
+import {createCoreRuntime} from '../src/core/runtime.mjs';
+import {createCoreFacade} from '../browser-runtime/core/client.mjs';
+import {CoreError} from '../browser-runtime/core/contracts.mjs';
 import {
     cleanExcerpt,
     extractDateMentions,
@@ -935,6 +939,197 @@ test('preference setAll preserves every entry in an arbitrary-size atomic batch'
     }finally{
         store.dispose();
     }
+});
+
+function optionalThemeFixture(context,services=[]){
+    const previous=new Map();
+    for(const name of ['Arcane','arcaneAndroid','document','localStorage']){
+        previous.set(name,Object.getOwnPropertyDescriptor(globalThis,name));
+    }
+    const storage=new Map();
+    const writes=[];
+    const requests=[];
+    const stores=[];
+    const runtime=createCoreRuntime({services});
+    runtime.start();
+    const facade=createCoreFacade({
+        async invoke(method,parameters={}){
+            requests.push({method,parameters});
+            const response=await runtime.handle({
+                protocol:'arcane/1',type:'request',id:`theme-${requests.length}`,method,parameters
+            });
+            if(!response.ok)throw new CoreError(response.error);
+            return response.result;
+        }
+    });
+    globalThis.Arcane=facade;
+    delete globalThis.arcaneAndroid;
+    globalThis.document={documentElement:{dataset:{arcaneAppId:'moon-garden'}}};
+    globalThis.localStorage={
+        getItem(key){return storage.get(key)??null;},
+        setItem(key,value){writes.push({key,value});storage.set(key,value);},
+        removeItem(key){storage.delete(key);}
+    };
+    context.after(async function releaseOptionalThemeFixture(){
+        for(const store of stores)store.dispose();
+        try{await runtime.close();}
+        finally{
+            for(const [name,descriptor] of previous){
+                if(descriptor)Object.defineProperty(globalThis,name,descriptor);
+                else delete globalThis[name];
+            }
+        }
+    });
+    function store(schema=[{key:'choice',type:'text',defaultValue:''}]){
+        const created=new PreferenceStore({namespace:'arcane',schema});
+        stores.push(created);
+        return created;
+    }
+    return {runtime,facade,storage,writes,requests,store};
+}
+
+test('the first theme preference writes use existing local storage when Core declares the whole namespace absent', async function absentThemeServices(t){
+    const current=optionalThemeFixture(t);
+    const appearance=current.store([{key:'appearance.colorScheme',type:'text',defaultValue:'system'}]);
+    const skin=current.store([{key:'appearance.activeSkin',type:'text',defaultValue:'custom'}]);
+    assert.deepEqual(await Promise.all([
+        appearance.set('appearance.colorScheme','dark'),
+        skin.set('appearance.activeSkin','')
+    ]),['dark','']);
+    assert.deepEqual(current.requests.map(function method(request){return request.method;}),[
+        'preferences.set','preferences.set'
+    ]);
+    assert.equal(current.storage.get('arcane.apps.moon-garden:arcane.preferences:arcane.appearance.colorScheme'),'"dark"');
+    assert.equal(current.storage.get('arcane.apps.moon-garden:arcane.preferences:arcane.appearance.activeSkin'),'""');
+    assert.deepEqual(await appearance.load(),{'appearance.colorScheme':'dark'});
+    assert.equal(current.requests.length,2,'Confirmed absence changes only this default adapter, without repeated probing.');
+    const presentation=new SystemAppearance(current.facade.appearance);
+    const unsupported=await presentation.apply({scheme:'dark',captionColor:'rgb(1, 2, 3)'});
+    assert.equal(unsupported.supported,false);
+    assert.equal(unsupported.reason,'core-namespace-unavailable');
+    assert.equal(unsupported.error.method,'appearance.apply');
+    assert.equal(unsupported.error.namespace,'appearance');
+    assert.equal(unsupported.error.code,'METHOD_NOT_ALLOWED');
+    assert.equal(typeof unsupported.error.stack,'string');
+    assert.equal(Object.hasOwn(unsupported,'platform'),false);
+    current.runtime.registerService({name:'appearance',methods:{
+        'appearance.apply':function apply(value){return {supported:true,value};},
+        'appearance.current':function inspect(){return {supported:true,scheme:'dark'};}
+    }});
+    assert.deepEqual(await presentation.current(),{supported:true,scheme:'dark'});
+    assert.deepEqual(await presentation.apply({scheme:'light',captionColor:'rgb(4, 5, 6)',textColor:'rgb(7, 8, 9)'}),{
+        supported:true,value:{scheme:'light',captionColor:'rgb(4, 5, 6)',textColor:'rgb(7, 8, 9)'}
+    });
+});
+
+test('partial preference services and original failures never become local writes', async function partialThemeServices(t){
+    const current=optionalThemeFixture(t,[{name:'read-only-preferences',methods:{
+        'preferences.get':function get(){return {found:true,value:'native original'};}
+    }}]);
+    const store=current.store();
+    assert.deepEqual(await store.load(),{choice:'native original'});
+    await assert.rejects(store.set('choice','replacement'),{
+        code:'METHOD_NOT_ALLOWED',reason:'core-method-unavailable',namespace:'preferences',method:'preferences.set'
+    });
+    assert.deepEqual(current.writes,[]);
+    assert.equal(store.values.choice,'native original');
+    for(const failure of [
+        Object.assign(new Error('Permission denied'),{code:'METHOD_NOT_ALLOWED'}),
+        Object.assign(new Error('Persistence failed'),{code:'EIO'}),
+        Object.assign(new Error('Transport failed'),{code:'ARCANE_TRANSPORT_UNAVAILABLE'}),
+        Object.assign(new Error('Cancelled'),{name:'AbortError',code:'ARCANE_REQUEST_ABORTED'}),
+        Object.assign(new Error('Another operation was absent'),{
+            code:'METHOD_NOT_ALLOWED',reason:'core-namespace-unavailable',namespace:'preferences',method:'preferences.get'
+        })
+    ]){
+        globalThis.Arcane={preferences:{
+            async get(){return {found:false};},
+            async set(){throw failure;},
+            async delete(){}
+        }};
+        const failed=current.store();
+        await assert.rejects(failed.set('choice','complete value\n🌒'),function original(error){return error===failure;});
+        assert.deepEqual(current.writes,[]);
+    }
+});
+
+test('an absent advertised preference batch preserves its rejection and later serial local operations', async function absentThemeBatch(t){
+    const current=optionalThemeFixture(t);
+    const store=current.store();
+    await assert.rejects(store.setAll({choice:'first'}),{
+        code:'METHOD_NOT_ALLOWED',reason:'core-namespace-unavailable',method:'preferences.setMany'
+    });
+    assert.deepEqual(current.writes,[]);
+    assert.equal(store.values.choice,'');
+    const complete='  Entire local choice\n🌒  ';
+    assert.deepEqual(await store.setAll({choice:complete}),{choice:complete});
+    assert.equal(current.writes.length,1);
+    assert.equal(JSON.parse(current.writes[0].value),complete);
+    assert.equal(current.requests.length,1);
+});
+
+test('optional preference fallback preserves operation context and stops after cancellation or disposal', async function cancelledThemeFallback(t){
+    const current=optionalThemeFixture(t);
+    for(const action of ['abort','dispose']){
+        let rejectNative;
+        let enterNative;
+        const entered=new Promise(function enteredNative(resolve){enterNative=resolve;});
+        const pending=new Promise(function nativePending(resolve,reject){rejectNative=reject;});
+        let received;
+        globalThis.Arcane={preferences:{
+            async get(){return {found:false};},
+            set(key,value,context){received={key,value,context};enterNative();return pending;},
+            async delete(){}
+        }};
+        const store=current.store();
+        const controller=new AbortController();
+        const saving=store.set('choice','  Complete pending choice\n🌒  ',{signal:controller.signal});
+        const rejection=assert.rejects(saving,{code:action==='abort'
+            ?'ARCANE_PREFERENCE_STORE_OPERATION_ABORTED':'ARCANE_PREFERENCE_STORE_DISPOSED'});
+        await entered;
+        assert.equal(received.context.signal,controller.signal);
+        assert.match(received.context.operationId,/:set:/u);
+        assert.equal(received.key,'arcane.choice');
+        assert.equal(received.value,'  Complete pending choice\n🌒  ');
+        if(action==='abort')controller.abort('Caller cancelled');
+        else store.dispose();
+        rejectNative(Object.assign(new Error('No optional preferences service'),{
+            code:'METHOD_NOT_ALLOWED',reason:'core-namespace-unavailable',namespace:'preferences',method:'preferences.set'
+        }));
+        await rejection;
+        if(action==='abort')await store.load();
+        else await pending.catch(function nativeSettled(){});
+        assert.deepEqual(current.writes,[]);
+        assert.equal(store.values.choice,'');
+    }
+});
+
+test('optional appearance absence is distinct from partial methods and original operation failures', async function optionalAppearanceFailures(t){
+    const current=optionalThemeFixture(t,[{name:'appearance',methods:{
+        'appearance.current':function inspect(){return {supported:true};}
+    }}]);
+    const partial=new SystemAppearance(current.facade.appearance);
+    await assert.rejects(partial.apply({scheme:'dark'}),{
+        code:'METHOD_NOT_ALLOWED',reason:'core-method-unavailable',method:'appearance.apply'
+    });
+    const missing=new SystemAppearance({async current(){
+        throw Object.assign(new Error('No appearance namespace'),{
+            code:'METHOD_NOT_ALLOWED',reason:'core-namespace-unavailable',namespace:'appearance',method:'appearance.current'
+        });
+    }});
+    assert.equal((await missing.current()).supported,false);
+    for(const failure of [
+        Object.assign(new Error('Permission denied'),{code:'METHOD_NOT_ALLOWED'}),
+        Object.assign(new Error('Native failure'),{code:'EIO'}),
+        Object.assign(new Error('Cancelled'),{name:'AbortError',code:'ARCANE_REQUEST_ABORTED'}),
+        Object.assign(new Error('Wrong method'),{
+            code:'METHOD_NOT_ALLOWED',reason:'core-namespace-unavailable',namespace:'appearance',method:'appearance.current'
+        })
+    ]){
+        const appearance=new SystemAppearance({async apply(){throw failure;}});
+        await assert.rejects(appearance.apply({scheme:'dark'}),function original(error){return error===failure;});
+    }
+    assert.deepEqual(await new SystemAppearance(null).apply({scheme:'dark'}),{supported:false,platform:'browser'});
 });
 
 test(

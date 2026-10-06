@@ -123,6 +123,20 @@ The shared `arcane-os/core/contracts` module owns `CORE_PROTOCOL` (`arcane/1`),
 availability errors remain observable; unavailable services are not replaced
 with browser behavior.
 
+A request with no registered handler retains code `METHOD_NOT_ALLOWED` and
+adds the exact `method`, its first dotted `namespace`, and a `reason`.
+`core-namespace-unavailable` means the dispatcher has neither a service with
+that name nor any registered method in that namespace. Otherwise the reason is
+`core-method-unavailable`; the built-in `system`, `app`, and `version`
+namespaces also count as present. This is a dispatch lookup result before any
+handler or permission decision, not a capability-discovery call. A read-only
+or partially registered service therefore never appears wholly absent.
+Handler/startup/permission errors remain unchanged and acquire none of these
+lookup markers. Generic or older `METHOD_NOT_ALLOWED` errors do not establish
+namespace absence. An optional browser adapter may recognize the exact absent
+namespace and method according to its own documented contract; the dispatcher
+does not select or create another implementation.
+
 Events have `{protocol, type:'event', event, data, time}`:
 
 - `core.ready`: the dispatcher is connected; service/model readiness is separate.

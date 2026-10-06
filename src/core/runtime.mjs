@@ -267,7 +267,21 @@ class CoreRuntime {
 
     #request(frame) {
         const registration = this.#methods.get(frame.method);
-        if (!registration) throw failure('METHOD_NOT_ALLOWED', `Core does not expose ${frame.method}.`);
+        if (!registration) {
+            const namespace = frame.method.split('.')[0];
+            const prefix = `${namespace}.`;
+            const namespacePresent = this.#services.has(namespace)
+                || [...this.#methods.keys(), 'system.ping', 'app.current', 'version.current'].some(
+                    function inNamespace(method) { return method.startsWith(prefix); }
+                );
+            throw new CoreError({
+                code: 'METHOD_NOT_ALLOWED',
+                message: `Core does not expose ${frame.method}.`,
+                reason: namespacePresent ? 'core-method-unavailable' : 'core-namespace-unavailable',
+                namespace,
+                method: frame.method
+            });
+        }
         const {service, handle, lifetime} = registration;
         const controller = new AbortController();
         const request = {id: frame.id, method: frame.method, lifetime, controller, task: null};

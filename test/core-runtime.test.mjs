@@ -645,3 +645,38 @@ test('Core shutdown attempts disposal after drain failure and retains both error
         drainFailure.message, disposeFailure.message
     ]);
 });
+
+test('missing Core methods distinguish absent namespaces from partial services and handler failures', async function namespaceAvailability(t) {
+    const denied=new CoreError({code:'METHOD_NOT_ALLOWED',message:'Actual permission denial'});
+    const runtime=createCoreRuntime({services:[
+        {name:'preferences',methods:{}},
+        {name:'read-only-owner',methods:{'appearance.current':function current(){return {supported:true};}}},
+        {name:'permission-owner',methods:{'permission.check':function permission(){throw denied;}}}
+    ]});
+    t.after(async function closeNamespaceFixture(){await runtime.close();});
+    runtime.start();
+    for(const [method,reason] of [
+        ['preferences.set','core-method-unavailable'],
+        ['appearance.apply','core-method-unavailable'],
+        ['system.missing','core-method-unavailable'],
+        ['app.missing','core-method-unavailable'],
+        ['version.missing','core-method-unavailable'],
+        ['unregistered.complete.method','core-namespace-unavailable']
+    ]){
+        const response=await runtime.handle(request(method,method));
+        assert.equal(response.ok,false);
+        assert.equal(response.error.code,'METHOD_NOT_ALLOWED');
+        assert.equal(response.error.reason,reason);
+        assert.equal(response.error.namespace,method.split('.')[0]);
+        assert.equal(response.error.method,method);
+        const transported=new CoreError(response.error);
+        assert.equal(transported.reason,reason);
+        assert.equal(transported.method,method);
+    }
+    const rejected=await runtime.handle(request('permission','permission.check'));
+    assert.equal(rejected.error.code,denied.code);
+    assert.equal(rejected.error.message,denied.message);
+    assert.equal(Object.hasOwn(rejected.error,'reason'),false);
+    assert.equal(Object.hasOwn(rejected.error,'namespace'),false);
+    assert.equal(Object.hasOwn(rejected.error,'method'),false);
+});
