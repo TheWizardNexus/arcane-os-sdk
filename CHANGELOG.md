@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.80.0
+
+- Add `assetProjectionId` and `resourcePaths` to native decision factories and
+  direct, service and Core `decisions.load` calls. A supplied ready projection
+  uses complete already-prepared model/tokenizer files through the existing
+  model-assets owner, without upstream preparation or another download.
+- Retain projected files through actual native ONNX and tokenizer exit, including
+  failure and cancellation. Acquire incoming ownership before retiring a prior
+  activation; coalesce only equal source, complete mapping and device selections.
+  Surface provisional cleanup failures through load, unload and disposal.
+- Preserve caller preparation ownership, original companion-file paths, complete
+  rows and outputs, configured native paths and ordinary explicit upstream
+  loading. Explicit `assetProjectionId:null` returns to that configured source.
+  Missing projections or mapped members report their actual errors.
+- Keep native Laya FP32 selection and existing runtime dependencies unchanged.
+  This release adds no model variant, GGUF route, driver, model download on
+  startup or automatic preference change.
+
 ## 0.79.1
 
 - Classify generic speech-model progress callbacks as loading, reserving
