@@ -41,6 +41,12 @@ An adapter whose stable identity cannot be established remains in the inventory
 with `deviceId: null` and a corresponding issue. The SDK does not invent a key
 from a name, enumeration order, hardware model number or adapter LUID.
 
+Windows discovery reads the present PCI devices' bus and address properties in
+one batched `Get-PnpDeviceProperty` call with `-ThrottleLimit 1`. This limits
+concurrency inside that query because concurrent CIM operations have been
+observed to duplicate some device results and omit others. Discovery remains
+asynchronous at the host, with the same shared catalog and explicit refresh.
+
 The CPU choice uses `deviceId: 'cpu'` and `identitySource: 'host-cpu'`. It selects
 the whole-host CPU execution target, without claiming socket or core affinity.
 Its `processors` entries contain `{deviceId, name, socketDesignation, cores,

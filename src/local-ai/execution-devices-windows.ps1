@@ -107,8 +107,10 @@ function Get-PresentPciDevices {
             }
         }
         if ($devicesById.Count -gt 0) {
+            # Concurrent CIM property operations can duplicate some device results
+            # and omit others. Serialize only this query's internal operations.
             $properties = @(
-                Get-PnpDeviceProperty -InstanceId ([string[]]@($devicesById.Keys)) -KeyName 'DEVPKEY_Device_BusNumber', 'DEVPKEY_Device_Address' -ErrorAction Continue 2>&1 3>&1
+                Get-PnpDeviceProperty -InstanceId ([string[]]@($devicesById.Keys)) -KeyName 'DEVPKEY_Device_BusNumber', 'DEVPKEY_Device_Address' -ThrottleLimit 1 -ErrorAction Continue 2>&1 3>&1
             )
             foreach ($property in $properties) {
                 if ($property -is [System.Management.Automation.ErrorRecord]) {
