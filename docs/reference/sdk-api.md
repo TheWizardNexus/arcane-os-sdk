@@ -69,7 +69,7 @@ runtime layouts.
 | `arcane-os/core/local-ai` | Native llama.cpp, Ollama and ONNX Core service, model readiness, complete responses and owned lifecycle. See [local AI through Core](local-ai.md). |
 | `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX/image requirements and NeMo libraries. |
 | `arcane-os/local-ai/onnx` | Retained native ONNX worker sessions with explicit graph loading and complete tensor inference. |
-| `arcane-os/local-ai/decisions` | Explicit native Laya FP32 decisions using the existing ONNX owner and a tokenizer Worker. |
+| `arcane-os/local-ai/decisions` | Explicit native Laya FP32/FP16 and Julia FP32 decisions using the existing ONNX owner and a tokenizer Worker. |
 | `arcane-os/core/decisions` | Renderer-independent typed-decision service composed with existing local-AI and model-assets owners. |
 | `arcane-os/ai/core-onnx` | Optional browser access to system ONNX through an existing Core connection. |
 | `arcane-os/local-ai/image` | Retained native stable-diffusion.cpp context, complete PNG generation and owned worker lifetime. |
@@ -186,7 +186,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `acceptWebSocket()` | function | `arcane-os`, `arcane-os/websocket` | WebSocket protocol | Node; browser-native client interoperability |
 | `WS` | class | `arcane-os`, `arcane-os/websocket-client` | Shared WebSocket clients | Node and native-WebSocket browser hosts |
 | `createBrowserDecisionModel()` | function | `arcane-os/ai/browser-decisions` | Browser typed decisions | Browser module Workers and the caller-selected inference backend |
-| `createNativeDecisionModel()` | function | `arcane-os/local-ai/decisions` | Native typed decisions | Node with an existing native ONNX owner and selected Laya FP32 files |
+| `createNativeDecisionModel()` | function | `arcane-os/local-ai/decisions` | Native typed decisions | Node with an existing native ONNX owner and selected Laya FP32/FP16 or Julia FP32 files |
 | `createNativeDecisionService()` | function | `arcane-os/core/decisions` | Native typed decisions | Node Core with existing local-AI and model-assets services |
 | `createNativeDecisionService default export` | function | `arcane-os/core/decisions` | Native typed decisions | Same native decision service factory |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
@@ -9505,22 +9505,34 @@ native installation eligibility and URL-bar promotion.
 
 ### Overview
 
-Runs explicitly selected Laya FP32 option scoring through an existing native
+Runs explicitly selected Laya FP32/FP16 or Julia FP32 option scoring through an existing native
 ONNX owner, with tokenization in a Node Worker. It creates no second inference
 engine and starts no model download at construction.
 
 ### Signature and result
 
 ```text
-createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',signal}={})
+createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,assetProjectionId,resourcePaths,family='laya',model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',executionTarget,signal}={})
 ```
 
 Import from `arcane-os/local-ai/decisions`. Supply the existing `onnx` owner and
 either `modelAssets` plus `workingDirectory`, or native `paths` for the model,
-tokenizer and tokenizer configuration. The selected graph requires FP32. The
+tokenizer and tokenizer configuration, or a ready `assetProjectionId` with
+`resourcePaths` for those three roles. Supported selections are Laya `fp32`,
+Laya `fp16` and Julia `fp32`; constructor defaults remain Laya FP32. The
 handle exposes `load`, `evaluate`, `classify`, `current`, `status`, `subscribe`,
 `unload` and terminal `dispose`; `classify` aliases `evaluate` and `status`
 aliases `current`.
+
+`load({family,model,revision,dtype,assetProjectionId,resourcePaths,executionTarget,signal})`
+selects each activation. Omitted or `undefined` fields retain their prior
+selection. A changed model field, source, mapping or device replaces the
+activation after actual cleanup; equal complete selections coalesce. Supply
+all matching model fields and files when changing family: metadata does not
+infer a repository or rewrite a supplied projection. Top-level model metadata
+continues to describe the retiring activation while `pendingActivation` records
+its successor. See [model selection](native-decisions.md#select-an-activations-model)
+for exact upstream graph/companion layouts and retained projection ownership.
 
 `evaluate(rows,{signal,runOptions})` preserves each complete `state`, `question`,
 `options` and optional `type` separately. It returns `{decisions,outputs}` with
@@ -9574,7 +9586,11 @@ reacquires `getONNXRuntime()` after any recovery. Native members are `load`,
 `start(context)`.
 
 RPC exposes `decisions.status`, `decisions.load`, `decisions.evaluate` and
-`decisions.unload`. Evaluation accepts `{rows,runOptions?}` and returns complete
+`decisions.unload`. Load accepts optional `family`, `model`, `revision`, `dtype`,
+`assetProjectionId`, `resourcePaths` and `executionTarget`, with the same
+per-activation selection and omission behavior as direct native load; the Core
+request signal owns cancellation. The service persists across model changes.
+Evaluation accepts `{rows,runOptions?}` and returns complete
 `{decisions,outputs}` using the existing tensor codec at the JSON boundary.
 `decisions.state` and replaying `subscribe(listener,{emitCurrent:true,signal})`
 report lifecycle. Unload is accepted service-lifetime cleanup; host shutdown

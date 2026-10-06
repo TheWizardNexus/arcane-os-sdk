@@ -1,7 +1,7 @@
-# Native Laya typed decisions
+# Native typed decisions
 
 `arcane-os/local-ai/decisions` and `arcane-os/core/decisions` run the selected
-Laya FP32 graph through the SDK's existing native ONNX owner. Tokenization runs
+Laya FP32, Laya FP16 or Julia FP32 graph through the SDK's existing native ONNX owner. Tokenization runs
 in its own Node Worker. A Core service can load and evaluate decisions without
 a renderer, browser session, WebGPU browser context or chat provider.
 
@@ -58,7 +58,7 @@ name to `decisions`. It exposes `load`, `evaluate`, `classify` (an alias for
 | Method | Parameters and result |
 | --- | --- |
 | `decisions.status` | Current lifecycle snapshot; does not load anything. |
-| `decisions.load` | `{assetProjectionId?, resourcePaths?, executionTarget?}`; explicit activation or source/device replacement, returning the ready lifecycle snapshot. The request signal cancels activation. A target is `{deviceId:string}` or `null`. |
+| `decisions.load` | `{family?, model?, revision?, dtype?, assetProjectionId?, resourcePaths?, executionTarget?}`; explicit activation or model/source/device replacement, returning the ready lifecycle snapshot. The request signal cancels activation. A target is `{deviceId:string}` or `null`. |
 | `decisions.evaluate` | `{rows, runOptions?}`; returns `{decisions, outputs}`. The request signal cancels the active model operation. |
 | `decisions.unload` | Releases the activation. Service-lifetime cleanup continues after the caller disconnects. |
 
@@ -94,11 +94,18 @@ const decisions = createNativeDecisionModel({
 These direct paths are native filesystem paths. Keep the graph's external data
 beside it under the exact filename required by the graph. The Core service
 resolves configured `paths` relative to `appRoot`; it does not copy or remove
-caller-owned files. For SDK-prepared files, the default selected upstream is
-`onnx-community/laya-typed-decisions-ONNX`, revision `main`, with exactly:
+caller-owned files. Factory defaults remain `family:'laya'`,
+`model:'onnx-community/laya-typed-decisions-ONNX'`, `revision:'main'` and
+`dtype:'fp32'`. SDK upstream preparation selects these exact layouts:
 
-- `onnx/model.onnx` and `onnx/model.onnx_data`;
-- `tokenizer.json` and `tokenizer_config.json`.
+| Family and dtype | Graph | Complete external data |
+| --- | --- | --- |
+| `laya`, `fp32` | `onnx/model.onnx` | `onnx/model.onnx_data` |
+| `laya`, `fp16` | `onnx/model_fp16.onnx` | `onnx/model_fp16.onnx_data` |
+| `julia`, `fp32` | `model.onnx` | `model.onnx.data` |
+
+Each selection uses `tokenizer.json` and `tokenizer_config.json` from its own
+selected repository. Julia's public repository is `SupersonicLabs/Julia-1-ONNX`.
 
 ## Load complete files already stored in DBOPFS
 
@@ -144,7 +151,7 @@ After loading, invoke `decisions.evaluate` with the complete `rows`, then
 `decisions.unload` when that native activation is no longer needed.
 
 Direct model and service calls accept
-`load({assetProjectionId, resourcePaths, executionTarget, signal})`; their
+`load({family, model, revision, dtype, assetProjectionId, resourcePaths, executionTarget, signal})`; their
 factory configuration accepts the same source selection. A direct model needs
 the existing `modelAssets` owner when selecting a projection. `resourcePaths`
 maps all three roles (`model`, `tokenizer`, `tokenizerConfig`) to exact
@@ -161,7 +168,8 @@ Omitted or `undefined` source fields retain the selected source and mappings.
 `assetProjectionId: null` returns to the factory's configured `paths`, or its
 existing upstream preparation when no paths were configured. Selecting another
 projection or changing any resource mapping replaces the activation even when
-the execution target stays the same. Equal source, mapping and device selections
+the execution target stays the same. Equal family, model, revision, dtype,
+source, mapping and device selections
 coalesce. The incoming retain is acquired before the prior activation retires,
 so device replacement can reuse a projection after the caller has released its
 preparation ownership. Superseded pending retains are released as their cleanup
@@ -178,8 +186,12 @@ model store. The approved `@huggingface/tokenizers@0.2.0` dependency reads the
 selected tokenizer files in its Worker. No Transformers or second ONNX runtime
 is loaded by this API.
 
-This graph selection requires `dtype:'fp32'`, which is also the default; another
-dtype reports the incompatible selection rather than substituting a graph.
+Native graph selections support Laya `fp32` and `fp16`, and Julia `fp32`.
+Other family/precision combinations report an unsupported selection. Laya FP16
+uses the published mixed-precision graph, which retains selected operations
+and outputs in FP32; it does not claim every graph operation uses FP16. Julia
+uses its typed five-input ONNX graph and raw option logits, without the upstream
+display-rounded `predict()` wrapper or invented action outputs.
 `sessionOptions` and `runOptions` pass to the existing native ONNX API unchanged.
 With no `executionTarget` selection, `executionPreference` defaults to `gpu`
 here: actual advertised native GPU provider creation is attempted, followed by
@@ -188,6 +200,49 @@ precedence on that unchanged path. The underlying generic ONNX factory
 continues to default to CPU. Accepted provider configuration is not evidence
 that GPU nodes executed. Full provider-attempt diagnostics remain in
 `execution`; see [native ONNX sessions](local-ai.md#native-onnx-sessions).
+
+## Select an activation's model
+
+Both factories and each direct/Core `load` accept `family`, `model`, `revision`
+and `dtype`. The same service persists while its selected activation changes:
+
+```js
+await client.invoke('decisions.load', {
+    family: 'julia',
+    model: 'SupersonicLabs/Julia-1-ONNX',
+    revision: 'main',
+    dtype: 'fp32',
+    assetProjectionId: juliaProjection.id,
+    resourcePaths: {
+        model: 'model.onnx',
+        tokenizer: 'tokenizer.json',
+        tokenizerConfig: 'tokenizer_config.json'
+    }
+}, {signal, timeoutMs: 0});
+```
+
+Here `juliaProjection` is the caller's ready projection containing Julia's
+complete graph, `model.onnx.data` and its own tokenizer files. The caller may
+release its preparation ownership after loading, as in the projection example.
+For upstream preparation without configured paths, select the same four model
+fields with `assetProjectionId: null`.
+
+Omitting a model field, or supplying `undefined`, retains its most recent
+selection, initially the factory default. The selection survives unload for a
+later explicit load. Changing any field replaces the activation; equal complete
+selections share it. Supply the complete new model selection when changing
+family, including its matching projection/mapping or configured native files.
+Changing `family` alone does not infer a repository, change precision, replace
+configured files, or rewrite a projection. Metadata describes the caller's
+selection; the SDK does not inspect weights to establish checkpoint identity.
+Configured `paths` and a selected projection keep their existing precedence
+over upstream preparation.
+
+Top-level `current().family`, `model`, `revision` and `dtype` follow the
+activation being loaded, used or retired. While replacement waits for prior
+cleanup, those fields and `execution` still describe the prior activation;
+`pendingActivation` carries the requested successor separately. The new
+selection takes ownership when its activation begins.
 
 ## Select an activation's execution device
 
@@ -228,15 +283,16 @@ resolution, accepted configuration and actual execution evidence. An unknown
 `observedTarget` remains `null`; successful configuration alone does not establish
 which device executed graph nodes.
 
-`pendingActivation` is separately `null` or `{executionTarget}` while a load or
-replacement is pending; its `executionTarget` property is omitted at JSON
+`pendingActivation` is separately `null` or a selection containing `family`,
+`model`, `revision`, `dtype` and `executionTarget` while a load or replacement
+is pending; its `executionTarget` property is omitted at JSON
 transport when the selection is `undefined`. A projected selection also includes
 `assetProjectionId` and its complete `resourcePaths` mapping. A pending target never overwrites the previous
 activation's `execution` record. The old record remains attributable to the
 retiring activation until its cleanup completes, then the new activation owns
 its own record. A request is not a claim that the requested device is running.
 
-Concurrent loads for the same source, resource mapping and target share their
+Concurrent loads for the same family, model, revision, dtype, source, resource mapping and target share their
 pending activation. A different selection supersedes the earlier pending request, which rejects with
 cancellation instead of returning another target's ready result. Replacement
 joins this model's actual tokenizer/native cleanup before creating its
@@ -280,7 +336,8 @@ progress includes model preparation, tokenization and evaluation; downloaded
 members report files, not byte progress. Complete technical errors belong in
 developer diagnostics, while the application owns its user-facing status.
 
-Concurrent callers selecting the same source, mapping and target share one explicit activation.
+Concurrent callers selecting the same family, model, revision, dtype, source,
+mapping and target share one explicit activation.
 Cancelling a load or evaluation cancels that activation and its outstanding operations, because the
 native session and tokenizer have one owner. Use separately owned models when
 independent cancellation is required. The construction `signal` governs the
@@ -304,5 +361,6 @@ availability. Android requires the host's supported native adaptation. Static
 source review and synthetic authored fixtures are not model execution or a
 claim of tested platform, precision or accelerator behavior.
 
-Upstream selection: [Laya FP32 model files](https://huggingface.co/onnx-community/laya-typed-decisions-ONNX/tree/main),
+Upstream selection: [Laya model files](https://huggingface.co/onnx-community/laya-typed-decisions-ONNX/tree/main),
+[Julia-1 model files](https://huggingface.co/SupersonicLabs/Julia-1-ONNX/tree/main),
 [Tokenizer package](https://www.npmjs.com/package/@huggingface/tokenizers).

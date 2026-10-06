@@ -6,7 +6,7 @@ function cancelled() {
 }
 
 /** One tokenizer worker owned by one native model activation. */
-export function createDecisionTokenizer({tokenizerPath, tokenizerConfigPath, signal, onError}) {
+export function createDecisionTokenizer({family = 'laya', tokenizerPath, tokenizerConfigPath, signal, onError}) {
     signal?.throwIfAborted();
     const pending = new Map();
     let nextId = 0;
@@ -14,7 +14,7 @@ export function createDecisionTokenizer({tokenizerPath, tokenizerConfigPath, sig
     let terminalError;
     let exited = false;
     const worker = new Worker(new URL('./decision-tokenizer-worker.mjs', import.meta.url), {
-        workerData: {tokenizerPath, tokenizerConfigPath}
+        workerData: {family, tokenizerPath, tokenizerConfigPath}
     });
     let resolveExit;
     const exit = new Promise(function tokenizerExit(resolve) { resolveExit = resolve; });

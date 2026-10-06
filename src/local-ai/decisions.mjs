@@ -5,7 +5,13 @@ import {decodeDecisionOutputs} from '../../browser-runtime/ai/decision-runtime.m
 import {createDecisionTokenizer} from './decision-tokenizer.mjs';
 
 const STATE_EVENT = 'ai.decisions.state';
-const LAYA_FILES = ['onnx/model.onnx', 'onnx/model.onnx_data', 'tokenizer.json', 'tokenizer_config.json'];
+
+function selectedGraph(family, dtype) {
+    if (family === 'laya' && dtype === 'fp32') return 'onnx/model.onnx';
+    if (family === 'laya' && dtype === 'fp16') return 'onnx/model_fp16.onnx';
+    if (family === 'julia' && dtype === 'fp32') return 'model.onnx';
+    throw new TypeError('Native decisions support Laya fp32/fp16 and Julia fp32 graph selections.');
+}
 
 function cancellation(message) {
     return new CoreError({name: 'AbortError', code: 'ARCANE_AI_REQUEST_ABORTED', message});
@@ -18,6 +24,7 @@ function sameExecutionTarget(left, right) {
 }
 
 function sameActivation(left, right) {
+    if (left.family !== right.family || left.model !== right.model || left.revision !== right.revision || left.dtype !== right.dtype) return false;
     if (!sameExecutionTarget(left.executionTarget, right.executionTarget) || left.assetProjectionId !== right.assetProjectionId) return false;
     if (left.resourcePaths === right.resourcePaths) return true;
     if (!left.resourcePaths || !right.resourcePaths) return false;
@@ -27,15 +34,15 @@ function sameActivation(left, right) {
 }
 
 /**
- * One explicitly activated Laya FP32 model using an existing native ONNX owner.
+ * One explicitly activated typed-decision model using an existing native ONNX owner.
  * It does not create another inference runtime or load on construction.
  */
 export function createNativeDecisionModel({
     onnx, modelAssets, workingDirectory, paths, assetProjectionId, resourcePaths,
-    model = 'onnx-community/laya-typed-decisions-ONNX', revision = 'main',
+    family = 'laya', model = 'onnx-community/laya-typed-decisions-ONNX', revision = 'main',
     dtype = 'fp32', sessionOptions, executionPreference = 'gpu', executionTarget, signal
 } = {}) {
-    if (dtype !== 'fp32') throw new TypeError('This native Laya graph selection requires dtype fp32.');
+    selectedGraph(family, dtype);
     const owner = {};
     const events = createArcaneEventSource(owner, {source: 'native-decisions', eventTypes: [STATE_EVENT]});
     const loads = new Set();
@@ -49,15 +56,17 @@ export function createNativeDecisionModel({
     let lastError = null;
     let execution = null;
     let selectedActivation = {
-        executionTarget,
+        family, model, revision, dtype, executionTarget,
         ...(assetProjectionId == null ? {} : {assetProjectionId, resourcePaths: resourcePaths && {...resourcePaths}})
     };
+    let activeSelection = selectedActivation;
     let pendingActivation;
 
     function current() {
         const pending = pendingActivation && (state !== 'ready' || pendingActivation.entry !== activation) ? pendingActivation : null;
         return {
-            family: 'laya', model, revision, dtype, state,
+            family: activeSelection.family, model: activeSelection.model,
+            revision: activeSelection.revision, dtype: activeSelection.dtype, state,
             loaded: state === 'ready', busy: state === 'loading' || Boolean(pending) || Boolean(activation?.jobs.size),
             activeRequests: activation?.jobs.size ?? 0, progress,
             error: lastError ? serializeCoreError(lastError) : null,
@@ -163,10 +172,14 @@ export function createNativeDecisionModel({
         }
         if (paths) return paths;
         if (!modelAssets) throw new CoreError({code: 'ARCANE_DECISION_ASSETS_UNAVAILABLE', message: 'Native decisions need prepared paths or the Core model-assets owner.'});
-        const base = `https://huggingface.co/${model}/resolve/${encodeURIComponent(revision)}/`;
+        const {family: selectedFamily, model: selectedModel, revision: selectedRevision, dtype: selectedDtype} = entry.selection;
+        const graph = selectedGraph(selectedFamily, selectedDtype);
+        const companion = selectedFamily === 'laya' ? `${graph}_data` : `${graph}.data`;
+        const members = [graph, companion, 'tokenizer.json', 'tokenizer_config.json'];
+        const base = `https://huggingface.co/${selectedModel}/resolve/${encodeURIComponent(selectedRevision)}/`;
         const projection = await modelAssets.prepare({
             id: entry.id, workingDirectory,
-            members: LAYA_FILES.map(function selectFile(path) { return {path, url: new URL(path, base).href}; }),
+            members: members.map(function selectFile(path) { return {path, url: new URL(path, base).href}; }),
             signal: entry.controller.signal,
             onProgress(value) { updateProgress(entry, value); }
         });
@@ -176,7 +189,7 @@ export function createNativeDecisionModel({
         await modelAssets.release(entry.id);
         entry.prepared = false;
         const files = Object.fromEntries(projection.members.map(function memberFile(member) { return [member.path, member.nativePath]; }));
-        return {model: files['onnx/model.onnx'], tokenizer: files['tokenizer.json'], tokenizerConfig: files['tokenizer_config.json']};
+        return {model: files[graph], tokenizer: files['tokenizer.json'], tokenizerConfig: files['tokenizer_config.json']};
     }
 
     function beginActivation(request) {
@@ -187,6 +200,7 @@ export function createNativeDecisionModel({
         request.retained = undefined;
         request.entry = entry;
         activation = entry;
+        activeSelection = entry.selection;
         state = 'loading';
         progress = {phase: 'preparing-model'};
         lastError = null;
@@ -196,6 +210,7 @@ export function createNativeDecisionModel({
             entry.controller.signal.throwIfAborted();
             updateProgress(entry, {phase: 'loading-model'});
             entry.tokenizer = createDecisionTokenizer({
+                family: entry.selection.family,
                 tokenizerPath: files.tokenizer, tokenizerConfigPath: files.tokenizerConfig,
                 signal: entry.controller.signal,
                 onError(error) {
@@ -258,14 +273,22 @@ export function createNativeDecisionModel({
         }).finally(function detachLoadCaller() { operationSignal?.removeEventListener('abort', abort); });
     }
 
-    async function load({signal: operationSignal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths} = {}) {
+    async function load({
+        family: requestedFamily, model: requestedModel, revision: requestedRevision, dtype: requestedDtype,
+        signal: operationSignal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths
+    } = {}) {
         assertOpen(operationSignal);
         const projection = requestedProjection === undefined ? selectedActivation.assetProjectionId : requestedProjection;
         const mapping = requestedPaths === undefined ? selectedActivation.resourcePaths : requestedPaths;
         const selection = {
+            family: requestedFamily === undefined ? selectedActivation.family : requestedFamily,
+            model: requestedModel === undefined ? selectedActivation.model : requestedModel,
+            revision: requestedRevision === undefined ? selectedActivation.revision : requestedRevision,
+            dtype: requestedDtype === undefined ? selectedActivation.dtype : requestedDtype,
             executionTarget: requestedTarget === undefined ? selectedActivation.executionTarget : requestedTarget,
             ...(projection == null ? {} : {assetProjectionId: projection, resourcePaths: mapping && typeof mapping === 'object' && !Array.isArray(mapping) ? {...mapping} : mapping})
         };
+        selectedGraph(selection.family, selection.dtype);
         if (pendingActivation && !pendingActivation.controller.signal.aborted && sameActivation(pendingActivation.selection, selection)) {
             return observeLoad(pendingActivation, operationSignal);
         }

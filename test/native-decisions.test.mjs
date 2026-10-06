@@ -36,7 +36,7 @@ function graphOutputs() {
     };
 }
 
-async function fixture(t, {invalidTokenizer = false} = {}) {
+async function fixture(t, {invalidTokenizer = false, family = 'laya'} = {}) {
     const parent = fileURLToPath(new URL('../.arcane/task-artifacts/', import.meta.url));
     await mkdir(parent, {recursive: true});
     const root = await mkdtemp(path.join(parent, 'native-decisions-'));
@@ -53,7 +53,9 @@ async function fixture(t, {invalidTokenizer = false} = {}) {
         // root is the exact task-owned child returned by mkdtemp above.
         await rm(root, {recursive: true, force: true});
     });
-    const vocabulary = {'[PAD]': 0, '[CLS]': 1, '[SEP]': 2, '[MASK]': 3, '[UNK]': 4};
+    const vocabulary = family === 'laya'
+        ? {'[PAD]': 0, '[CLS]': 1, '[SEP]': 2, '[MASK]': 3, '[UNK]': 4}
+        : {'<pad>': 0, '<bos>': 1, '<eos>': 2, '<mask>': 3, '[UNK]': 4};
     for (const text of ['choice score noul question: ', ...rows.flatMap(function completeFields(row) {
         return [row.state, row.question, ...row.options];
     })]) {
@@ -457,6 +459,78 @@ for (const route of ['direct', 'Core']) {
         assert.equal(native.calls.load.length, 4);
     });
 
+    test(
+        `${route} activation metadata changes replace the model without replacing its owner`,
+        async function nativeVariantReplacement(t) {
+            const laya = await fixture(t);
+            const julia = await fixture(t, {family: 'julia'});
+            const exitGate = laya.gate();
+            const juliaMembers = [
+                {path: 'model.onnx', nativePath: julia.paths.model},
+                {path: 'model.onnx.data', nativePath: path.join(julia.root, 'model.onnx.data')},
+                {path: 'tokenizer.json', nativePath: julia.paths.tokenizer},
+                {path: 'tokenizer_config.json', nativePath: julia.paths.tokenizerConfig}
+            ];
+            const assets = fakeAssets(laya, [{id: 'laya-moon'}, {id: 'julia-moon', members: juliaMembers}]);
+            const native = fakeONNX(
+                {
+                    exitGate,
+                    beforeLoad() {
+                        for (const previous of native.owner.current().sessions) assert.equal(previous.exited, true);
+                    }
+                }
+            );
+            const decisions = projectedOwner(laya, native, assets);
+            await loadProjection(decisions, {assetProjectionId: 'laya-moon', resourcePaths});
+            await assets.owner.release('laya-moon');
+            const first = decisions.current();
+            const intermediate = loadProjection(decisions, {dtype: 'fp16'});
+            const rejected = assert.rejects(intermediate, {code: 'ARCANE_AI_REQUEST_ABORTED'});
+            await native.unloadStarted.promise;
+            assert.equal(decisions.current().dtype, 'fp32');
+            assert.equal(decisions.current().execution, first.execution);
+            assert.equal(decisions.current().pendingActivation.dtype, 'fp16');
+            const selection = {
+                family: 'julia', model: 'SupersonicLabs/Julia-1-ONNX', revision: 'main', dtype: 'fp32',
+                assetProjectionId: 'julia-moon',
+                resourcePaths: {model: 'model.onnx', tokenizer: 'tokenizer.json', tokenizerConfig: 'tokenizer_config.json'},
+                executionTarget: {deviceId: 'cpu'}
+            };
+            const replacement = loadProjection(decisions, selection);
+            const same = loadProjection(decisions, {...selection, resourcePaths: {...selection.resourcePaths}});
+            assert.deepEqual(decisions.current().pendingActivation, selection);
+            assert.equal(decisions.current().family, 'laya');
+            assert.equal(decisions.current().model, first.model);
+            exitGate.resolve();
+            await Promise.all([rejected, replacement, same]);
+            assert.equal(native.calls.load.length, 2);
+            assert.equal(native.calls.load[1].model, julia.paths.model);
+            assert.equal(decisions.current().family, 'julia');
+            assert.equal(decisions.current().model, selection.model);
+            assert.equal(decisions.current().dtype, 'fp32');
+            assert.equal(decisions.current().pendingActivation, null);
+            assert.equal(assets.records.get('laya-moon').state, 'released');
+            assert.equal(assets.records.get('julia-moon').uses, 1);
+            assert.equal(assets.calls.prepare.length, 0);
+            const result = await decisions.evaluate(rows);
+            assert.deepEqual(native.calls.run[0].feeds, expectedInputs(julia.vocabulary));
+            assert.equal(result.decisions[0].row, rows[0]);
+            await loadProjection(decisions, {family: undefined, model: undefined, revision: undefined, dtype: undefined});
+            assert.equal(native.calls.load.length, 2);
+            await loadProjection(decisions, {revision: 'selected-revision'});
+            assert.equal(native.calls.load.length, 3);
+            assert.equal(decisions.current().revision, 'selected-revision');
+            await loadProjection(decisions, {model: 'application/selected-julia-checkpoint'});
+            assert.equal(native.calls.load.length, 4);
+            assert.equal(decisions.current().model, 'application/selected-julia-checkpoint');
+            await decisions.unload();
+            await loadProjection(decisions);
+            assert.equal(decisions.current().family, 'julia');
+            assert.equal(decisions.current().revision, 'selected-revision');
+            assert.equal(native.calls.load.length, 5);
+        }
+    );
+
     test(`${route} target replacement retains the incoming projection before predecessor exit and drops superseded pending uses`, async function retainedReplacement(t) {
         const files = await fixture(t);
         const exitGate = files.gate();
@@ -582,6 +656,97 @@ for (const route of ['direct', 'Core']) {
 }
 
 for (const route of ['direct', 'Core']) {
+    test(
+        `${route} selected Laya and Julia graphs retain complete 160-row typed results`,
+        async function selectedNativeGraphs(t) {
+            const variants = [
+                {
+                    family: 'laya', model: 'onnx-community/laya-typed-decisions-ONNX', dtype: 'fp32',
+                    graph: 'onnx/model.onnx', companion: 'onnx/model.onnx_data'
+                },
+                {
+                    family: 'laya', model: 'onnx-community/laya-typed-decisions-ONNX', dtype: 'fp16',
+                    graph: 'onnx/model_fp16.onnx', companion: 'onnx/model_fp16.onnx_data'
+                },
+                {
+                    family: 'julia', model: 'SupersonicLabs/Julia-1-ONNX', dtype: 'fp32',
+                    graph: 'model.onnx', companion: 'model.onnx.data'
+                }
+            ];
+            for (const variant of variants) {
+                const files = await fixture(t, {family: variant.family});
+                const completeRows = Array.from(
+                    {length: 160},
+                    function completeDecisionRow(_, index) {
+                        return {...rows[index % rows.length], applicationRecord: {index, note: '  雪 🐙\r\nWhole moon request.  '}};
+                    }
+                );
+                const originalRows = structuredClone(completeRows);
+                const outputs = {
+                    logits: {
+                        type: 'float32', dims: [160, 3],
+                        data: new Float32Array(completeRows.flatMap(function optionScores() { return [0, 1, 2]; }))
+                    },
+                    ...(variant.family === 'laya' ? {
+                        act_logits: {
+                            type: 'float32', dims: [160, 2],
+                            data: new Float32Array(completeRows.flatMap(function actionScores() { return [1, 0]; }))
+                        }
+                    } : {})
+                };
+                const native = fakeONNX({outputs});
+                const assets = fakeAssets(files);
+                const configuration = {
+                    family: variant.family, model: variant.model, revision: 'chosen/revision', dtype: variant.dtype,
+                    workingDirectory: 'model-working'
+                };
+                const decisions = files.own(
+                    route === 'direct'
+                        ? createNativeDecisionModel({...configuration, onnx: native.owner, modelAssets: assets.owner})
+                        : createNativeDecisionService(configuration, {appRoot: files.root})
+                );
+                if (route === 'Core') decisions.start(
+                    {
+                        getService(name) {
+                            return name === 'local-ai' ? {getONNXRuntime() { return native.owner; }} : assets.owner;
+                        },
+                        emit() {}
+                    }
+                );
+                assert.equal(decisions.current().family, variant.family);
+                assert.equal(decisions.current().dtype, variant.dtype);
+                assert.equal(native.calls.load.length, 0);
+                await decisions.load();
+                assert.equal(native.calls.load[0].model, path.join(files.root, variant.graph));
+                assert.deepEqual(
+                    assets.calls.prepare[0].members.map(function memberPath(member) { return member.path; }),
+                    [variant.graph, variant.companion, 'tokenizer.json', 'tokenizer_config.json']
+                );
+                for (const member of assets.calls.prepare[0].members) {
+                    assert.equal(member.url, `https://huggingface.co/${variant.model}/resolve/chosen%2Frevision/${member.path}`);
+                }
+                const result = route === 'Core'
+                    ? await decisions.methods['decisions.evaluate']({rows: completeRows}, {signal: t.signal})
+                    : await decisions.evaluate(completeRows);
+                assert.equal(native.calls.run[0].feeds.input_ids.dims[0], 160);
+                assert.equal(result.decisions.length, 160);
+                assert.deepEqual(completeRows, originalRows);
+                const probability = 1 / (1 + Math.exp(-1));
+                for (const [index, decision] of result.decisions.entries()) {
+                    assert.equal(decision.row, completeRows[index]);
+                    assert.equal(decision.row.state, originalState);
+                    if (decision.row.type === 'score' || decision.row.type === 'noul') {
+                        assert.equal(decision.value, probability);
+                        assert.equal(decision.probabilities[1], probability);
+                    }
+                    assert.equal(Object.hasOwn(decision, 'actionLogits'), variant.family === 'laya');
+                }
+                assert.deepEqual(route === 'Core' ? decodeTensorMap(result.outputs) : result.outputs, outputs);
+                await decisions.unload();
+            }
+        }
+    );
+
     test(`${route} decisions retain the selected target, distinguish automatic selection and coalesce equal targets`, async function selectedDecisionTarget(t) {
         const files = await fixture(t);
         const native = fakeONNX();
@@ -659,7 +824,10 @@ for (const route of ['direct', 'Core']) {
         const intermediate = decisions.load({executionTarget: intermediateTarget});
         const rejectedIntermediate = assert.rejects(intermediate, {code: 'ARCANE_AI_REQUEST_ABORTED'});
         assert.equal(decisions.current().execution, firstExecution);
-        assert.deepEqual(decisions.current().pendingActivation, {executionTarget: intermediateTarget});
+        assert.deepEqual(decisions.current().pendingActivation, {
+            family: 'laya', model: 'onnx-community/laya-typed-decisions-ONNX', revision: 'main', dtype: 'fp32',
+            executionTarget: intermediateTarget
+        });
         await native.unloadStarted.promise;
         await rejectedEvaluation;
         assert.equal(run.signal.aborted, true);
@@ -671,7 +839,10 @@ for (const route of ['direct', 'Core']) {
         assert.equal(assets.records.get(firstExecution.id).retained, true);
         assert.equal(assets.calls.releaseRetain.length, 0);
         const final = decisions.load({executionTarget: finalTarget});
-        assert.deepEqual(decisions.current().pendingActivation, {executionTarget: finalTarget});
+        assert.deepEqual(decisions.current().pendingActivation, {
+            family: 'laya', model: 'onnx-community/laya-typed-decisions-ONNX', revision: 'main', dtype: 'fp32',
+            executionTarget: finalTarget
+        });
         assert.equal(decisions.current().execution, firstExecution);
         assert.equal(native.calls.load.length, 1);
         assert.equal(assets.calls.prepare.length, 1);

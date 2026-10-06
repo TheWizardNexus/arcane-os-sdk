@@ -10,6 +10,7 @@ function sameExecutionTarget(left, right) {
 
 function sameActivation(left, right) {
     if (!left || !right || !sameExecutionTarget(left.executionTarget, right.executionTarget) || left.assetProjectionId !== right.assetProjectionId) return false;
+    if (left.family !== right.family || left.model !== right.model || left.revision !== right.revision || left.dtype !== right.dtype) return false;
     if (left.resourcePaths === right.resourcePaths) return true;
     if (!left.resourcePaths || !right.resourcePaths) return false;
     const entries = Object.entries(left.resourcePaths);
@@ -32,6 +33,10 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
     let closing;
     let unsubscribe;
     let selectedActivation = {
+        family: configuration.family === undefined ? 'laya' : configuration.family,
+        model: configuration.model === undefined ? 'onnx-community/laya-typed-decisions-ONNX' : configuration.model,
+        revision: configuration.revision === undefined ? 'main' : configuration.revision,
+        dtype: configuration.dtype === undefined ? 'fp32' : configuration.dtype,
         executionTarget: configuration.executionTarget,
         ...(configuration.assetProjectionId == null ? {} : {assetProjectionId: configuration.assetProjectionId, resourcePaths: configuration.resourcePaths && {...configuration.resourcePaths}})
     };
@@ -40,7 +45,7 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
 
     function current() {
         const snapshot = model?.current() ?? {
-            family: 'laya', model: configuration.model ?? 'onnx-community/laya-typed-decisions-ONNX',
+            family: configuration.family ?? 'laya', model: configuration.model ?? 'onnx-community/laya-typed-decisions-ONNX',
             revision: configuration.revision ?? 'main', dtype: configuration.dtype ?? 'fp32',
             state: closing ? 'disposed' : 'unloaded', loaded: false, busy: Boolean(loading),
             activeRequests: 0, progress: null, error: null, execution: null
@@ -66,12 +71,19 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
 
     function operationSignal(signal) { return signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal; }
 
-    function load({signal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths} = {}) {
+    function load({
+        family: requestedFamily, model: requestedModel, revision: requestedRevision, dtype: requestedDtype,
+        signal, executionTarget: requestedTarget, assetProjectionId: requestedProjection, resourcePaths: requestedPaths
+    } = {}) {
         operationSignal(signal).throwIfAborted();
         if (!context) throw new CoreError({code: 'CORE_NOT_READY', message: 'Register and start the decision service with Core before loading.'});
         const projection = requestedProjection === undefined ? selectedActivation.assetProjectionId : requestedProjection;
         const mapping = requestedPaths === undefined ? selectedActivation.resourcePaths : requestedPaths;
         const selection = {
+            family: requestedFamily === undefined ? selectedActivation.family : requestedFamily,
+            model: requestedModel === undefined ? selectedActivation.model : requestedModel,
+            revision: requestedRevision === undefined ? selectedActivation.revision : requestedRevision,
+            dtype: requestedDtype === undefined ? selectedActivation.dtype : requestedDtype,
             executionTarget: requestedTarget === undefined ? selectedActivation.executionTarget : requestedTarget,
             ...(projection == null ? {} : {assetProjectionId: projection, resourcePaths: mapping && typeof mapping === 'object' && !Array.isArray(mapping) ? {...mapping} : mapping})
         };
@@ -116,6 +128,7 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
                 );
                 model = createNativeDecisionModel({
                     ...configuration, paths, onnx: localAI.getONNXRuntime(), modelAssets,
+                    family: selection.family, model: selection.model, revision: selection.revision, dtype: selection.dtype,
                     executionTarget: selection.executionTarget, assetProjectionId: selection.assetProjectionId,
                     resourcePaths: selection.resourcePaths, signal: lifetime.signal
                 });
@@ -221,6 +234,7 @@ export function createNativeDecisionService(configuration = {}, {appRoot = proce
             'decisions.status': current,
             'decisions.load': function loadRequest(parameters, request) {
                 return load({
+                    family: parameters?.family, model: parameters?.model, revision: parameters?.revision, dtype: parameters?.dtype,
                     executionTarget: parameters?.executionTarget, assetProjectionId: parameters?.assetProjectionId,
                     resourcePaths: parameters?.resourcePaths, signal: request.signal
                 });

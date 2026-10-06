@@ -17,7 +17,7 @@ try {
     };
     parentPort.on('message', function encodeRequest({id, rows}) {
         try {
-            const {encoded, pad} = encodeDecisionRows(interfaceAdapter, rows, 'laya');
+            const {encoded, pad} = encodeDecisionRows(interfaceAdapter, rows, workerData.family);
             const inputs = createDecisionInputs(encoded, pad);
             parentPort.postMessage({id, result: inputs});
         } catch (error) {
