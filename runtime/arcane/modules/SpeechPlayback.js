@@ -42,7 +42,7 @@ function splitSpeechText(value=''){
     return text.trim()?[text]:[];
 }
 
-function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
+function normalizeParts(parts,defaultVoice=null,defaultSpeed=1,textFormat=null){
     if(!is.array(parts)||!parts.length){
         throw new TypeError('Narration text cannot be blank. The full visual content remains available.');
     }
@@ -63,6 +63,7 @@ function normalizeParts(parts,defaultVoice=null,defaultSpeed=1){
         if(!is.finite(speed)||speed<=0)throw new RangeError('Every speech segment requires a positive speech speed.');
         return {
             input,
+            ...(textFormat==='plain'?{textFormat:'plain'}:{}),
             pauseAfterMs,
             role:String(candidate?.role||'narration'),
             speed,
@@ -425,6 +426,7 @@ class SpeechPlayback{
         model=null,
         voice=null,
         responseFormat=null,
+        textFormat=null,
         speed=1,
         onState=function noop(){},
         createObjectURL,
@@ -485,6 +487,7 @@ class SpeechPlayback{
         this.responseFormat=responseFormat===null||responseFormat===undefined
             ?null
             :String(responseFormat);
+        this.textFormat=textFormat==='plain'?'plain':null;
         this.speed=normalizedSpeed;
         this.key='';
         this.state='idle';
@@ -622,10 +625,13 @@ class SpeechPlayback{
     }
 
     async requestSpeech(part,signal){
-        const input=stripSpeechFormatting(part.input);
+        const input=part.textFormat==='plain'
+            ?part.input
+            :stripSpeechFormatting(part.input);
         const preparation={speechInputPrepared:true};
         const payload={
             input,
+            ...(part.textFormat==='plain'?{textFormat:'plain'}:{}),
             speed:part.speed,
             ...(this.model?{model:this.model}:{}),
             ...(part.voice?{voice:part.voice}:{}),
@@ -799,6 +805,7 @@ class SpeechPlayback{
         model=this.model,
         voice=this.voice,
         responseFormat=this.responseFormat,
+        textFormat=this.textFormat,
         speed=this.speed,
         autoplay=true
     }={}){
@@ -843,10 +850,12 @@ class SpeechPlayback{
             this.model=selectedModel;
             this.voice=selectedVoice;
             this.responseFormat=selectedResponseFormat;
+            this.textFormat=textFormat==='plain'?'plain':null;
             normalized=normalizeParts(
                 is.function(parts)?parts():parts,
                 selectedVoice,
-                numericSpeed
+                numericSpeed,
+                this.textFormat
             );
             this.parts=normalized;
         }catch(error){
@@ -1036,7 +1045,12 @@ class SpeechPlayback{
                 playback.abortControllers.delete(active.controller);
                 if(completed===true)return await playback.advance();
                 if(active.control.error)playback.fail(active.control.error);
-                else playback.emit('ready',playback.message('stopped'));
+                else playback.emit(
+                    'ready',
+                    playback.message('stopped'),
+                    playback.key,
+                    {reason:'native-playback-stopped'}
+                );
                 return false;
             }catch(error){
                 console.error('[Arcane speech playback] Native speech failed.',error);

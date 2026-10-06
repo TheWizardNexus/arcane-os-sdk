@@ -476,9 +476,10 @@ ordinary repeated punctuation remain literal. Complete synthesis calls may
 select `textFormat:'plain'` to preserve exact input: supply it in `prepareTTS`
 options or the payload of `fetchTTS`, provider-runtime TTS requests, or direct
 Kokoro requests. The SDK consumes this control before engine/host dispatch;
-omission keeps the default cleanup. Streaming narration and `SpeechPlayback`
-retain their existing formatting behavior. This option does not change the
-selected engine's input capacity or establish complete upstream synthesis. Original
+omission keeps the default cleanup. `SpeechPlayback` accepts the same option in
+its constructor or `prepare()` call and forwards each part's exact input.
+Streaming narration retains its existing formatting behavior. This option does
+not change the selected engine's input capacity or establish complete upstream synthesis. Original
 messages and caller payloads remain unchanged for display, storage, and model
 input. The `arcane-os/speech-text` entrypoint exports the same
 `MarkdownSpeech` streaming class and `stripSpeechFormatting()` one-pass helper

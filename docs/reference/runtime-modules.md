@@ -132,7 +132,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance. | Cross-host | Complete mutable results; blocked-domain policy requires `secure:true`. |
 | [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
-| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Admits complete speech segments to a capacity-advertising provider immediately, retains serialized native/custom lookahead, and plays every result in exact indexed order. | Browser + native bridge | Stored part text stays exact; the outbound speech-input copy receives automatic formatting-mark cleanup; provider/media failures remain mixed. |
+| [`SpeechPlayback.js`](#speechplaybackjs) | esm | Admits complete speech segments to a capacity-advertising provider immediately, retains serialized native/custom lookahead, and plays every result in exact indexed order. | Browser + native bridge | Stored part text stays exact; outbound input receives default formatting cleanup or explicit plain-text preservation; provider/media failures remain mixed. |
 | [`StaticDocumentCatalog.js`](#staticdocumentcatalogjs) | esm | Loads a positive static document inventory with cache, search, and complete context. | Browser / native WebView / server with fetch | Mutable complete catalog/content normalization; malformed data and transport failures remain visible. |
 | [`SystemAppearance.js`](#systemappearancejs) | esm | Reads or applies native appearance, returning an explicit unsupported result when the bridge or optional namespace is absent. | Browser/native hybrid | Exact absent optional namespace normalized with its complete error; partial-method and genuine native errors preserved. |
 | [`SystemPlatformPresentation.js`](#systemplatformpresentationjs) | classic-script | Maps kernel names to presentation labels/classes without granting platform authority. | Browser / native WebView classic script | Fully normalized presentation only. |
@@ -3973,8 +3973,8 @@ console.log(Object.keys(module));
 
 Preserves exact nonblank text, admits complete speech segments according to the
 selected client's advertised capacity, and plays indexed HTML audio in exact
-input order. Stored parts remain exact; only each outbound synthesis payload
-copy receives automatic formatting-mark cleanup.
+input order. Stored parts remain exact; each outbound synthesis payload copy
+receives default formatting-mark cleanup or explicit plain-text preservation.
 
 ### Public surface
 
@@ -3992,6 +3992,7 @@ new SpeechPlayback({
   model=null,
   voice=null,
   responseFormat=null,
+  textFormat=null,
   speed=1,
   onState=()=>{},
   createObjectURL,
@@ -4006,7 +4007,7 @@ native descriptor, a native provider's silent `prepare(payload,{signal})`,
 `fetchTTS(payload, signal)`, or `synthesize(payload, {signal})`.
 The playback-oriented method is preferred. `SpeechPlayback` also supplies a third
 SDK-internal preparation object; existing two-argument clients may ignore it.
-`prepare({key,parts,model,voice,responseFormat,
+`prepare({key,parts,model,voice,responseFormat,textFormat,
 speed,autoplay=true})` uses only caller-supplied model, voice, and response-format
 values; those three omitted values remain omitted so the selected AI/model
 catalog may provide its documented defaults. Speed defaults to `1`, is normalized
@@ -4020,12 +4021,24 @@ There is no hard-coded model, response format, voice, or cloud/browser fallback.
 the caller's exact string in one mutable array without trimming, splitting, or
 freezing it. `prepare()` likewise preserves each nonblank part's exact `input`
 string while normalizing its other playback fields into a new mutable record.
-At synthesis time, `requestSpeech()` copies that record, removes repeated same
-formatting marks from only the outbound `input`, and delegates with the
+At synthesis time, default `requestSpeech()` behavior copies that record, removes
+repeated same formatting marks from only the outbound `input`, and delegates with the
 SDK-internal `{speechInputPrepared:true}` argument so downstream SDK boundaries
 do not apply the non-idempotent filter again. Original part objects, stored
 parts, displayed text, and all non-input payload fields remain unchanged. The
 class applies no part-count, character-count, pause, or input upper cap.
+
+Set `textFormat:'plain'` in the constructor or `prepare()` options to forward
+every part's exact `input` without formatting cleanup. The selection is captured
+with the prepared parts, including queued and lookahead requests. A `prepare()`
+override becomes the instance's selection for later omitted options, like its
+voice and speed options; explicit `null` or another non-`undefined` value other
+than `'plain'` selects the existing cleanup. Plain requests carry `textFormat:'plain'` to every
+supported speech client along with the existing internal preparation marker;
+default requests keep their existing payload shape. Original part objects stay
+unchanged, and per-part voices, ordering, cancellation, and silent
+`autoplay:false` preparation retain their existing behavior. This controls SDK
+text treatment, not the selected speech engine's pronunciation or input capacity.
 
 ### Admission and playback order
 
@@ -4053,6 +4066,11 @@ Replay use the native control; only a successful current native `finished`
 advances the next part. Native errors remain observable, and a failed native
 control stays owned until its optional `released` promise confirms cleanup.
 Stale completion after stop/restart/disposal cannot advance replacement content.
+When current native `finished` resolves `false` without an error, the existing
+`ready` event carries `reason:'native-playback-stopped'` and its operation ID;
+initial prepared `ready` has no such reason. Only natural completion of the last
+part emits `ended`. Errors never establish native resource release; failed
+controls remain retained through their existing `released` boundary.
 Selecting a native part hides and clears the HTML audio source while preserving
 the same shared playback state events and complete original parts.
 
@@ -4087,7 +4105,7 @@ Exact lifecycle reasons are `playback-replaced`, `playback-stopped`,
 `playback-destroyed`, `speech-playback-cancelled`,
 `speech-synthesis-superseded`, `speech-synthesis-cancelled`,
 `speech-synthesizer-unavailable`, `synthesized-audio-contract-mismatch`,
-`audio-playback-rejected`, `audio-autoplay-rejected`,
+`audio-playback-rejected`, `audio-autoplay-rejected`, `native-playback-stopped`,
 `speech-playback-request-contract-mismatch`, and
 `speech-synthesis-rejected`, as applicable to the emitted state.
 

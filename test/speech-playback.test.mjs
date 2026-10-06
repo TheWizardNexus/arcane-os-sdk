@@ -162,6 +162,80 @@ function nativeSpeechFixture(input,controls,exposeRelease=true) {
 }
 
 test(
+    'SpeechPlayback forwards exact plain input through every client and preserves default cleanup',
+    async function testPlainSpeechPlayback() {
+        for(const method of ['prepareTTSPlayback','fetchTTS','prepare','synthesize']) {
+            const requests=[];
+            const speech={
+                async [method](payload,options,preparation) {
+                    requests.push({payload,options,preparation});
+                    return minimalWavBlob();
+                }
+            };
+            const audio=new ContractAudio();
+            const playback=new SpeechPlayback({
+                audio,
+                speech,
+                textFormat:'plain',
+                createObjectURL:function createPlainSpeechURL() {
+                    return `blob:plain-${method}-${requests.length}`;
+                },
+                revokeObjectURL:function releasePlainSpeechURL() {}
+            });
+            const question='  **Question?**\nKeep _these_ marks and *##*.  ';
+            const answer='\n## Answer\n`code` ~~literal~~  ';
+            const parts=[
+                {input:question,voice:'question-voice',role:'question'},
+                {input:answer,voice:'answer-voice',role:'answer'}
+            ];
+            try {
+                assert.deepEqual(await playback.prepare({parts,autoplay:false}),{
+                    ready:true,
+                    played:false
+                });
+                await waitForContract(
+                    function everyPlainPartRequested() {return requests.length===2;},
+                    `${method} must receive both complete plain parts`
+                );
+                for(let index=0;index<parts.length;index+=1) {
+                    assert.deepEqual(requests[index].payload,{
+                        input:parts[index].input,
+                        textFormat:'plain',
+                        speed:1,
+                        voice:parts[index].voice
+                    });
+                    assert.deepEqual(requests[index].preparation,{speechInputPrepared:true});
+                    assert.equal(playback.parts[index].input,parts[index].input);
+                    assert.equal(Object.hasOwn(parts[index],'textFormat'),false);
+                }
+                assert.equal(audio.paused,true);
+                await playback.prepare({
+                    parts:[{input:'**Default cleanup.**'}],
+                    textFormat:null,
+                    autoplay:false
+                });
+                assert.deepEqual(requests.at(-1).payload,{
+                    input:'Default cleanup.',
+                    speed:1
+                });
+                await playback.prepare({
+                    parts:[{input:question}],
+                    textFormat:'plain',
+                    autoplay:false
+                });
+                assert.equal(requests.at(-1).payload.input,question);
+                assert.equal(requests.at(-1).payload.textFormat,'plain');
+                await playback.prepare({parts:[{input:answer}],autoplay:false});
+                assert.equal(requests.at(-1).payload.input,answer);
+                assert.equal(requests.at(-1).payload.textFormat,'plain');
+            } finally {
+                playback.destroy();
+            }
+        }
+    }
+);
+
+test(
     'SpeechPlayback prepares native parts silently and advances only after native completion',
     async function testNativePlaybackOrderAndControls() {
         const requests=[];
@@ -246,6 +320,46 @@ test(
             assert.equal(await completion,true);
             assert.equal(playback.state,'ended');
             assert.equal(playback.nativePlayback,null);
+        } finally {
+            playback.destroy();
+        }
+    }
+);
+
+test(
+    'SpeechPlayback distinguishes native stopped completion from initial ready',
+    async function testNativeStoppedReason() {
+        const controls=[];
+        const states=[];
+        const playback=new SpeechPlayback({
+            audio:new ContractAudio(),
+            speech:{
+                prepare(payload) {return nativeSpeechFixture(payload.input,controls);}
+            },
+            onState:function observeNativeStoppedState(detail) {states.push(detail);}
+        });
+        try {
+            await playback.prepare({parts:['First.','Second.'],autoplay:false});
+            const initial=states.find(function initiallyReady(detail) {
+                return detail.state==='ready';
+            });
+            assert.equal(initial.reason,null);
+            await playback.play();
+            controls[0].stop();
+            await waitForContract(function nativeStoppedReported() {
+                return states.some(function stopped(detail) {
+                    return detail.reason==='native-playback-stopped';
+                });
+            },'Native non-natural completion must have a public semantic reason.');
+            const stopped=states.at(-1);
+            assert.equal(stopped.state,'ready');
+            assert.equal(stopped.reason,'native-playback-stopped');
+            assert.equal(stopped.operationId,initial.operationId);
+            assert.equal(stopped.index,0);
+            assert.equal(controls.length,1);
+            assert.equal(states.some(function naturallyEnded(detail) {
+                return detail.state==='ended';
+            }),false);
         } finally {
             playback.destroy();
         }

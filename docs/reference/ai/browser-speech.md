@@ -1008,8 +1008,11 @@ waits for its next character or the final flush.
 state. `fetchTTS()`, provider-runtime TTS requests, direct Kokoro provider
 requests, and `SpeechPlayback` apply the same default cleanup to complete input.
 Complete-input APIs can explicitly select `textFormat:'plain'` as described
-below. The streaming `streamTTS()` options still ignore `textFormat`;
-streaming narration and `SpeechPlayback` keep their existing cleanup.
+below. `SpeechPlayback` accepts `textFormat:'plain'` in its constructor or
+`prepare()` options and forwards each prepared part's exact input through every
+supported speech client. Omitted options reuse its current selection; explicit
+`null` restores default cleanup. The streaming `streamTTS()` options still ignore
+`textFormat` and streaming narration keeps its existing cleanup.
 SDK-internal delegation carries `{speechInputPrepared:true}` outside the speech
 payload after its owner selects text treatment, preventing a second
 non-idempotent cleanup pass or cleanup of explicitly plain input.
@@ -1019,8 +1022,9 @@ playback timing are not changed by the filter.
 
 Direct native `provider.prepare()` and `provider.play()` preserve their complete
 `input` as supplied. The native route of `ai.prepareTTSPlayback()` also preserves
-that input; shared streaming and `SpeechPlayback` perform their existing cleanup
-before calling it. Choose the high-level narration path when that speech-only
+that input; shared streaming and default `SpeechPlayback` perform cleanup before
+calling it. Plain `SpeechPlayback` preserves the complete input instead.
+Choose the high-level narration path when that speech-only
 formatting cleanup is desired.
 
 The shared helper is public for code that needs the speech-only
