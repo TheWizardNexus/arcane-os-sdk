@@ -38,7 +38,7 @@
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
       "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
       "protocol": "Git working repository and SDK process adapter",
-      "normalization": "Returns directory, open, status, pull, push and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work."
+      "normalization": "Returns directory, open, status, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are inspected without rewriting, resetting or pulling. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. write snapshots exact selected text and paths, writes files, stages/commits only literal owned paths and non-force pushes, preserving unrelated staged files and ordinary Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes."
     },
     {
       "id": "core-speech:createSpeechService",

@@ -47,7 +47,7 @@ await repository.close();
 ```
 
 `createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run}={})`
-returns `{directory,open,status,pull,push,close,drain,dispose}`. The `directory`
+returns `{directory,open,status,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
 - Omit `directory` to select `<repositoriesRoot>/<name>`. The application supplies
@@ -67,7 +67,8 @@ property is the absolute selected working path.
   authentication remain with Git and the native host. The SDK adds no download,
   credential store, polling, network retry or process supervisor.
 
-All operation methods accept `{signal}={}` and return promises:
+The open/status/pull/push methods accept `{signal}={}` and return promises;
+`write` accepts the complete file/message request described below:
 
 | Method | Result and side effect |
 |---|---|
@@ -75,6 +76,7 @@ All operation methods accept `{signal}={}` and return promises:
 | `status` | Prepares the checkout if needed, then returns the existing `repositoryStatus` result unchanged. |
 | `pull` | Prepares the checkout if needed, then runs the existing clean-checkout, fast-forward-only `repositoryPull` operation unchanged. |
 | `push` | Prepares the checkout if needed, then runs the existing `repositoryPush` operation unchanged, preserving its support for unrelated uncommitted working files. |
+| `write` | Writes exact caller-selected text files, stages and commits only their literal paths, then performs one ordinary non-force push. Returns confirmed operation outcomes; see below. |
 | `close`, `drain`, `dispose` | The same idempotent operation: stop accepting new calls and await accepted work and its process/event cleanup. They retain the repository on disk. |
 
 Opening an existing repository never pulls, switches branches, resets, changes
@@ -84,6 +86,111 @@ untouched and reports its Git error or `ARCANE_REPOSITORY_DIRECTORY_INVALID`.
 A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.
+
+## Write, commit and push selected text
+
+```javascript
+const result = await repository.write({
+    files: [{path: 'dispatches/moon-cheese.md', content: completeAuthoredText}],
+    message: authoredCommitMessage,
+    signal
+});
+```
+
+`write({files:[{path,content}],message,signal}={})` requires at least one explicit
+file, a nonempty commit message and string content (including an empty string).
+Paths name working files relative to this repository, not its root, outside
+paths or Git-owned `.git` metadata. Strings must be representable as UTF-8;
+native filenames cannot contain NUL. Incompatible input reports a `TypeError`
+before any write, rather than replacing text. Content may contain NUL, BOM,
+CRLF, leading/trailing whitespace and every ordinary Unicode character.
+
+The method copies the selected records and their original strings synchronously
+when called. Later changes to the caller's array, file records or selected UI
+connection cannot alter accepted work. It does not freeze the caller's objects,
+add document labels, normalize line endings, trim content or wrap documents.
+The workspace's originally selected directory remains the operation owner.
+
+After preparing that checkout, it creates needed parent directories and writes
+each complete file using the ordinary native UTF-8 filesystem API. These are
+caller-owned replacements, not an append-only policy or a multi-file atomic
+transaction. Applications choose which paths and content may be replaced.
+Ordinary filesystem behavior, including existing symlinks, remains with the
+native host.
+
+One `git --literal-pathspecs add -- <paths>` stages only those exact names.
+One `git --literal-pathspecs commit --only --cleanup=verbatim --file - -- <paths>`
+commits only those paths, leaving unrelated staged paths staged. The original
+message is streamed unchanged through standard input. One ordinary `git push`
+then uses that repository's existing remote/ref configuration, identity,
+credentials and hooks. There is no implicit pull, branch switch, forced push,
+hook bypass, automatic retry, rollback or reset. If Git reports no changes to
+commit, that actual failure is returned; the SDK creates no empty commit.
+These are Git's documented [selected-path commit](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---only)
+and [literal pathspec](https://git-scm.com/docs/git#Documentation/git.txt---literal-pathspecs) semantics.
+
+Existing Git attributes, clean filters, EOL settings and hooks continue to apply
+when Git stages/commits content. The filesystem write preserves the original
+text; this API does not claim that repository-configured filters leave Git blob
+text identical. It preserves those settings. A push may also send existing history or other
+refs selected by the repository's ordinary push configuration.
+
+### Result and failure outcomes
+
+Successful completion returns:
+
+```text
+{
+    directory,
+    state: 'pushed',
+    stage: 'complete',
+    paths: [originalSelectedPath, ...],
+    writtenPaths: [confirmedWrittenPath, ...],
+    written: true,
+    staged: true,
+    committed: true,
+    pushed: true,
+    outputs: [{stage: 'prepare'|'stage'|'commit'|'push', stdout, stderr, code?, signal?}, ...]
+}
+```
+
+Each output record retains complete stdout/stderr. `code` and the process
+termination `signal` are included when a completed process result is available.
+An in-progress write also records its current `path` on a failure outcome.
+`writtenPaths` records successful filesystem writes in input order; `written`
+becomes true only after every requested write succeeds. The other booleans
+record successful Git command completion. **False means success is unconfirmed,
+not that files, the index, HEAD or the remote certainly remained unchanged.**
+
+- `local`: no successful commit or push has been confirmed. Inspect
+  `writtenPaths`, `written`, `staged` and `stage` for actual local progress.
+- `committed`: Git completed the commit; no successful push has been confirmed.
+  Cancellation before push keeps this result rather than claiming delivery.
+- `pushed`: Git reported successful completion of the push. A later observer
+  error retains that confirmed result while still reporting the observer error.
+- `uncertain`: an attempted file write, commit or push did not supply successful
+  completion evidence. Partial files or index changes can remain, and a remote
+  can accept updates before a connection failure hides the acknowledgement.
+  Previously confirmed `writtenPaths`, `committed` or `pushed` evidence remains
+  present. A known pre-spawn failure does not invent a dispatched side effect.
+
+After operation acceptance and execution begins, failures reject with an
+`ArcaneError` whose `cause` is the original complete failure and whose `details`
+is the outcome above. The code/message retain the original failure when
+available, and nested process details remain available through its cause.
+Input errors, a pre-aborted/queued-aborted request or a call after closing reject
+before writer execution and have the existing TypeError/cancellation/closing
+contract. No success is fabricated from an error string or callback.
+
+Cancellation is checked before each subsequent filesystem/Git action. Active
+Git cancellation drains through the existing process owner. Completion is
+recorded before checking cancellation for the next action: an accepted commit
+is retained if push has not begun, and an accepted push is retained if an
+observer subsequently fails. Failed operations leave their actual files and
+index state available for inspection; the application chooses recovery.
+Await or retain the write promise and connect the workspace's terminal drain
+to its Core service lifetime. The application still owns any decision to make
+that Core method service-lifetime rather than request-lifetime work.
 
 ## Ownership, concurrency and shutdown
 
@@ -107,6 +214,8 @@ The caller retains each operation's complete result or failure separately.
 The cold path is one selected connection, one parent-directory creation and one
 Git clone. Opening an existing checkout uses one read-only Git command. A
 prepared owner's status/pull/push use their existing repository operation graph.
+An accepted writer uses one filesystem write per explicitly selected file,
+then one add, one commit and one push, stopping at the first failure.
 There is no scan across applications, connections, models or platforms. Git
 progress, process-starting/completion, heartbeat and cancellation events use
 the existing `onEvent` owner with complete output and backpressure.

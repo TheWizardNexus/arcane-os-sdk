@@ -7731,13 +7731,21 @@ explicit existing path. The application owns the remote, branch and Core API.
 createRepositoryWorkspace({name,directory,dataRoot,remote,branch,onEvent,run=runProcess}={})
 ```
 
-Returns `{directory,open,status,pull,push,close,drain,dispose}`. Construction does
+Returns `{directory,open,status,pull,push,write,close,drain,dispose}`. Construction does
 no I/O. Operations accept `{signal}`; a missing or empty destination clones once,
 while existing checkout files, branches, remotes and local changes remain intact.
 Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the [complete inputs, results,
 errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+`write({files:[{path,content}],message,signal})` snapshots the exact selected
+strings, writes those repository-relative files, commits only their literal
+paths and performs an ordinary non-force push. It retains unrelated staged
+paths and existing Git filters/hooks. Results and causal failures distinguish
+confirmed local writes, commits, pushes and uncertain attempted side effects;
+complete process output is retained. See [the complete writer outcome
+contract](core-repositories.md#write-commit-and-push-selected-text).
 
 ```javascript
 import {createRepositoryWorkspace} from 'arcane-os/core/repositories';

@@ -1,4 +1,4 @@
-import {mkdir, readdir} from 'node:fs/promises';
+import {mkdir, readdir, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import Is from 'strong-type';
@@ -60,7 +60,7 @@ export function createRepositoryWorkspace(
     let opened = false;
     let closing = null;
 
-    async function prepare(signal) {
+    async function prepare(signal, execute = run) {
         throwIfAborted(signal);
         if (opened) return {directory: repositoryDirectory, cloned: false};
         let entries;
@@ -74,7 +74,7 @@ export function createRepositoryWorkspace(
         if (entries.length) {
             // A parent checkout or a bare object cache is not this connection's
             // working root. Inspection never changes an existing destination.
-            const result = await run(
+            const result = await execute(
                 'git',
                 ['rev-parse', '--is-inside-work-tree', '--show-prefix'],
                 {cwd: repositoryDirectory, signal, onEvent}
@@ -97,7 +97,7 @@ export function createRepositoryWorkspace(
         const arguments_ = ['clone', '--progress'];
         if (branch !== undefined) arguments_.push('--branch', branch);
         arguments_.push('--', remote, repositoryDirectory);
-        const result = await run(
+        const result = await execute(
             'git',
             arguments_,
             {cwd: path.dirname(repositoryDirectory), signal, onEvent}
@@ -168,6 +168,171 @@ export function createRepositoryWorkspace(
         );
     }
 
+    function write({files, message, signal} = {}) {
+        let selectedFiles;
+        try {
+            requireString(message, 'message');
+            if (!message.isWellFormed()) throw new TypeError('message cannot be represented completely as UTF-8 text.');
+            if (!is.array(files) || files.length === 0) {
+                throw new TypeError('write requires at least one explicitly selected file.');
+            }
+            selectedFiles = Array.from(
+                files,
+                function snapshotFile(file) {
+                    const {path: filename, content} = file;
+                    requireString(filename, 'file.path');
+                    if (!filename.isWellFormed() || filename.includes('\0')) {
+                        throw new TypeError('file.path cannot be represented completely as a native filename.');
+                    }
+                    if (!is.string(content) || !content.isWellFormed()) {
+                        throw new TypeError('file.content must be complete UTF-8-representable text.');
+                    }
+                    const destination = path.resolve(repositoryDirectory, filename);
+                    const relative = path.relative(repositoryDirectory, destination);
+                    const first = relative.split(path.sep)[0];
+                    if (path.isAbsolute(filename) || !relative || relative === '..'
+                        || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+                        || first.toLowerCase() === '.git') {
+                        throw new TypeError('file.path must name a working file relative to this repository, outside Git metadata.');
+                    }
+                    return {path: filename, content, destination};
+                }
+            );
+        } catch (error) {
+            return Promise.reject(error);
+        }
+
+        return accept(
+            async function writeRepositoryFiles() {
+                const outcome = {
+                    directory: repositoryDirectory,
+                    state: 'local',
+                    stage: 'prepare',
+                    paths: selectedFiles.map(function selectedPath(file) { return file.path; }),
+                    writtenPaths: [],
+                    written: false,
+                    staged: false,
+                    committed: false,
+                    pushed: false,
+                    outputs: []
+                };
+                let pendingWrite = false;
+
+                async function executeGit(stage, args, input, options = {}) {
+                    throwIfAborted(signal);
+                    outcome.stage = stage;
+                    const output = {stage, stdout: '', stderr: ''};
+                    const observed = {stdout: false, stderr: false};
+                    outcome.outputs.push(output);
+                    let beforeStartFailed = false;
+
+                    function consumeOutput({stream, chunk}) {
+                        observed[stream] = true;
+                        output[stream] += chunk;
+                    }
+
+                    async function observeEvent(event) {
+                        try {
+                            await onEvent?.(event);
+                        } catch (error) {
+                            if (event.type === 'process.starting') beforeStartFailed = true;
+                            throw error;
+                        }
+                    }
+
+                    function recordCompletion(result) {
+                        if (!result || !is.integer(result.code)) return;
+                        output.code = result.code;
+                        output.signal = result.signal ?? null;
+                        for (const stream of ['stdout', 'stderr']) {
+                            if (!observed[stream] && is.string(result[stream])) output[stream] = result[stream];
+                        }
+                        if (result.code !== 0) return;
+                        if (stage === 'stage') outcome.staged = true;
+                        if (stage === 'commit') {
+                            outcome.committed = true;
+                            outcome.state = 'committed';
+                        }
+                        if (stage === 'push') {
+                            outcome.pushed = true;
+                            outcome.state = 'pushed';
+                        }
+                    }
+
+                    try {
+                        const result = await run(
+                            'git',
+                            args,
+                            {cwd: options.cwd ?? repositoryDirectory, signal, onEvent: observeEvent,
+                                onOutput: consumeOutput, captureOutput: false, input}
+                        );
+                        recordCompletion(result);
+                        if (result.code !== 0) {
+                            throw new ArcaneError(
+                                'ARCANE_OPERATION_FAILED',
+                                `Git ${stage} exited with code ${String(result.code)}.`,
+                                {details: result}
+                            );
+                        }
+                        return {...result, stdout: output.stdout, stderr: output.stderr};
+                    } catch (error) {
+                        if (!beforeStartFailed) recordCompletion(error?.details);
+                        const notStarted = beforeStartFailed
+                            || (error?.code === 'ARCANE_PREREQUISITE_MISSING' && !error?.details)
+                            || (error?.code === 'ARCANE_CANCELLED' && !error?.details);
+                        if (!notStarted && output.code !== 0 && (stage === 'commit' || stage === 'push')) {
+                            outcome.state = 'uncertain';
+                        }
+                        throw error;
+                    }
+                }
+
+                async function* commitMessage() {
+                    yield message;
+                }
+
+                try {
+                    await prepare(
+                        signal,
+                        function prepareGit(command, args, options) {
+                            return executeGit('prepare', args, undefined, options);
+                        }
+                    );
+                    outcome.stage = 'write';
+                    for (const file of selectedFiles) {
+                        throwIfAborted(signal);
+                        outcome.path = file.path;
+                        await mkdir(path.dirname(file.destination), {recursive: true});
+                        throwIfAborted(signal);
+                        pendingWrite = true;
+                        await writeFile(file.destination, file.content, {encoding: 'utf8', signal});
+                        pendingWrite = false;
+                        outcome.writtenPaths.push(file.path);
+                    }
+                    outcome.written = true;
+                    delete outcome.path;
+                    await executeGit('stage', ['--literal-pathspecs', 'add', '--', ...outcome.paths]);
+                    await executeGit(
+                        'commit',
+                        ['--literal-pathspecs', 'commit', '--only', '--cleanup=verbatim', '--file', '-', '--', ...outcome.paths],
+                        commitMessage()
+                    );
+                    await executeGit('push', ['push']);
+                    outcome.stage = 'complete';
+                    return outcome;
+                } catch (cause) {
+                    if (pendingWrite) outcome.state = 'uncertain';
+                    throw new ArcaneError(
+                        cause?.code ?? 'ARCANE_REPOSITORY_WRITE_FAILED',
+                        cause instanceof Error ? cause.message : String(cause),
+                        {cause, details: outcome, exitCode: cause?.exitCode}
+                    );
+                }
+            },
+            signal
+        );
+    }
+
     function close() {
         if (!closing) {
             closing = Promise.allSettled([...pending]).then(
@@ -188,7 +353,7 @@ export function createRepositoryWorkspace(
         return closing;
     }
 
-    return {directory: repositoryDirectory, open, status, pull, push, close, drain: close, dispose: close};
+    return {directory: repositoryDirectory, open, status, pull, push, write, close, drain: close, dispose: close};
 }
 
 function requireString(value, name) {

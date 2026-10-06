@@ -211,3 +211,186 @@ test('active cancellation passes to the process owner and close joins its failur
     await Promise.all([observedOpen, observedClose]);
     assert.equal(await readFile(path.join(directory, 'partial.txt'), 'utf8'), 'Preserved clone state.');
 });
+
+test('writer snapshots exact text and selected paths, retains clone output and scopes its commit', async function exactWriter(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'connected repository');
+    const started = deferred();
+    const released = deferred();
+    const calls = [];
+    const content = '\uFEFF  Moon cheese 🧀\r\nNUL:\0\nFinal line.  ';
+    const message = '  Complete moon dispatch\n\nLast authored line.  ';
+    const filename = 'dispatches/moon [cheese].md';
+    const files = [{path: filename, content}];
+    async function run(command, args, options) {
+        calls.push({command, args, cwd: options.cwd});
+        if (args[0] === 'clone') {
+            await mkdir(directory);
+            started.resolve();
+            await released.promise;
+        }
+        if (args.includes('commit')) {
+            const chunks = [];
+            for await (const chunk of options.input) chunks.push(chunk);
+            assert.deepEqual(chunks, [message]);
+        }
+        await options.onOutput({stream: 'stdout', chunk: `Complete ${args[0]} output 🦑\r\n`});
+        await options.onOutput({stream: 'stderr', chunk: 'Complete diagnostic.\n'});
+        return {code: 0, signal: null, stdout: null, stderr: null};
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'selected-remote', run});
+    const operation = repository.write({files, message});
+    files[0].path = 'wrong.md';
+    files[0].content = 'Wrong replacement.';
+    files.push({path: 'also-wrong.md', content: 'Wrong extra.'});
+    repository.directory = path.join(root, 'wrong connection');
+    await started.promise;
+    released.resolve();
+    const result = await operation;
+    assert.equal(result.directory, directory);
+    assert.equal(result.state, 'pushed');
+    assert.equal(result.stage, 'complete');
+    assert.deepEqual(result.paths, [filename]);
+    assert.deepEqual(result.writtenPaths, [filename]);
+    assert.deepEqual([result.written, result.staged, result.committed, result.pushed], [true, true, true, true]);
+    assert.equal(await readFile(path.join(directory, filename), 'utf8'), content);
+    assert.deepEqual(await readdir(directory), ['dispatches']);
+    assert.deepEqual(calls.map(function command(record) { return record.args; }), [
+        ['clone', '--progress', '--', 'selected-remote', directory],
+        ['--literal-pathspecs', 'add', '--', filename],
+        ['--literal-pathspecs', 'commit', '--only', '--cleanup=verbatim', '--file', '-', '--', filename],
+        ['push']
+    ]);
+    assert.equal(calls[0].cwd, root);
+    assert.ok(calls.slice(1).every(function selectedWorkingPath(call) { return call.cwd === directory; }));
+    assert.deepEqual(result.outputs.map(function stage(output) { return output.stage; }), ['prepare', 'stage', 'commit', 'push']);
+    assert.equal(result.outputs[0].stdout, 'Complete clone output 🦑\r\n');
+    assert.ok(result.outputs.every(function complete(output) { return output.stderr === 'Complete diagnostic.\n' && output.code === 0; }));
+    await repository.close();
+});
+
+test('writer retains earlier successful files and original filesystem failure without staging', async function partialLocalWrite(t) {
+    const directory = await fixture(t);
+    await mkdir(path.join(directory, 'not-a-file'));
+    const calls = [];
+    async function run(command, args) {
+        calls.push(args);
+        return processResult('true\n\n');
+    }
+    const repository = createRepositoryWorkspace({directory, run});
+    await assert.rejects(
+        repository.write({files: [{path: 'first.md', content: 'Every first line.\n'}, {path: 'not-a-file', content: 'Second file.'}], message: 'Selected files'}),
+        function failedWrite(error) {
+            assert.ok(error.cause instanceof Error);
+            assert.equal(error.details.state, 'uncertain');
+            assert.equal(error.details.stage, 'write');
+            assert.equal(error.details.path, 'not-a-file');
+            assert.deepEqual(error.details.writtenPaths, ['first.md']);
+            assert.deepEqual([error.details.written, error.details.staged, error.details.committed, error.details.pushed], [false, false, false, false]);
+            return true;
+        }
+    );
+    assert.equal(await readFile(path.join(directory, 'first.md'), 'utf8'), 'Every first line.\n');
+    assert.equal(calls.length, 1);
+    await repository.close();
+});
+
+test('writer preserves commit completion when cancelled before push', async function committedCancellation(t) {
+    const directory = await fixture(t);
+    await writeFile(path.join(directory, 'existing.md'), 'Existing file.');
+    const controller = new AbortController();
+    const calls = [];
+    async function run(command, args) {
+        calls.push(args);
+        if (args[0] === 'rev-parse') return processResult('true\n\n');
+        if (args.includes('commit')) controller.abort();
+        return processResult('Confirmed complete process.\n');
+    }
+    const repository = createRepositoryWorkspace({directory, run});
+    await assert.rejects(
+        repository.write({files: [{path: 'selected.md', content: 'Complete text.'}], message: 'Complete message', signal: controller.signal}),
+        function committedBeforeCancellation(error) {
+            assert.equal(error.code, 'ARCANE_CANCELLED');
+            assert.equal(error.details.state, 'committed');
+            assert.equal(error.details.committed, true);
+            assert.equal(error.details.pushed, false);
+            return true;
+        }
+    );
+    assert.equal(calls.some(function pushed(args) { return args[0] === 'push'; }), false);
+    await repository.close();
+});
+
+test('writer retains confirmed push despite later observer failure and keeps full output', async function pushedObserverFailure(t) {
+    const directory = await fixture(t);
+    await writeFile(path.join(directory, 'existing.md'), 'Existing file.');
+    const failure = new Error('Complete observer failure.\nFinal line.');
+    failure.details = {code: 0, signal: null, stdout: null, stderr: null};
+    async function run(command, args, options) {
+        if (args[0] === 'rev-parse') return processResult('true\n\n');
+        if (args[0] === 'push') {
+            await options.onOutput({stream: 'stdout', chunk: 'Complete remote acknowledgement.\n'});
+            await options.onOutput({stream: 'stderr', chunk: 'Complete push diagnostic.\n'});
+            throw failure;
+        }
+        return processResult();
+    }
+    const repository = createRepositoryWorkspace({directory, run});
+    await assert.rejects(
+        repository.write({files: [{path: 'selected.md', content: 'Complete text.'}], message: 'Complete message'}),
+        function pushedBeforeObserverError(error) {
+            assert.equal(error.cause, failure);
+            assert.equal(error.details.state, 'pushed');
+            assert.equal(error.details.committed, true);
+            assert.equal(error.details.pushed, true);
+            assert.deepEqual(error.details.outputs[3], {
+                stage: 'push', stdout: 'Complete remote acknowledgement.\n',
+                stderr: 'Complete push diagnostic.\n', code: 0, signal: null
+            });
+            return true;
+        }
+    );
+    await repository.close();
+});
+
+test('writer distinguishes pre-spawn observer failure from interrupted commit and uncertain push', async function uncertainOperations(t) {
+    for (const selected of ['pre-start', 'commit', 'push']) {
+        const directory = await fixture(t);
+        await writeFile(path.join(directory, 'existing.md'), 'Existing file.');
+        const failure = new Error('Complete operation failure.\nFinal line.');
+        if (selected !== 'pre-start') {
+            failure.code = 'ARCANE_PREREQUISITE_MISSING';
+            failure.details = {code: 1, signal: null, stdout: '', stderr: 'Complete partial process diagnostics.\n'};
+        }
+        function onEvent(event) {
+            if (selected === 'pre-start' && event.stage === 'commit') throw 'Complete thrown observer value.';
+        }
+        async function run(command, args, options) {
+            if (args[0] === 'rev-parse') return processResult('true\n\n');
+            if (selected === 'pre-start' && args.includes('commit')) {
+                try {
+                    await options.onEvent({type: 'process.starting', stage: 'commit'});
+                } catch (cause) {
+                    throw new Error('The event callback failed: Complete thrown observer value.', {cause});
+                }
+            }
+            if ((selected === 'commit' && args.includes('commit')) || (selected === 'push' && args[0] === 'push')) throw failure;
+            return processResult();
+        }
+        const repository = createRepositoryWorkspace({directory, run, onEvent});
+        await assert.rejects(
+            repository.write({files: [{path: 'selected.md', content: 'Complete text.'}], message: 'Complete message'}),
+            function actualOutcome(error) {
+                assert.equal(error.details.state, selected === 'pre-start' ? 'local' : 'uncertain');
+                assert.equal(error.details.committed, selected === 'push');
+                assert.equal(error.details.pushed, false);
+                if (selected !== 'pre-start') {
+                    assert.equal(error.cause, failure);
+                    assert.equal(error.details.outputs[error.details.outputs.length - 1].stderr, failure.details.stderr);
+                }
+                return true;
+            }
+        );
+        await repository.close();
+    }
+});
