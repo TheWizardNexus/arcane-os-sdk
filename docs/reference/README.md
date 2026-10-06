@@ -54,7 +54,7 @@ alone does not make bare module names resolve in a browser.
 | Choose theme-switcher corner radii, label font and group background through host CSS | [Theme-switcher styling properties](runtime-components.md#theme-switcherhtml) |
 | Use optional Core preferences and appearance without masking real failures | [PreferenceStore](runtime-modules.md#preferencestorejs), [SystemAppearance](runtime-modules.md#systemappearancejs), and [Core lookup errors](core-runtime.md#state-and-frames) |
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
-| Preserve exact text in an explicit complete synthesis call | [Exact complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input) and [managed AI narration](sdk-api.md#managed-ai-narration) |
+| Preserve exact speech text and complete browser Kokoro audio | [Exact complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input) and [managed AI narration](sdk-api.md#managed-ai-narration) |
 | Select initial native window dimensions and resizing behavior | [Initial native window size](core-native-packaging.md#initial-native-window-size) and [Windows provider](sdk-api.md#createwindowsnativeprovider) |
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
@@ -63,7 +63,7 @@ alone does not make bare module names resolve in a browser.
 | Reuse dependency-ready native services without a renderer | [Core service composition](core-runtime.md#native-service-composition) and [existing ONNX owner](local-ai.md#native-service-owners) |
 | Compose application Core services during source development, independently of local AI | [Development Core services](core-development.md) |
 | Share one application service runtime between its native UI and MCP process | [Shared Core host](core-shared-host.md) |
-| Store complete browser model resources through one DBOPFS owner | [Model resources](ai/browser-decisions.md#shared-dbopfs-model-resources) and [speech routing](ai/browser-speech.md#ordinary-module-routing) |
+| Store complete browser model resources, including the selected decision-runtime entry, through one DBOPFS owner | [Model resources](ai/browser-decisions.md#shared-dbopfs-model-resources) and [speech routing](ai/browser-speech.md#ordinary-module-routing) |
 | Observe committed storage changes across live application documents | [DBOPFS change subscriptions](runtime-modules.md#dbopfsjs) |
 | Cancel cold speech preparation while preserving other activation interests | [Prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio) |
 | Own an explicitly selected native Codex App Server session | [Codex App Server](codex-app-server.md) |

@@ -9550,12 +9550,25 @@ No decisions are inserted into chat history or durable storage.
 
 Optional `store` is an existing SDK DBOPFS model or speech store exposing
 `fetchResource(input, options)`. It remains outside cloned Worker configuration.
-The selected loader routes its actual model/configuration/tokenizer resources
-through that owner and disables competing model caches in this explicit mode.
-Omission preserves ordinary upstream loading. Native ESM imports retain their
-platform loader. Resource progress counts closed shards; cancellation joins
-resource cleanup before outstanding `load()`/`evaluate()` calls settle.
+Explicit activation first stores the complete selected `runtime.moduleUrl`
+entry and materializes it as a JavaScript object URL without rewriting source.
+The configured original URL remains the resource selection for later loads.
+The selected loader also routes its actual model/configuration/tokenizer
+resources through that owner and disables competing model caches in this mode.
+Each activation revokes its runtime object URL after terminating its Worker on
+cancellation, failure, unload or disposal. Resource progress counts closed
+shards; cancellation joins runtime-entry and resource cleanup before outstanding
+`load()`/`evaluate()` calls settle. Runtime-entry HTTP failures report
+`ARCANE_DECISION_RUNTIME_DOWNLOAD_FAILED` with the complete stored response in
+`error.response` for developer diagnostics.
 `unload()` and `dispose()` acknowledge their state transition synchronously.
+
+The default runtime entry is self-contained. Custom stored entries must work
+from an object URL: entry materialization changes `import.meta.url` and does not
+rewrite relative imports or original-location support-file references. Native
+absolute ESM dependencies and custom factory imports outside upstream preloads
+remain browser-owned. Omitting `store` preserves direct native module loading
+and ordinary upstream model loading. See [shared model resources](ai/browser-decisions.md#shared-dbopfs-model-resources).
 
 ### Example
 
@@ -10441,6 +10454,18 @@ returns mutable `{audio:Uint8Array,contentType:'audio/wav'}` containing 24 kHz
 mono 16-bit PCM. Unsupported formats fail
 `ARCANE_AI_UNSUPPORTED_RESPONSE_FORMAT`; malformed adapter audio fails
 `ARCANE_AI_INVALID_PROVIDER_RESULT`. Unknown fields and accessors reject as malformed.
+
+The Kokoro adapter retains upstream text normalization and phonemization, then
+tokenizes without truncation and sends every content token through the selected
+engine. Short inputs use one inference; longer inputs use ordered segments
+within that engine's capacity and return all generated audio in order. Each
+segment retains the engine's required outer padding, voice-style selection and
+speed. The segments share the slot's existing loaded model and disposal owner;
+they do not create another model or provider-pool slot. Cancellation is checked
+between inference segments and before returning audio; already-running upstream
+inference may finish. This engine transport is distinct from the SDK's optional
+`textFormat:'plain'` input treatment. See [complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input)
+for the selected tokenizer/model contract and upstream revision behavior.
 
 Automatic execution tries a complete WebNN NPU pool when
 `navigator.ml.createContext` is exposed, then WebGPU when `navigator.gpu` is

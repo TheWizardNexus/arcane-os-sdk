@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.71.1",
+  "sdkVersion": "0.71.2",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -542,7 +542,7 @@
       "summary": "Explicit-load Laya and Julia-1 decisions with caller-selected precision, complete inputs and graph results.",
       "availability": "Browser module Workers and the selected Transformers.js backend; import/construction starts no model load",
       "protocol": "Caller-owned state/question/options rows; five-input decision graph; native Worker request/result lifecycle",
-      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes actual loader resources through fetchResource outside cloned Worker configuration; stored mode disables competing model caches, preserves complete HTTP responses and joins resource cleanup before outstanding calls settle. Omission retains upstream loading; no decision-result persistence or precision fallback"
+      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes the complete selected runtime entry and actual loader resources through fetchResource outside cloned Worker configuration. Each activation materializes unchanged entry source with JavaScript MIME and retains its original configured URL for later loads; its object URL is revoked after Worker termination. Stored mode disables competing model caches, preserves complete HTTP responses and joins runtime-entry/resource cleanup before outstanding calls settle. Runtime-entry HTTP failures retain error.response. Custom stored entries must support an object URL and changed import.meta.url; native absolute dependencies and custom factory imports outside upstream preloads remain browser-owned. Omission retains direct native module and upstream model loading; no decision-result persistence or precision fallback"
     },
     {
       "id": "root:acceptWebSocket",
@@ -3708,7 +3708,7 @@
       "summary": "Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI runtime.",
       "availability": "Browser with DBOPFS, Web Locks, Workers, object URLs, and caller-selected kokoro-js runtime/model content",
       "protocol": "arcane-ai-provider/2 tts/synthesize",
-      "normalization": "Independent load, status, request, unload, cancellation and disposal; optional ordinary model.voices records remain complete in the synchronous catalog without loading or constraining synthesis. Provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
+      "normalization": "Independent load, status, request, unload, cancellation and disposal; optional ordinary model.voices records remain complete in the synchronous catalog without loading or constraining synthesis. Upstream text normalization and phonemization remain selected-runtime behavior. Tokenization disables truncation; short inputs use one inference and longer inputs send every content token through ordered engine-capacity segments, retaining required outer padding and all generated audio in order. Segments share the slot's existing model and disposal owner. Request-local cancellation is observed between segments and before returning audio; an already-running upstream inference may finish. Provider-native requests return 24000 Hz Float32Array PCM, while shared AI.js requests use wav and return complete Uint8Array audio/wav data; never selects a cloud fallback"
     },
     {
       "id": "browser-speech:createBrowserSpeechArtifactGraph",
