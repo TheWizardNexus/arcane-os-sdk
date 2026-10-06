@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.61.0
+
+- Add retained local image generation through Core, with public native runtime,
+  Core service and browser accessor entrypoints. Applications keep ownership of
+  prompts, styles, saved images and associations.
+- Select the approved stable-diffusion.cpp runtime and Stable Diffusion 1.4
+  checkpoint through existing local-AI configuration. Runtime installation and
+  model storage/preparation remain separate; model setup uses the existing
+  DBOPFS model store and a retained Core working-file projection.
+- Preserve complete prompts and PNG results, synchronous transient Thinking
+  acknowledgement, observable model state and progress, actual cancellation
+  joining, and native context/file cleanup. Preparation does not block page
+  rendering or unrelated Core services.
+- Expose model-assets preparation and service entrypoints alongside image
+  generation. Native contexts retain working files until actual unload; the
+  browser accessor closes only its own requests and subscriptions.
+- Built-in distributions select CPU on Windows and Linux and the same upstream
+  Metal/CPU archive on macOS. Windows CUDA preparation remains separate pending
+  work; publication does not claim GPU-first Windows or PM execution.
+- Keep optional engine/binding acquisition in the selected application's
+  existing installer workflow. No engine binaries or model checkpoint are added
+  to the npm package, and its declared dependency tree is unchanged.
+
 ## 0.60.0
 
 - Add `Arcane.window.setTheme(presentation, {signal})` for the current native
