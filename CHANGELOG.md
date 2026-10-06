@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.72.0
+
+- Add optional `native.launchContext` defaults for ordinary packaged launch and
+  public `resolveNativeLaunchContext()` through `arcane-os/core/host`. Native
+  applications and external MCP can select the same app-owned state, workspace,
+  shared endpoint and log without reconstructing platform paths.
+- Extend `readCoreLaunchContext()` with explicit defaults and opt-in native
+  resolution. Preserve complete explicit launch records, selected workspace
+  values, ordinary stdio ownership and the existing no-option entry path.
+- Forward packaged launch defaults through Windows and macOS launchers while
+  preserving window, profile, service and shared-host lifecycle behavior. No
+  stored-data migration or dependency change is introduced.
+
 ## 0.71.2
 
 - Preserve complete browser Kokoro synthesis input through the selected runtime's
