@@ -186,10 +186,12 @@ export function createDevelopmentCore({
     }
 
     const ready = Promise.resolve().then(async function prepareApplicationCore() {
-        operationSignal.throwIfAborted();
         const launchContext = {appRoot, signal: operationSignal, onEvent, ...context};
         runtime = createCoreRuntime({application, version, services});
         stopFrames = runtime.onFrame(routeFrame);
+        // Accepted definitions already own resources. Register their cleanup
+        // before honoring an abort, even when close precedes this microtask.
+        operationSignal.throwIfAborted();
         const composed = await Promise.allSettled(
             serviceModules.map(async function loadApplicationService(selection) {
                 const source = pathToFileURL(path.resolve(appRoot, selection.module));

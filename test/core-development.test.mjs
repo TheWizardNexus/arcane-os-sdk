@@ -56,6 +56,23 @@ async function connect(core, client) {
     return response;
 }
 
+test('immediate Core close drains and disposes accepted definitions without starting them', async function immediateClose() {
+    const lifecycle = [];
+    const core = createDevelopmentCore({services: [{
+        name: 'moon',
+        start() { lifecycle.push('started'); },
+        drain() { lifecycle.push('drained'); },
+        dispose() { lifecycle.push('disposed'); }
+    }]});
+    const closing = core.close();
+    assert.strictEqual(core.close(), closing);
+    await assert.rejects(core.ready, {name: 'AbortError'});
+    await closing;
+    assert.deepEqual(lifecycle, ['drained', 'disposed']);
+    assert.equal(core.current().state, 'closed');
+    assert.equal(core.current().core.services[0].state, 'closed');
+});
+
 test('source Core composes app factories without local AI and preserves complete options/context', async function appServices(t) {
     const directory = fileURLToPath(new URL('../.arcane/core-development-fixtures/', import.meta.url));
     await mkdir(directory, {recursive: true});

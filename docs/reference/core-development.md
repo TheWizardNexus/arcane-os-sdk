@@ -146,6 +146,10 @@ and observable. The SDK claims no completion for a service that ignores its
 cancellation or never settles. It never kills the application process merely
 because one page disconnects.
 
+Definitions supplied in `services` belong to this cleanup owner as soon as the
+handle is returned. Calling `close()` before its preparation microtask still
+drains and disposes those definitions without starting them or loading modules.
+
 This is one development-server process on Windows, Linux or macOS. It is not a
 cross-process host discovery/start-or-reuse service, nor control of existing
 Codex desktop tasks. Android requires its separate host adaptation. See
