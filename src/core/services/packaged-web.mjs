@@ -8,8 +8,10 @@ export function createPackagedWebService({artifactRoot}, context = {}) {
     let server;
     let closing = false;
     let lifetime;
+    let current = null;
     return {
         name: 'packaged-web',
+        current() { return current === null ? null : {...current}; },
         async start(runtime) {
             const manifest = JSON.parse(await readFile(path.join(artifactRoot, 'arcane-native.json'), 'utf8'));
             // The launcher chooses app state independently of its installation.
@@ -48,9 +50,11 @@ export function createPackagedWebService({artifactRoot}, context = {}) {
                     await writeFile(originFile, JSON.stringify({host: '127.0.0.1', port: server.port}) + '\n', {flag: 'wx'});
                 }
                 const url = new URL(manifest.start, server.origin).href;
-                runtime.emit('core.web.ready', {origin: server.origin, url, port: server.port});
+                current = {origin: server.origin, url, port: server.port};
+                runtime.emit('core.web.ready', {...current});
                 lifetime = server.lifecycle.then(
                     function packagedServerEnded() {
+                        current = null;
                         if (!closing) {
                             runtime.emit('core.web.failed', serializeCoreError(
                                 new Error('The packaged application listener closed unexpectedly.')
@@ -58,6 +62,7 @@ export function createPackagedWebService({artifactRoot}, context = {}) {
                         }
                     },
                     function packagedServerFailed(error) {
+                        current = null;
                         if (!closing) runtime.emit('core.web.failed', serializeCoreError(error));
                         throw error;
                     }
@@ -66,6 +71,7 @@ export function createPackagedWebService({artifactRoot}, context = {}) {
                 // now; the native diagnostic event owns immediate reporting.
                 lifetime.catch(function observePackagedServerFailure() {});
             } catch (error) {
+                current = null;
                 closing = true;
                 if (server) {
                     try { await server.close(); }
@@ -78,6 +84,7 @@ export function createPackagedWebService({artifactRoot}, context = {}) {
         },
         async drain() {
             closing = true;
+            current = null;
             if (!server) return;
             const results = await Promise.allSettled([server.close(), server.closed, lifetime]);
             const failures = [...new Set(results.filter(function rejected(result) {

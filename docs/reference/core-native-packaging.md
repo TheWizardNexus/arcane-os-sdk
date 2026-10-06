@@ -210,6 +210,19 @@ details and [the client contract](core-client.md) for native bridge integration.
 
 ## Launch-time locations
 
+For one app-owned Core shared by the native window and a separate MCP process,
+the launch context may explicitly select `sharedHost:{endpoint,logFile}`. The
+generated native child then connects through a stdio bridge, starting an
+independent headless Core only when the selected endpoint is absent. Its
+endpoint claim precedes application service imports/factories. Closing a native
+window disconnects its bridge; explicit shared-host shutdown drains services.
+Omitting `sharedHost` preserves the existing stdio-owned Core lifetime.
+See [shared Core host ownership](core-shared-host.md) for exact startup,
+connection, cancellation, diagnostics, endpoint, and platform contracts.
+The packaged-web service exposes `current()` as its active `{origin,url,port}`
+or `null`; the shared host replays that current listener to a newly attached
+macOS bridge, without restarting the server or retaining historical events.
+
 The generated Core entry accepts `--arcane-launch-config <path>`. The public
 `readCoreLaunchContext({argv=process.argv.slice(2)}={})` function in
 `arcane-os/core/host` reads that explicitly selected JSON object. A native host

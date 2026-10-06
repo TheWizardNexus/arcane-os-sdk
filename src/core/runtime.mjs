@@ -109,7 +109,12 @@ class CoreRuntime {
     }
 
     emit(event, data) {
-        const frame = {protocol: CORE_PROTOCOL, type: 'event', event, data, time: new Date().toISOString()};
+        return this.#emit(event, data);
+    }
+
+    #emit(event, data, requestId) {
+        const frame = {protocol: CORE_PROTOCOL, type: 'event', event, data,
+            ...(requestId === undefined ? {} : {requestId}), time: new Date().toISOString()};
         this.#events.dispatch(FRAME_EVENT, frame);
         return frame;
     }
@@ -158,7 +163,7 @@ class CoreRuntime {
         return service.definition;
     }
 
-    #serviceContext(service) {
+    #serviceContext(service, requestId) {
         const runtime = this;
         return {
             application: this.#application,
@@ -167,7 +172,7 @@ class CoreRuntime {
                 return runtime.getService(name);
             },
             emit(event, data) {
-                return runtime.emit(event, data);
+                return runtime.#emit(event, data, requestId);
             }
         };
     }
@@ -295,7 +300,7 @@ class CoreRuntime {
                     const result = await handle.call(
                         service.definition,
                         frame.parameters,
-                        {...runtime.#serviceContext(service), requestId: frame.id, signal: controller.signal}
+                        {...runtime.#serviceContext(service, frame.id), requestId: frame.id, signal: controller.signal}
                     );
                     aborted(controller);
                     return result;

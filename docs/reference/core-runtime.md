@@ -71,6 +71,15 @@ receives `(parameters, {application, service, emit, getService, requestId, signa
 `this` bound to its service definition. A hook or handler may publish a complete
 service-owned event through `emit(event, data)`.
 
+A request handler's `emit` places its owning request ID in the event frame's
+optional top-level `requestId`, leaving `data` unchanged. Multi-connection hosts
+can route those frames to the requesting connection even when different clients
+choose the same application `streamId`. Lifecycle-hook `emit` and public
+`runtime.emit` remain uncorrelated service-wide events. Retain that service
+context when an application intentionally publishes a change to every client;
+request-context events belong to the originating request. The ordinary Core
+client still delivers the complete original event data to its listeners.
+
 ### Native service composition
 
 `await runtime.getService(name)` and `await context.getService(name)` return the

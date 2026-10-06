@@ -9,6 +9,7 @@ const is = new Is(false);
 export const SDK_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const CORE_FILES = [
     'src/core/host.mjs',
+    'src/core/shared-host.mjs',
     'src/core/runtime.mjs',
     'src/core/stdio.mjs',
     'src/event-manager.mjs',
@@ -161,11 +162,11 @@ export function coreEntrySource(application, version, services, {localAI, runtim
     }) ?? false;
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
-        return `import createService${index} from ${JSON.stringify(specifier)};`;
+        return {binding: `{default: createService${index}}`, specifier};
     });
     // JSON parsing retains authored field names that have object-literal syntax.
     const definitions = services.map(function serviceDefinition(service, index) {
-        return `    createService${index}(JSON.parse(${JSON.stringify(JSON.stringify(service.options === undefined ? {} : service.options))}), context)`;
+        return `    register(createService${index}(JSON.parse(${JSON.stringify(JSON.stringify(service.options === undefined ? {} : service.options))}), context));`;
     });
     if (localAI !== undefined) {
         const chatConfiguration = {
@@ -175,31 +176,30 @@ export function coreEntrySource(application, version, services, {localAI, runtim
                 return id !== 'stable-diffusion.cpp' && id !== 'whisper.cpp';
             })
         };
-        imports.push("import {createLocalAIService} from 'arcane-os/core/local-ai';");
-        definitions.push(`    createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), context)`);
+        imports.push({binding: '{createLocalAIService}', specifier: 'arcane-os/core/local-ai'});
+        definitions.push(`    register(createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chatConfiguration))}), context));`);
     }
     if (modelAssetsSelected) {
-        imports.push("import {createModelAssetService} from 'arcane-os/core/model-assets';");
-        definitions.push('    modelAssets');
+        imports.push({binding: '{createModelAssetService}', specifier: 'arcane-os/core/model-assets'});
     }
     if (imageSelected) {
-        imports.push("import {createLocalImageService} from 'arcane-os/core/image';");
-        definitions.push(`    createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets})`);
+        imports.push({binding: '{createLocalImageService}', specifier: 'arcane-os/core/image'});
+        definitions.push(`    register(createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets}));`);
     }
     if (whisperSelected) {
-        imports.push("import path from 'node:path';");
-        imports.push("import {createSpeechService} from 'arcane-os/core/speech';");
-        imports.push("import {createWhisperRuntime} from 'arcane-os/local-ai/whisper';");
-        definitions.push('    createSpeechService({stt, signal: context.signal})');
+        imports.push({binding: '{createSpeechService}', specifier: 'arcane-os/core/speech'});
+        imports.push({binding: '{createWhisperRuntime}', specifier: 'arcane-os/local-ai/whisper'});
     }
     if (packagedWeb) {
-        imports.push("import {createPackagedWebService} from 'arcane-os/core/packaged-web';");
-        definitions.push("    createPackagedWebService({artifactRoot: fileURLToPath(new URL('../', import.meta.url))}, context)");
+        imports.push({binding: '{createPackagedWebService}', specifier: 'arcane-os/core/packaged-web'});
+        definitions.push("    packagedWeb = createPackagedWebService({artifactRoot: fileURLToPath(new URL('../', import.meta.url))}, context);",
+            '    register(packagedWeb);');
     }
     return [
         "import {fileURLToPath} from 'node:url';",
-        "import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';",
-        ...imports,
+        "import path from 'node:path';",
+        "import {isSea} from 'node:sea';",
+        "import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';",
         '',
         ...(localAI === undefined ? [] : [
             '// Bundled runtime paths are artifact-root-relative POSIX paths.',
@@ -244,30 +244,62 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         '    ...await readCoreLaunchContext()',
         '};',
         '',
-        ...(modelAssetsSelected ? ['const modelAssets = createModelAssetService({appRoot: context.appRoot});', ''] : []),
+        ...(packagedWeb ? ['let packagedWeb;', ''] : []),
+        'async function createServices(register) {',
+        `    const [${imports.map(function binding(selection) { return selection.binding; }).join(', ')}] = await Promise.all([`,
+        ...imports.map(function importService(selection) { return `        import(${JSON.stringify(selection.specifier)})`; }).map(
+            function separateImport(line, index) { return line + (index < imports.length - 1 ? ',' : ''); }
+        ),
+        '    ]);',
+        ...(modelAssetsSelected ? ['    const modelAssets = createModelAssetService({appRoot: context.appRoot});', '    register(modelAssets);'] : []),
         ...(whisperSelected ? [
-            'const stt = createWhisperRuntime(',
-            '    {',
-            '        runtime: context.runtimes.find(function selectedWhisperRuntime(runtime) {',
-            "            return runtime.id === 'whisper.cpp';",
-            '        }),',
-            "        temporaryDirectory: path.join(context.stateRoot ?? path.join(context.appRoot, '.arcane'), 'speech', 'whisper'),",
-            '        onEvent: context.onEvent',
-            '    }',
-            ');',
-            ''
+            '    const stt = createWhisperRuntime(',
+            '        {',
+            '            runtime: context.runtimes.find(function selectedWhisperRuntime(runtime) {',
+            "                return runtime.id === 'whisper.cpp';",
+            '            }),',
+            "            temporaryDirectory: path.join(context.stateRoot ?? path.join(context.appRoot, '.arcane'), 'speech', 'whisper'),",
+            '            onEvent: context.onEvent',
+            '        }',
+            '    );',
+            '    register(createSpeechService({stt, signal: context.signal}));'
         ] : []),
-        'const host = startCoreHost({',
-        `    application: JSON.parse(${JSON.stringify(JSON.stringify(application))}),`,
-        `    version: ${JSON.stringify(version)},`,
-        `    services: [\n${definitions.join(',\n')}\n    ]`,
-        '});',
+        ...definitions,
+        '}',
+        `const application = JSON.parse(${JSON.stringify(JSON.stringify(application))});`,
+        `const version = ${JSON.stringify(version)};`,
+        'let host;',
+        'if (context.sharedHost === undefined) {',
+        '    const services = [];',
+        '    await createServices(function register(service) { services.push(service); });',
+        '    host = startCoreHost({application, version, services});',
+        "} else if (process.argv.includes('--arcane-core-headless')) {",
+        '    host = await runSharedCoreHost({',
+        '        endpoint: context.sharedHost.endpoint, application, version,',
+        '        configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); },',
+        ...(packagedWeb ? [
+            '        getReplayEvents() {',
+            '            const current = packagedWeb?.current();',
+            "            return current ? [{event: 'core.web.ready', data: current}] : [];",
+            '        }'
+        ] : []),
+        '    });',
+        '} else {',
+        '    host = await startSharedCoreBridge({',
+        '        endpoint: context.sharedHost.endpoint,',
+        '        start: {',
+        '            command: process.execPath,',
+        "            args: [...(isSea() ? [] : [fileURLToPath(import.meta.url)]), ...process.argv.slice(2), '--arcane-core-headless'],",
+        '            logFile: context.sharedHost.logFile',
+        '        }',
+        '    });',
+        '}',
         '',
-        'function closeCore() { host.close(); }',
+        'function closeCore() { host?.close(); }',
         "process.on('SIGINT', closeCore);",
         "process.on('SIGTERM', closeCore);",
         'try {',
-        '    await host.closed;',
+        '    await host?.closed;',
         '} catch (error) {',
         "    console.error('Arcane Core host failed:', error);",
         '    process.exitCode = 1;',

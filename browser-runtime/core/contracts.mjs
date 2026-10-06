@@ -5,7 +5,7 @@ export const CORE_READY_EVENTS=['transport.ready','core.ready'];
 export const CORE_FRAME_CONTRACTS={
     request:{type:'request',fields:['protocol','type','id','method','parameters','sentAt']},
     response:{type:'response',fields:['protocol','type','id','ok'],success:['result'],failure:['error'],optional:['time']},
-    event:{type:'event',fields:['protocol','type','event','data'],optional:['time']},
+    event:{type:'event',fields:['protocol','type','event','data'],optional:['time','requestId']},
     cancel:{type:'control',control:'request.cancel',fields:['protocol','type','control','requestId']},
     cancelAll:{type:'control',control:'requests.cancelAll',fields:['protocol','type','control']},
     replay:{type:'control',control:'runtime.replay',fields:['protocol','type','control']}

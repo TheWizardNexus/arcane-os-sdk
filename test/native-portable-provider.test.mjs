@@ -188,10 +188,10 @@ test('portable assembly preserves complete app and dependency files and authors 
         assert.deepEqual(included, installed);
     }
     const entry = await readFile(path.join(output, 'runtime/arcane-core.mjs'), 'utf8');
-    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';"));
-    assert.ok(entry.includes('import createService0 from "../app/services/dispatch.mjs";'));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes('import("../app/services/dispatch.mjs")'));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
-    assert.ok(entry.includes('await host.closed'));
+    assert.ok(entry.includes('await host?.closed'));
     assert.equal(entry.includes('arcane-os/core/local-ai'), false);
     assert.equal(entry.includes('createLocalAIService'), false);
     await assert.rejects(readdir(path.join(output, 'runtime/local-ai')), {code: 'ENOENT'});
@@ -219,7 +219,7 @@ test('portable Core entry shares explicit launch context without changing author
     ];
     const entry = coreEntrySource(launchApplication, '1.2.3', services);
     assert.ok(entry.includes("import {fileURLToPath} from 'node:url';"));
-    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
     assert.ok(entry.includes([
         'const context = {',
         "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",
@@ -227,11 +227,11 @@ test('portable Core entry shares explicit launch context without changing author
         '};'
     ].join('\n')));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
-    assert.ok(entry.includes('import createService1 from "../app/services/arrival%20notes.mjs";'));
+    assert.ok(entry.includes('import("../app/services/arrival%20notes.mjs")'));
     assert.ok(entry.includes('createService1(JSON.parse("null"), context)'));
     assert.ok(entry.includes('createService2(JSON.parse("{}"), context)'));
-    assert.ok(entry.includes(`application: JSON.parse(${JSON.stringify(JSON.stringify(launchApplication))})`));
-    assert.ok(entry.includes('await host.closed'));
+    assert.ok(entry.includes(`const application = JSON.parse(${JSON.stringify(JSON.stringify(launchApplication))})`));
+    assert.ok(entry.includes('await host?.closed'));
     assert.equal(services[0].options, options);
     assert.equal(services[1].options, null);
     assert.equal(services[2].options, undefined);
@@ -258,7 +258,7 @@ test('portable Core entry composes only selected local AI with relocatable runti
     }];
     const services = [{module: 'services/dispatch.mjs', options}];
     const entry = coreEntrySource(application, '1.2.3', services, {localAI, runtimes});
-    assert.ok(entry.includes("import {createLocalAIService} from 'arcane-os/core/local-ai';"));
+    assert.ok(entry.includes('import("arcane-os/core/local-ai")'));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
     assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), context)`));
     assert.ok(entry.includes("return fileURLToPath(new URL('../' + relative.split('/').map(encodeURIComponent).join('/'), import.meta.url));"));
@@ -284,14 +284,33 @@ test('portable Core entry composes only selected local AI with relocatable runti
 test('portable Core shares one model-assets owner for ONNX and image selections', function selectedModelAssetOwner() {
     for (const selection of [['onnx'], ['stable-diffusion.cpp'], ['onnx', 'stable-diffusion.cpp']]) {
         const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: selection}});
-        assert.equal([...entry.matchAll(/import \{createModelAssetService\}/g)].length, 1);
+        assert.equal([...entry.matchAll(/import\("arcane-os\/core\/model-assets"\)/g)].length, 1);
         assert.equal([...entry.matchAll(/const modelAssets = createModelAssetService\(/g)].length, 1);
-        assert.equal([...entry.matchAll(/^    modelAssets,?$/gm)].length, 1);
+        assert.equal([...entry.matchAll(/^    register\(modelAssets\);$/gm)].length, 1);
         assert.equal(entry.includes('createLocalImageService'), selection.includes('stable-diffusion.cpp'));
         if (selection.includes('stable-diffusion.cpp')) assert.ok(entry.includes('{...context, modelAssets}'));
     }
     const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: ['llama.cpp']}});
     assert.equal(entry.includes('createModelAssetService'), false);
+});
+
+test('portable Core opts into one lazy shared host while retaining default stdio and current packaged origin replay', function sharedCoreEntry() {
+    const entry = coreEntrySource(application, '1.2.3', [{module: 'services/dispatch.mjs', options: {content: '  Complete 🧀\r\n'}}],
+        {packagedWeb: true});
+    assert.ok(entry.includes('async function createServices(register) {'));
+    assert.ok(entry.includes('await Promise.all(['));
+    assert.ok(entry.includes('import("../app/services/dispatch.mjs")'));
+    assert.equal(entry.includes('import createService0 from'), false);
+    assert.ok(entry.includes('if (context.sharedHost === undefined) {'));
+    assert.ok(entry.includes('host = startCoreHost({application, version, services});'));
+    assert.ok(entry.includes("process.argv.includes('--arcane-core-headless')"));
+    assert.ok(entry.includes('host = await runSharedCoreHost({'));
+    assert.ok(entry.includes('configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); }'));
+    assert.ok(entry.includes('host = await startSharedCoreBridge({'));
+    assert.ok(entry.includes('command: process.execPath'));
+    assert.ok(entry.includes('logFile: context.sharedHost.logFile'));
+    assert.ok(entry.includes('const current = packagedWeb?.current();'));
+    assert.ok(entry.includes("return current ? [{event: 'core.web.ready', data: current}] : [];"));
 });
 
 test('portable assembly resolves the shared browser event module from a selected installed SDK alias', async function installedSdkAlias(t) {
