@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.68.0
+
+- Add per-instance theme-switcher `configure({modes,labels})` and initial
+  `data-modes` / `data-system-label` presentation. Applications can select
+  Light / Dark / System with complete readable labels while the default
+  Auto / Light / Dark / Skin choices remain unchanged. Preserve selected,
+  disabled and keyboard-focus states with wrapping based on component space.
+- Distinguish a wholly absent Core namespace from a missing method in a
+  registered service. Retain `METHOD_NOT_ALLOWED` and add exact `method`,
+  `namespace` and `reason` lookup metadata; genuine handler errors remain intact.
+- Let the default preference adapter complete single operations through its
+  existing app-scoped local store only after an exact absent preferences
+  namespace response, retaining cancellation, disposal and full values.
+  An advertised rejected atomic batch is never retried as serial writes.
+- Treat an exactly absent optional appearance namespace as unsupported, keeping
+  the original diagnostic. Preserve partial-service and genuine errors, the
+  existing theme persistence order, native window theming and app-owned host
+  preferences. No OS-wide appearance change, migration or dependency is added.
+
 ## 0.67.0
 
 - Add native Laya FP32 typed decisions through `arcane-os/local-ai/decisions`
