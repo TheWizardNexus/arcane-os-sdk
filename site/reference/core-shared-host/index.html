@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">One application, one shared Core host</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="one-application-one-shared-core-host">One application, one shared Core host</h1><p class="doc-lead">arcane-os/core/host provides a Node local-IPC owner for applications whose native UI and separate MCP process use the same catalog, drafts, review queue, and Git service. The application chooses one endpoint and one set of services. The endpoint is a nonempty local pipe/socket path. The SDK connects to it, optionally starts an explicit headless entry, and keeps client disconnection separate from service shutdown.</p><div class="doc-meta"><span>SDK 0.83.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">One application, one shared Core host</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="one-application-one-shared-core-host">One application, one shared Core host</h1><p class="doc-lead">arcane-os/core/host provides a Node local-IPC owner for applications whose native UI and separate MCP process use the same catalog, drafts, review queue, and Git service. The application chooses one endpoint and one set of services. The endpoint is a nonempty local pipe/socket path. The SDK connects to it, optionally starts an explicit headless entry, and keeps client disconnection separate from service shutdown.</p><div class="doc-meta"><span>SDK 0.84.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="./" aria-current="page">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-shared-host.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#host-entry">Host entry</a><a href="#connect-reuse-or-start-headlessly">Connect, reuse, or start headlessly</a><a href="#correlation-events-and-state">Correlation, events, and state</a><a href="#native-launch-and-platforms">Native launch and platforms</a></nav></details><p><code>arcane-os/core/host</code> provides a Node local-IPC owner for applications whose
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-shared-host.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#attach-to-an-existing-window-owned-core">Attach to an existing window-owned Core</a><a href="#host-entry">Host entry</a><a href="#connect-reuse-or-start-headlessly">Connect, reuse, or start headlessly</a><a href="#correlation-events-and-state">Correlation, events, and state</a><a href="#native-launch-and-platforms">Native launch and platforms</a></nav></details><p><code>arcane-os/core/host</code> provides a Node local-IPC owner for applications whose
 native UI and separate MCP process use the same catalog, drafts, review queue,
 and Git service. The application chooses one endpoint and one set of services.
 The endpoint is a nonempty local pipe/socket path. The SDK connects to it,
@@ -27,6 +27,61 @@ or processes, share preference files, copy a catalog, retry requests, or retain
 event history. Application methods and policy stay in the application services.
 Use the <a href="../mcp-stdio/">MCP server</a> for external MCP framing; local Core continues
 to use the existing <code>arcane/1</code> protocol and Content-Length stream framing.</p>
+<h2 id="attach-to-an-existing-window-owned-core">Attach to an existing window-owned Core</h2>
+<p><code>startCoreListener({runtime,endpoint,onError})</code> adds a local IPC listener to an
+existing Core runtime. It resolves <code>{endpoint,closed,close}</code> after binding the
+selected endpoint. It neither constructs nor starts a runtime or service. The
+existing host retains its application, services, origin, profile, state location
+and shutdown ownership.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {startCoreListener} from &#39;arcane-os/core/host&#39;;
+
+// host is the application&#39;s existing startCoreHost/startCoreStdio handle.
+const listener = await startCoreListener({runtime: host.runtime, endpoint: selectedEndpoint});
+try {
+    await host.closed;
+} finally {
+    await listener.close();
+}
+</code></pre></div>
+<p>An external client uses <code>connectSharedCoreHost({endpoint: selectedEndpoint})</code>
+with <code>start</code> omitted, invokes the application&#39;s existing methods through
+<code>connection.client.invoke(method, parameters)</code>, and calls <code>connection.close()</code>
+when finished. This connection uses the existing SDK framing, correlation and
+current-runtime replay; it does not launch another Core or replay requests.
+The listener does not implement or intercept <code>core.host.shutdown</code>.
+<code>connection.shutdown()</code> therefore has no listener-owned shutdown operation;
+without an application method of that name it returns the ordinary
+<code>METHOD_NOT_ALLOWED</code> error. The window&#39;s host remains the shutdown owner.</p>
+<p>Disconnect and <code>listener.close()</code> cancel only the affected connections&#39;
+request-lifetime work. Explicit listener close drains queued output and releases
+the endpoint without closing the runtime or waiting for accepted service-lifetime
+work; that work remains tracked by its service/runtime owner. When the runtime
+itself begins shutdown, the listener rejects new requests and retains its endpoint
+through runtime drain/disposal, then closes its connections automatically.
+Observe both the host&#39;s <code>closed</code> and the listener&#39;s <code>closed</code> for their respective
+completion or failure. <code>close()</code> is idempotent. Transport errors reach <code>onError</code>
+(complete console diagnostics by default); terminal listener failures reject
+<code>closed</code>. Bind failures reject startup with their actual native error and leave
+the supplied runtime alive. A draining/closed runtime rejects attachment with
+<code>CORE_CLOSING</code>.</p>
+<p>Stdio and each IPC connection have independent request correlation and
+cancellation. Handlers reached through stdio or this listener receive the
+original client ID in <code>context.requestId</code>; <code>context.coreRequestId</code> exposes the
+fresh internal ID used by runtime dispatch and protocol routing. Responses and
+top-level event correlation return to their originating connection. The new listener leaves all event data,
+including any authored <code>data.requestId</code>, and all parameters/results unchanged.
+Its runtime-state snapshot retains the runtime&#39;s internal active IDs. Late events
+from a retired request never attach to a later reuse of that client&#39;s ID.
+Uncorrelated service events remain shared. See the
+<a href="../core-runtime/#state-and-frames">runtime metadata contract</a>.</p>
+<p>For a generated native entry, select
+<code>native.launchContext.coreListener:{endpoint}</code> and omit <code>sharedHost</code>. This adds
+the listener to the ordinary window/stdio runtime; closing the native window
+still drains Core. The endpoint is explicit, with no inferred headless startup
+or new default location. Its parent directory must already exist on platforms
+that require one. Selecting both <code>coreListener</code> and <code>sharedHost</code> reports
+<code>TypeError</code> because they select different runtime lifetimes. See
+<a href="../core-native-packaging/#launch-time-locations">native launch locations</a>.</p>
 <h2 id="host-entry">Host entry</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {runSharedCoreHost} from &#39;arcane-os/core/host&#39;;
 
@@ -108,8 +163,8 @@ and disconnect it. They leave accepted service-lifetime work and the host
 running. <code>closed</code> observes connection termination and rejects on a transport
 error. A subsequent connection uses the still-running owner. Reconnection is
 explicit; failed or uncertain requests are never resubmitted.</p>
-<p><code>await connection.shutdown(invokeOptions)</code> explicitly invokes the host-owned
-<code>core.host.shutdown</code> operation. It drains the shared runtime, returns
+<p>For an owning shared host, <code>await connection.shutdown(invokeOptions)</code> explicitly
+invokes the host-owned <code>core.host.shutdown</code> operation. It drains the shared runtime, returns
 <code>{state:&#39;closed&#39;}</code> after successful service cleanup, then closes the connection.
 A drain failure returns the full Core error. Shutdown affects <strong>all</strong> clients
 of that app endpoint and belongs to the application owner&#39;s explicit lifecycle,
@@ -117,8 +172,8 @@ not ordinary UI/MCP cleanup. The host reserves this one method; application
 services should use their own namespaces. Cancelling the caller&#39;s invoke wait
 after shutdown acceptance does not undo the shared shutdown.</p>
 <h2 id="correlation-events-and-state">Correlation, events, and state</h2>
-<p>Each connection has its own request-ID space. The transport substitutes an
-internal Core request ID and restores the originating ID on responses and
+<p>Each connection has its own request-ID space. The owning shared-host adapter
+substitutes an internal Core request ID and restores the originating ID on responses and
 the optional top-level event <code>requestId</code>. Existing <code>data.requestId</code> values that
 carry that same Core correlation ID are restored too. <code>parameters</code>, returned results, schemas,
 documents, and content remain complete and unchanged. A handler&#39;s
@@ -134,10 +189,10 @@ connection&#39;s IDs; other connections&#39; active requests retain Core-side ID
 <code>request.cancel</code> and <code>requests.cancelAll</code> affect only the sending connection&#39;s
 requests. A disconnect performs the same scoped cancellation. The underlying
 runtime continues to preserve service-lifetime acceptance.</p>
-<p><code>runtime.replay</code> sends only that connection the current <code>core.ready</code>,
-<code>core.state</code>, and <code>core.service.state</code> snapshot. Optional synchronous
-<code>getReplayEvents()</code> returns current <code>{event,data}</code> records from their actual
-service owners. It is for current domain state, not historical chunks or
+<p>Both listener forms handle <code>runtime.replay</code> by sending only that connection the
+current <code>core.ready</code>, <code>core.state</code>, and <code>core.service.state</code> snapshot. Optional
+synchronous <code>getReplayEvents()</code> on the owning shared host returns current
+<code>{event,data}</code> records from their actual service owners. It is for current domain state, not historical chunks or
 retired requests. Subscribe before requesting a domain snapshot when its live
 events may change; applications own those domain methods and state.</p>
 <h2 id="native-launch-and-platforms">Native launch and platforms</h2>
@@ -212,9 +267,9 @@ services and <code>arcane/1</code> client semantics remain the shared boundary.<
 execution on a particular platform. Applications adopt it through the published
 SDK and their corresponding native package build, not by copying this source.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#host-entry">Host entry</a><a href="#connect-reuse-or-start-headlessly">Connect, reuse, or start headlessly</a><a href="#correlation-events-and-state">Correlation, events, and state</a><a href="#native-launch-and-platforms">Native launch and platforms</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#attach-to-an-existing-window-owned-core">Attach to an existing window-owned Core</a><a href="#host-entry">Host entry</a><a href="#connect-reuse-or-start-headlessly">Connect, reuse, or start headlessly</a><a href="#correlation-events-and-state">Correlation, events, and state</a><a href="#native-launch-and-platforms">Native launch and platforms</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.83.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.84.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

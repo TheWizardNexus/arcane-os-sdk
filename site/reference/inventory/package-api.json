@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.83.1",
+  "sdkVersion": "0.84.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 302,
+  "memberCount": 303,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -4374,7 +4374,7 @@
       "summary": "Creates an app-neutral Core dispatcher with explicit services, request lifetimes, events and graceful drain.",
       "availability": "Node on Windows, Linux and macOS native hosts; Android requires its host adaptation",
       "protocol": "arcane/1 dispatcher and service lifecycle",
-      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order. Missing dispatch retains METHOD_NOT_ALLOWED with exact method/namespace and core-namespace-unavailable or core-method-unavailable; named services, registered methods and built-in namespaces establish presence. Handler/startup/permission errors remain unchanged."
+      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. runtime.handle(frame,{contextRequestId}) optionally sets handler requestId while coreRequestId remains frame.id; omitted metadata exposes both equal. Internal IDs continue to own cancellation/state/event envelopes and payloads remain unchanged. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order. Missing dispatch retains METHOD_NOT_ALLOWED with exact method/namespace and core-namespace-unavailable or core-method-unavailable; named services, registered methods and built-in namespaces establish presence. Handler/startup/permission errors remain unchanged."
     },
     {
       "id": "core-stdio:encodeCoreFrame",
@@ -4416,7 +4416,7 @@
       "summary": "Attaches an existing Core runtime to framed input and output with concurrent dispatch and graceful shutdown.",
       "availability": "Node with readable input and writable output streams",
       "protocol": "Content-Length framed arcane/1 stdio",
-      "normalization": "Returns {runtime,closed,close}; preserves queued output order, reports parser and stream failures, drains accepted runtime work on EOF and never exits the host or ends caller-owned output"
+      "normalization": "Returns {runtime,closed,close}; scopes responses/request events, cancellation and current-state replay to its connection, preserving original service-facing requestId and complete payloads while routing unique internal IDs. Preserves queued output order, reports parser and stream failures, drains accepted runtime work on EOF and never exits the host or ends caller-owned output"
     },
     {
       "id": "native-portable-provider:createPortableNativeProvider",
@@ -4598,7 +4598,7 @@
       "summary": "Resolves matching per-app native state, workspace and optional shared endpoint defaults for packaged UI and external MCP.",
       "availability": "Node native locations on Windows/Linux/macOS; Android and other hosts supply stateRoot and native adaptation",
       "protocol": "Pure native launch-context resolution and existing local IPC",
-      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned."
+      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. Optional coreListener:{endpoint} is preserved without endpoint defaults and attaches to that same window-owned runtime in the generated entry; selecting it together with sharedHost reports TypeError there. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned."
     },
     {
       "id": "core-host:readCoreLaunchContext",
@@ -4629,6 +4629,20 @@
       "normalization": "Returns the existing {runtime,closed,close} transport owner; an optional abort signal invokes the same idempotent drain without killing the process, replacing service readiness or cancelling accepted service-lifetime work"
     },
     {
+      "id": "core-host:startCoreListener",
+      "name": "startCoreListener",
+      "displayName": "startCoreListener()",
+      "kind": "function",
+      "signature": "startCoreListener({runtime,endpoint,onError}={})",
+      "entrypoints": ["arcane-os/core/host"],
+      "primaryImport": "arcane-os/core/host",
+      "group": "Shared Core host",
+      "summary": "Attaches local IPC to an existing window-owned Core runtime without changing its services or lifetime.",
+      "availability": "Node named pipes on Windows and Unix-domain sockets on Linux/macOS; Android requires its host adaptation",
+      "protocol": "arcane/1 over local IPC with per-connection correlation, cancellation and current-state replay",
+      "normalization": "Returns {endpoint,closed,close}; never constructs, starts or closes the supplied runtime. Explicit close flushes queued output and disconnects its clients while accepted service work remains runtime-owned. Runtime shutdown retains the endpoint through service drain then closes the listener. Preserves parameters/results/event data, original handler requestId and internal coreRequestId; no host shutdown RPC. Bind errors reject startup; transport errors reach onError and terminal errors reject closed. Native launchContext.coreListener:{endpoint} selects the existing stdio branch; no sharedHost/headless selection or inferred endpoint."
+    },
+    {
       "id": "core-host:startSharedCoreHost",
       "name": "startSharedCoreHost",
       "displayName": "startSharedCoreHost()",
@@ -4654,7 +4668,7 @@
       "summary": "Connects to one selected host and optionally starts an explicit headless entry when absent.",
       "availability": "Node local IPC and optional explicit child process with diagnostic file",
       "protocol": "arcane/1 Core client; optional Node startup IPC handshake",
-      "normalization": "Returns {client,endpoint,closed,close,shutdown}. Only ENOENT/ECONNREFUSED selects start {command,args,cwd,env,logFile}; no request retry. Close cancels this connection's request work while preserving the host and accepted service work. Explicit shutdown drains all clients' shared host; cancelling a launch wait does not kill the host"
+      "normalization": "Returns {client,endpoint,closed,close,shutdown}. Only ENOENT/ECONNREFUSED selects start {command,args,cwd,env,logFile}; no request retry. Close cancels this connection's request work while preserving the host and accepted service work. Explicit shutdown drains an owning shared host for all clients; cancelling a launch wait does not kill the host. Connect to startCoreListener with start omitted; that borrowed listener implements no core.host.shutdown operation and its runtime owner retains shutdown."
     },
     {
       "id": "core-host:runSharedCoreHost",
