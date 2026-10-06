@@ -94,9 +94,14 @@ async function advertisedCUDA(t) {
     assert.equal(loaded.execution.attempts[0].status, 'configured');
     assert.equal(loaded.execution.fallback, false);
     assert.deepEqual(runtime.current().sessions[0].execution, loaded.execution);
-    const unloaded = await runtime.unload(
+    assert.equal(runtime.current().sessions[0].stopping, false);
+    const unloading = runtime.unload(
         {id: loaded.id}
     );
+    assert.equal(runtime.current().sessions[0].stopping, true);
+    assert.equal(runtime.current().sessions[0].loaded, true);
+    assert.equal(runtime.current().sessions[0].exited, false);
+    const unloaded = await unloading;
     assert.equal(unloaded.loaded, false);
     assert.equal(runtime.current().sessions[0].exited, true);
 }

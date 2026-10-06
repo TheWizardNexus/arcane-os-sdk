@@ -95,7 +95,7 @@ export function createONNXRuntime({modulePath,onEvent,signal}={}){
 
     function current(){
         return {sessions:[...sessions.values()].map(function sessionState(entry){
-            return {...structuredClone(entry.state), exited:entry.exited};
+            return {...structuredClone(entry.state), stopping:entry.stopping, exited:entry.exited};
         }),closed};
     }
 

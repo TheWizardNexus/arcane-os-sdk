@@ -176,7 +176,9 @@ export function createNativeDecisionModel({
             entry.unsubscribe = onnx.subscribe(function nativeStateChanged(snapshot) {
                 if (activation !== entry || entry.controller.signal.aborted) return;
                 const selected = snapshot.sessions.find(function sameSession(value) { return value.id === entry.id; });
-                if (snapshot.closed || !selected?.loaded || ['unloading', 'unloaded', 'error'].includes(selected.state)) {
+                // A failed run may leave ONNX loaded and its queued runs usable.
+                // Stopping revokes readiness before physical residency ends.
+                if (snapshot.closed || selected?.stopping || !selected?.loaded || ['unloading', 'unloaded'].includes(selected.state)) {
                     const error = selected?.error ? new CoreError(selected.error) : cancellation('The native ONNX session was retired.');
                     stop(entry, error, selected?.error ? 'error' : 'unloaded').catch(reportCleanupFailure);
                 }

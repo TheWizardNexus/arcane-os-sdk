@@ -92,7 +92,7 @@ function pendingOperation(task, signal) {
     });
 }
 
-function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runGate, exitGate} = {}) {
+function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runError, runGate, exitGate} = {}) {
     const sessions = new Map();
     const listeners = new Set();
     const calls = {load: [], run: [], unload: []};
@@ -100,6 +100,13 @@ function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runGate, ex
     const unloadStarted = deferred();
     function current() { return {closed: false, sessions: [...sessions.values()]}; }
     function publish() { for (const listener of listeners) listener(current()); }
+    function failWorker(error) {
+        const session = sessions.get(calls.load[0].id);
+        session.stopping = true;
+        session.state = 'error';
+        session.error = error;
+        publish();
+    }
     const owner = {
         current,
         subscribe(listener) {
@@ -111,23 +118,37 @@ function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runGate, ex
             calls.load.push(options);
             options.signal.throwIfAborted();
             if (loadError) throw loadError;
-            const session = {id: options.id, model: options.model, loaded: true, state: 'ready', error: null, exited: false};
+            const session = {id: options.id, model: options.model, loaded: true, state: 'ready', error: null, stopping: false, exited: false};
             sessions.set(options.id, session);
             publish();
             return session;
         },
         async run(options) {
             calls.run.push(options);
+            const error = calls.run.length === 1 ? runError : undefined;
             options.signal.throwIfAborted();
             runStarted.resolve(options);
             if (runGate) await pendingOperation(runGate.promise, options.signal);
             options.signal.throwIfAborted();
+            const session = sessions.get(options.id);
+            if (error) {
+                session.state = 'error';
+                session.error = error;
+                publish();
+                throw error;
+            }
+            if (session.state === 'error') {
+                session.state = 'ready';
+                session.error = null;
+                publish();
+            }
             return outputs;
         },
         async unload(options) {
             calls.unload.push(options);
             const session = sessions.get(options.id);
             assert.ok(session, 'Only an actually created session may be unloaded.');
+            session.stopping = true;
             session.state = 'unloading';
             publish();
             unloadStarted.resolve(options);
@@ -141,7 +162,7 @@ function fakeONNX({outputs = graphOutputs(), loadError, unloadError, runGate, ex
             return session;
         }
     };
-    return {owner, calls, outputs, runStarted, unloadStarted};
+    return {owner, calls, outputs, runStarted, unloadStarted, failWorker};
 }
 
 function fakeAssets(files) {
@@ -418,6 +439,111 @@ test('ordinary row errors keep the tokenizer and native activation usable', asyn
     assert.equal(native.calls.load.length, 1);
     assert.equal(native.calls.run.length, 1);
 });
+
+test(
+    'a recoverable ONNX run error preserves its original error, sibling jobs and the loaded activation',
+    async function recoverableNativeRunError(t) {
+        const files = await fixture(t);
+        const runGate = files.gate();
+        const error = new Error('The moon graph rejected this row.\nComplete native run diagnostic: 雪 🐙.');
+        error.code = 'FIXTURE_ROW_REJECTED';
+        error.details = {state: originalState, question: rows[0].question};
+        const native = fakeONNX(
+            {runError: error, runGate}
+        );
+        const model = files.own(
+            createNativeDecisionModel(
+                {onnx: native.owner, paths: files.paths}
+            )
+        );
+        const snapshots = [];
+        const stop = model.subscribe(
+            function observeRecoverableError(snapshot) {
+                snapshots.push(snapshot);
+            }
+        );
+        await model.load();
+        const evaluating = model.evaluate(rows);
+        const rejected = assert.rejects(
+            evaluating,
+            function preserveOriginalRunError(value) {
+                assert.equal(value, error);
+                assert.equal(value.message, error.message);
+                assert.equal(value.details.state, originalState);
+                return true;
+            }
+        );
+        await native.runStarted.promise;
+        const sibling = model.evaluate(rows);
+        assert.equal(model.current().activeRequests, 2);
+        const completed = Promise.all(
+            [rejected, sibling]
+        );
+        runGate.resolve();
+        const [, result] = await completed;
+        assert.equal(result.outputs, native.outputs);
+        assert.equal(result.decisions[0].row, rows[0]);
+        assert.equal(native.calls.load.length, 1);
+        assert.equal(native.calls.unload.length, 0);
+        assert.equal(native.calls.load[0].signal.aborted, false);
+        assert.equal(native.owner.current().sessions[0].stopping, false);
+        assert.equal(model.current().loaded, true);
+        assert.equal(model.current().state, 'ready');
+        assert.equal(model.current().activeRequests, 0);
+        const failedRow = snapshots.find(
+            function completeLoadedRunFailure(snapshot) {
+                return snapshot.loaded && snapshot.error?.message === error.message;
+            }
+        );
+        assert.ok(failedRow);
+        assert.deepEqual(failedRow.error.details, error.details);
+        const later = await model.evaluate(rows);
+        assert.equal(later.outputs, native.outputs);
+        assert.equal(native.calls.run.length, 3);
+        assert.equal(native.calls.load.length, 1);
+        assert.equal(native.calls.unload.length, 0);
+        stop();
+    }
+);
+
+test(
+    'terminal ONNX stopping revokes readiness while retaining physically loaded files until exit',
+    async function terminalNativeStopping(t) {
+        const files = await fixture(t);
+        const exitGate = files.gate();
+        const native = fakeONNX(
+            {exitGate}
+        );
+        const assets = fakeAssets(files);
+        const model = files.own(
+            createNativeDecisionModel(
+                {onnx: native.owner, modelAssets: assets.owner, workingDirectory: 'model-working'}
+            )
+        );
+        await model.load();
+        const error = new Error('The native worker failed.\nComplete terminal diagnostic.');
+        error.code = 'FIXTURE_WORKER_FAILED';
+        native.failWorker(error);
+        assert.equal(model.current().loaded, false);
+        assert.equal(model.current().state, 'unloading');
+        assert.equal(model.current().error.message, error.message);
+        assert.equal(model.current().error.code, error.code);
+        assert.equal(native.owner.current().sessions[0].stopping, true);
+        assert.equal(native.owner.current().sessions[0].loaded, true);
+        assert.equal(native.owner.current().sessions[0].exited, false);
+        await native.unloadStarted.promise;
+        assert.equal(assets.calls.releaseRetain.length, 0);
+        assert.equal(assets.records.get(native.calls.load[0].id).retained, true);
+        const released = model.unload();
+        exitGate.resolve();
+        await released;
+        assert.equal(native.owner.current().sessions[0].exited, true);
+        assert.equal(native.owner.current().sessions[0].loaded, false);
+        assert.equal(assets.calls.releaseRetain.length, 1);
+        assert.equal(model.current().state, 'error');
+        assert.equal(model.current().error.message, error.message);
+    }
+);
 
 test('terminal tokenizer initialization failure is observable and retires native ownership', async function terminalTokenizerFailure(t) {
     const files = await fixture(t, {invalidTokenizer: true});

@@ -166,7 +166,9 @@ exit. A rejected load, inference or termination request alone does not permit
 file deletion. Cleanup joins active operations and native output delivery,
 preserves cleanup errors, then releases only its working projection. It never
 deletes supplied `paths`. A failed ordinary row does not destroy a healthy
-loaded session; terminal Worker failure retires its activation. Cancelled or
+loaded session or cancel sibling evaluations. The ONNX owner's `stopping:true`
+retires decision readiness immediately on terminal Worker failure or shutdown,
+even while its physical `loaded` state remains true pending actual exit. Cancelled or
 retired operations cannot return a successful late result.
 
 Shared Node/Worker/filesystem code is portable across Windows, Linux and macOS;

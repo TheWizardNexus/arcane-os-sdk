@@ -392,6 +392,10 @@ record contains `id`, `model`, `state`, `loaded`, `error`, input/output names an
 metadata. A live ID requires explicit unload before replacement. An ID may be
 loaded again once its previous worker exits after a failed load or unload.
 A run error retains the loaded session so a corrected request can use it.
+`current().sessions[].stopping` becomes `true` when terminal shutdown begins,
+including worker failure or explicit cancellation/unload. The session is then
+unavailable for new runs even while `loaded` remains `true` until actual exit.
+A recoverable run error keeps `stopping:false` and the loaded session usable.
 `current().sessions[].exited` reports actual worker exit, independently of a
 rejected load or inference. Unload joins worker exit and output delivery even
 when requesting termination fails; complete cleanup errors remain observable.
