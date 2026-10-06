@@ -216,7 +216,7 @@ export function createONNXRuntime({modulePath,onEvent,signal,executionDevices:su
         operationSignal.throwIfAborted();
         if (entry.stopping || entry.exited || entry.active !== operation) return;
         operation.payload = {...operation.payload, targetResolution, deviceInventory};
-        entry.state.execution = {...entry.state.execution, ...targetResolution};
+        entry.state.execution = {...entry.state.execution, ...targetResolution, deviceInventory: deviceInventory ?? null};
         publish(entry);
         postOperation(entry, operation);
     }
@@ -348,7 +348,7 @@ export function createONNXRuntime({modulePath,onEvent,signal,executionDevices:su
             state:{id,model,state:'loading',loaded:false,error:null,inputNames:[],outputNames:[],inputMetadata:[],outputMetadata:[],
                 execution: {requestedTarget: executionTarget ?? null, resolvedDevice: null,
                     resolution: executionTarget === undefined || executionTarget === null ? 'automatic' : null,
-                    reason: 'session-loading', configuredTarget: null, observedTarget: null}},
+                    reason: 'session-loading', configuredTarget: null, observedTarget: null, deviceInventory: null}},
             controller: new AbortController(), preparation: null,
             worker:null,active:null,queue:[],stopping:false,exited:false,stopTask:null,terminalError:null,releaseError:null,terminationRequested:false,outputTasks:[]
         };
@@ -356,7 +356,7 @@ export function createONNXRuntime({modulePath,onEvent,signal,executionDevices:su
         sessions.set(id,entry);
         try{
             entry.worker=new Worker(new URL('./onnx-worker.mjs',import.meta.url),{
-                workerData:{modulePath},stdout:true,stderr:true
+                workerData:{modulePath,sessionId:id,model},stdout:true,stderr:true
             });
             entry.outputTasks.push(
                 captureOutput(entry,entry.worker.stdout,'local-ai.onnx.stdout'),

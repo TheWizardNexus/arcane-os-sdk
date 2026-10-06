@@ -1,11 +1,13 @@
 import {parentPort,workerData} from 'node:worker_threads';
 import {pathToFileURL} from 'node:url';
 import Is from 'strong-type';
+import {encodeTensorMap,encodeTensorFetches} from '../../browser-runtime/ai/onnx-tensors.mjs';
 
 const is=new Is(false);
 const imported=await import(pathToFileURL(workerData.modulePath).href);
 const ort=imported.default??imported;
 let session;
+let sessionExecution;
 
 function describeError(error){
     if(!(error instanceof Error))return {name:'Error',message:String(error),cause:error};
@@ -27,6 +29,7 @@ async function createSession(request) {
         resolution: 'automatic',
         reason: selectProviders ? 'engine-default-required' : 'caller-session-options',
         ...request.targetResolution,
+        deviceInventory: request.deviceInventory ?? null,
         configuredTarget: null,
         observedTarget: null,
         supportedBackends: [],
@@ -225,28 +228,35 @@ function tensorMap(records,inputs=false){
 }
 
 async function handleRequest(request){
+    let runStage;
+    let feeds;
+    let fetches;
     try{
         let result;
         if(request.operation==='load'){
-            const execution = await createSession(request);
+            sessionExecution = await createSession(request);
             result={
                 inputNames:session.inputNames,
                 outputNames:session.outputNames,
                 inputMetadata:session.inputMetadata,
                 outputMetadata:session.outputMetadata
             };
-            if (execution) result.execution = execution;
+            if (sessionExecution) result.execution = sessionExecution;
         }else if(request.operation==='run'){
-            const feeds=tensorMap(request.feeds,true);
-            const fetches=request.fetches===undefined||request.fetches===null||is.array(request.fetches)
+            runStage='feed-conversion';
+            feeds=tensorMap(request.feeds,true);
+            runStage='fetch-conversion';
+            fetches=request.fetches===undefined||request.fetches===null||is.array(request.fetches)
                 ?request.fetches:tensorMap(request.fetches);
             // ORT treats an empty fetch map as its options overload and would
             // ignore the third argument. Both forms select every output.
             const allOutputs=fetches===undefined
                 ||(fetches!==null&&!is.array(fetches)&&Object.keys(fetches).length===0);
+            runStage='session.run';
             const outputs=allOutputs
                 ?await session.run(feeds,request.runOptions)
                 :await session.run(feeds,fetches,request.runOptions);
+            runStage='output-conversion';
             result=Object.fromEntries(Object.entries(outputs).map(function tensorRecord([name,tensor]){
                 return [name,{type:tensor.type,data:tensor.data,dims:tensor.dims}];
             }));
@@ -258,9 +268,33 @@ async function handleRequest(request){
         }
         // Structured cloning retains typed tensors and BigInt without taking
         // ownership of the caller's buffers or converting their contents.
+        if(request.operation==='run')runStage='result-delivery';
         parentPort.postMessage({requestId:request.requestId,operation:request.operation,result});
     }catch(error){
-        parentPort.postMessage({requestId:request.requestId,operation:request.operation,error:describeError(error)});
+        const record=describeError(error);
+        if(request.operation==='run'){
+            const diagnostic={
+                sessionId:workerData.sessionId,requestId:request.requestId,stage:runStage,
+                model:workerData.model,runtimeModulePath:workerData.modulePath,
+                execution:sessionExecution??null,runOptions:request.runOptions,
+                feedsSource:feeds===undefined?'request':'converted',
+                fetchesSource:runStage==='feed-conversion'||runStage==='fetch-conversion'?'request':'converted'
+            };
+            record.onnxRun=diagnostic;
+            try{
+                diagnostic.inputNames=session?.inputNames??null;
+                diagnostic.inputMetadata=session?.inputMetadata??null;
+                diagnostic.outputNames=session?.outputNames??null;
+                diagnostic.outputMetadata=session?.outputMetadata??null;
+                // Copy complete tensors only after failure. The same codec used
+                // by Core tensor transport preserves BigInt and typed values.
+                diagnostic.feeds=encodeTensorMap(feeds===undefined?request.feeds:feeds);
+                diagnostic.fetches=encodeTensorFetches(diagnostic.fetchesSource==='request'?request.fetches:fetches);
+            }catch(diagnosticError){
+                diagnostic.diagnosticError=describeError(diagnosticError);
+            }
+        }
+        parentPort.postMessage({requestId:request.requestId,operation:request.operation,error:record});
     }finally{
         if(request.operation==='unload')parentPort.close();
     }

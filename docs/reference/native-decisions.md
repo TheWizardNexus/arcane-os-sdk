@@ -336,6 +336,18 @@ progress includes model preparation, tokenization and evaluation; downloaded
 members report files, not byte progress. Complete technical errors belong in
 developer diagnostics, while the application owns its user-facing status.
 
+An ONNX run failure reaches the rejected evaluation and retained `error` in
+`current()`, `decisions.status`, and `decisions.state`, including the complete
+[`error.onnxRun` diagnostic](local-ai.md#native-onnx-sessions). This identifies
+the actual session, request, failure stage, model path, provider execution
+record, graph metadata and complete encoded feed tensors with their dimensions.
+The activation's `execution.execution.deviceInventory` retains the complete
+inventory consumed during its load, or `null` when that path did not gather one.
+Neither observation starts another hardware query or changes model execution.
+Retain these complete records in the selected developer inspection surface;
+ordinary user status remains application-owned. A retained error identifies
+that failed request and does not by itself establish that a later request failed.
+
 Concurrent callers selecting the same family, model, revision, dtype, source,
 mapping and target share one explicit activation.
 Cancelling a load or evaluation cancels that activation and its outstanding operations, because the

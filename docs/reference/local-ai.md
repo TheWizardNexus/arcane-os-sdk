@@ -420,9 +420,13 @@ unchanged, including on the final CPU attempt.
 Every loaded session includes an `execution` record in its ordinary state
 events: `preference`, `requestedTarget`, `resolvedDevice`, `resolution`,
 `reason`, `configuredTarget`, `observedTarget`, complete `supportedBackends`,
-`selectedProviders`, ordered `attempts` with their full errors, `fallback`, and
-`discoveryError`. Each attempt records provider names in `executionProviders`,
-its requested `configuredTarget`, `status` (`configured` or `failed`), and
+`selectedProviders`, ordered `attempts` with their full errors, `fallback`,
+`discoveryError`, and `deviceInventory`. The inventory retains the complete
+`{platform,state,devices,issues}` already obtained for that load's automatic
+physical selection. It is `null` when that load did not gather an inventory;
+retaining it performs no additional discovery. Each attempt records provider
+names in `executionProviders`, its requested `configuredTarget`, `status`
+(`configured` or `failed`), and
 `error`. The accepted top-level `configuredTarget` is
 `{source,executionProviders}`; it retains the complete provider options,
 including native numeric `deviceId` values. Its `source` is `cpu-default`,
@@ -530,6 +534,23 @@ no token streaming in the generic tensor operation.
 String input containing U+0000 reports an incompatibility at the native tensor
 boundary: the Node binding uses null-terminated strings and cannot preserve
 that input completely. The SDK does not alter the supplied string.
+
+A failed run preserves the original error, stack, cause and additional fields,
+and adds the developer diagnostic `error.onnxRun`. It contains `sessionId`,
+`requestId`, `stage`, the original `model` path and `runtimeModulePath`, the
+session's complete `execution` record, `runOptions`, and input/output names and
+metadata. `stage` distinguishes `feed-conversion`, `fetch-conversion`,
+`session.run`, `output-conversion`, and `result-delivery`. `feeds` and `fetches`
+retain complete tensor types, dimensions and data through the existing Core tensor encoding;
+omitted options remain omitted at the JSON boundary. `feedsSource` and
+`fetchesSource` identify `request` records when conversion did not complete,
+or `converted` values prepared for `session.run`. No partial converted map is
+presented as the complete input. The actual input tensors are preserved without changes
+to inference, and successful runs create no diagnostic tensor copy. If building
+this diagnostic fails, its complete `diagnosticError` accompanies the fields
+obtained before that failure; the original run error remains the failure.
+Session metadata and feeds describe graph inputs, not internal node tensors
+that the native runtime has not reported.
 
 `current()` returns `{sessions,closed}`. `subscribe(listener)` replays current
 state synchronously and returns an unsubscribe function. Load, readiness,
