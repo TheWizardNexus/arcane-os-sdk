@@ -42,13 +42,16 @@ try {
     // Native loading takes its own retain handle before using these files.
     await projection.release();
 }
-const result = await image.generate({
-    model: 'sd14',
-    prompt: 'A dignified raccoon who has been put in charge of the moon.',
-    signal
-});
-// Display or save the complete returned image through the application owner.
-await image.unload();
+try {
+    const result = await image.generate({
+        model: 'sd14',
+        prompt: 'A dignified raccoon who has been put in charge of the moon.',
+        signal
+    });
+    // Display or save the complete returned image through the application owner.
+} finally {
+    await image.unload();
+}
 ```
 
 This example assumes that the application selected the `sd14` model and its
