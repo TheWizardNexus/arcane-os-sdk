@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.86.0
+
+- Add fixed `Tab`, `Shift+Tab`, `Enter` and `Space` key operations to
+  `connectAppControl` and the public `arcane app-control key` command. Each
+  request sends an ordered press/release pair to the selected WebView's current
+  focus without desktop activation or global input. Preserve complete phase
+  outcomes, original errors and observation of a dispatched release after
+  cancellation or navigation; never replay an ambiguous action.
+- Add `resize` to the same client and CLI for a Normal window's native client
+  dimensions. Return actual previous and resulting dimensions plus the observed
+  CSS viewport; restoration is an explicit second request. Preserve window
+  state, position, profile, origin and zoom, and report minimized or maximized
+  state without changing it.
+- Include viewport, document focus and accessible open-shadow focus-path
+  observations in inspection. These are DOM/native observations, not proof of
+  an application action or completed asynchronous handler. The matching Windows
+  host asset is required for the new operations; existing consumer artifacts
+  must adopt the public package and rebuild through their owning workflow.
+
 ## 0.85.0
 
 - Add `createModelObservationService({runtime, localAI, image, decisions})`
