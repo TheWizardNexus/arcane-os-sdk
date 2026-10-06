@@ -388,6 +388,22 @@ function createWorkerFixture(context) {
             );
         }
 
+        waitForLoad() {
+            const worker = this;
+            return new Promise(function observeLoad(resolve) {
+                function loadPosted() {
+                    const request = worker.messages.find(function isLoad(message) {
+                        return message.op === 'load';
+                    });
+                    if (!request) return;
+                    worker.removeEventListener('fixture-posted', loadPosted);
+                    resolve(request);
+                }
+                worker.addEventListener('fixture-posted', loadPosted);
+                loadPosted();
+            });
+        }
+
         waitForEvaluation(count = 1) {
             const worker = this;
             return new Promise(
@@ -425,9 +441,9 @@ function createWorkerFixture(context) {
             }
         }
     );
-    function createClient(family = 'laya', store = null) {
+    function createClient(family = 'laya', store = null, configuration = {}) {
         const client = createBrowserDecisionModel(
-            {family, model: `fixture/${family}`, store}
+            {family, model: `fixture/${family}`, ...configuration, store}
         );
         clients.push(client);
         return client;
@@ -441,6 +457,274 @@ function finishFixtureLoad(worker) {
     );
 }
 
+function createRuntimeUrlFixture(context, workers) {
+    const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    const created = [];
+    const revoked = [];
+    Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: function createFixtureRuntimeUrl(blob) {
+            const url = `blob:https://runtime.example.test/decision-${created.length + 1}`;
+            created.push({url, blob});
+            return url;
+        }
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: function revokeFixtureRuntimeUrl(url) {
+            const worker = workers.find(function ownsRuntime(candidate) {
+                return candidate.messages.some(function selectedRuntime(message) {
+                    return message.payload?.runtime?.moduleUrl === url;
+                });
+            }) ?? workers.at(-1);
+            revoked.push({url, terminated: worker.terminated});
+        }
+    });
+    context.after(function restoreRuntimeUrlFixture() {
+        if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate);
+        else delete URL.createObjectURL;
+        if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke);
+        else delete URL.revokeObjectURL;
+    });
+    return {created, revoked};
+}
+
+function storedRuntimeResponse() {
+    return {
+        file: new Blob([RUNTIME_FIXTURE_SOURCE], {type: 'application/octet-stream'}),
+        status: 200,
+        statusText: 'OK',
+        headers: [['content-type', 'application/octet-stream']],
+        url: 'https://runtime.example.test/transformers.js',
+        redirected: false
+    };
+}
+
+test('stored runtime entry is lazy, complete and reused through its original URL across activations', async function storedRuntimeEntry(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    const sourceUrl = 'https://runtime.example.test/transformers.js';
+    const requests = [];
+    const saved = new Map();
+    const response = storedRuntimeResponse();
+    let downloads = 0;
+    const store = {
+        async fetchResource(input, {signal, onProgress}) {
+            assert.equal(signal.aborted, false);
+            requests.push(input);
+            const cached = saved.has(input);
+            if (!cached) {
+                downloads += 1;
+                saved.set(input, response);
+            }
+            onProgress({phase: 'download', completed: 1, total: 1, unit: 'shards', url: input, cached});
+            return saved.get(input);
+        }
+    };
+    const runtime = {moduleUrl: sourceUrl, wasmPaths: 'https://runtime.example.test/onnx/'};
+    const client = fixture.createClient('laya', store, {runtime});
+    const progress = [];
+    client.subscribe(function observeStoredProgress(state) {
+        if (state.progress?.phase === 'download') progress.push(state.progress);
+    });
+    assert.deepEqual(requests, []);
+    assert.deepEqual(urls.created, []);
+    assert.equal(fixture.workers.length, 0);
+    for (let activation = 0; activation < 2; activation += 1) {
+        const loading = client.load();
+        const sharedLoad = client.load();
+        const worker = fixture.workers[activation];
+        const request = await worker.waitForLoad();
+        const materialized = urls.created[activation];
+        assert.equal(request.payload.runtime.moduleUrl, materialized.url);
+        assert.equal(request.payload.runtime.wasmPaths, runtime.wasmPaths);
+        assert.equal(request.storedResources, true);
+        assert.equal(Object.hasOwn(request.payload, 'store'), false);
+        assert.equal(materialized.blob.type, 'text/javascript');
+        assert.equal(await materialized.blob.text(), RUNTIME_FIXTURE_SOURCE);
+        assert.equal(urls.revoked.length, activation);
+        finishFixtureLoad(worker);
+        await Promise.all([loading, sharedLoad]);
+        assert.equal(client.status().loaded, true);
+        if (activation === 0) client.unload();
+        else client.dispose();
+        assert.equal(worker.terminated, true);
+        assert.deepEqual(urls.revoked[activation], {url: materialized.url, terminated: true});
+    }
+    assert.deepEqual(requests, [sourceUrl, sourceUrl]);
+    assert.equal(downloads, 1);
+    assert.deepEqual(progress.map(function cacheState(item) { return item.cached; }), [false, true]);
+    assert.equal(runtime.moduleUrl, sourceUrl);
+    assert.notEqual(urls.created[0].url, urls.created[1].url);
+});
+
+test('cancelling runtime preparation joins storage cleanup and never materializes a late result', async function cancelRuntimeEntry(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    for (const result of ['reject', 'resolve']) {
+        let started;
+        let finish;
+        const downloading = new Promise(function observeStart(resolve) { started = resolve; });
+        const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+        let storeSignal;
+        const store = {
+            async fetchResource(input, {signal}) {
+                storeSignal = signal;
+                started();
+                await cleanup;
+                if (result === 'reject') throw signal.reason;
+                return storedRuntimeResponse();
+            }
+        };
+        const client = fixture.createClient('laya', store);
+        const controller = new AbortController();
+        let settled = false;
+        const outcome = client.load({signal: controller.signal}).then(
+            function unexpectedLoad() { assert.fail('Cancelled runtime preparation cannot load.'); },
+            function cancelledLoad(error) { settled = true; return error; }
+        );
+        const worker = fixture.workers.at(-1);
+        await downloading;
+        const reason = new Error(`Cancel stored runtime and ${result} after cleanup.`);
+        controller.abort(reason);
+        assert.equal(client.status().state, 'unloaded');
+        assert.equal(worker.terminated, true);
+        assert.equal(storeSignal.reason, reason);
+        await Promise.resolve();
+        assert.equal(settled, false);
+        finish();
+        assert.equal(await outcome, reason);
+        assert.deepEqual(worker.messages, []);
+        assert.deepEqual(urls.created, []);
+    }
+});
+
+test('runtime progress can unload reentrantly while cleanup remains owned', async function reentrantRuntimeUnload(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    let finish;
+    const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+    let unloading;
+    const cancelled = new Promise(function observeUnload(resolve) { unloading = resolve; });
+    const store = {
+        async fetchResource(input, {signal, onProgress}) {
+            onProgress({phase: 'download', completed: 1, total: null, unit: 'shards', url: input});
+            assert.equal(signal.aborted, true);
+            await cleanup;
+            return storedRuntimeResponse();
+        }
+    };
+    const client = fixture.createClient('laya', store);
+    client.subscribe(function unloadFromProgress(state) {
+        if (state.progress?.phase !== 'download') return;
+        client.unload();
+        unloading();
+    });
+    let settled = false;
+    const outcome = client.load().catch(function recordCancellation(error) { settled = true; return error; });
+    await cancelled;
+    await Promise.resolve();
+    assert.equal(settled, false);
+    assert.equal(fixture.workers[0].terminated, true);
+    finish();
+    assert.equal((await outcome).name, 'AbortError');
+    assert.deepEqual(urls.created, []);
+});
+
+test('runtime transport and Worker failures revoke the module URL after termination', async function failedRuntimeActivation(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    for (const failure of ['post', 'worker']) {
+        const store = {async fetchResource() { return storedRuntimeResponse(); }};
+        const client = fixture.createClient('laya', store);
+        const reason = new Error(`Complete ${failure} failure: 雪\nsecond line`);
+        const loading = client.load();
+        const rejected = assert.rejects(loading, function originalFailure(error) { return error === reason; });
+        const worker = fixture.workers.at(-1);
+        if (failure === 'post') {
+            worker.postMessage = function failRuntimeDispatch() { throw reason; };
+        } else {
+            await worker.waitForLoad();
+            const event = new Event('error');
+            Object.defineProperty(event, 'error', {value: reason});
+            worker.dispatchEvent(event);
+        }
+        await rejected;
+        assert.equal(client.status().state, 'error');
+        assert.equal(client.status().error, reason);
+        assert.equal(worker.terminated, true);
+        assert.deepEqual(urls.revoked.at(-1), {url: urls.created.at(-1).url, terminated: true});
+    }
+    assert.equal(urls.created.length, 2);
+    assert.equal(urls.revoked.length, 2);
+});
+
+test('runtime HTTP failures retain the complete stored response without importing it', async function failedRuntimeResponse(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    const response = {...storedRuntimeResponse(), status: 404, statusText: 'Not Found',
+        file: new Blob(['Complete runtime error: 雪\nsecond line'])};
+    const store = {async fetchResource() { return response; }};
+    const client = fixture.createClient('laya', store);
+    await assert.rejects(client.load(), function completeRuntimeFailure(error) {
+        return error.code === 'ARCANE_DECISION_RUNTIME_DOWNLOAD_FAILED' && error.response === response;
+    });
+    assert.equal(await client.status().error.response.file.text(), 'Complete runtime error: 雪\nsecond line');
+    assert.equal(fixture.workers[0].terminated, true);
+    assert.deepEqual(fixture.workers[0].messages, []);
+    assert.deepEqual(urls.created, []);
+});
+
+test('runtime cancellation preserves a genuine storage cleanup failure', async function failedRuntimeCleanup(context) {
+    const fixture = createWorkerFixture(context);
+    let started;
+    let finish;
+    const downloading = new Promise(function observeStart(resolve) { started = resolve; });
+    const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+    const failure = new Error('Complete runtime writer cleanup failure.');
+    const store = {
+        async fetchResource() {
+            started();
+            await cleanup;
+            throw failure;
+        }
+    };
+    const client = fixture.createClient('laya', store);
+    const controller = new AbortController();
+    const reason = new Error('Cancel runtime activation.');
+    const loading = client.load({signal: controller.signal});
+    const rejected = assert.rejects(loading, function joinedFailures(error) {
+        return error instanceof AggregateError && error.errors[0] === reason && error.errors[1] === failure;
+    });
+    await downloading;
+    controller.abort(reason);
+    finish();
+    await rejected;
+    assert.equal(client.status().error.errors[1], failure);
+    assert.equal(fixture.workers[0].terminated, true);
+});
+
+test('without a store the selected runtime URL keeps direct Worker loading', async function directRuntimeEntry(context) {
+    const fixture = createWorkerFixture(context);
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    const runtime = {moduleUrl: 'https://runtime.example.test/custom-transformers.js'};
+    const client = fixture.createClient('laya', null, {runtime});
+    assert.equal(fixture.workers.length, 0);
+    const loading = client.load();
+    const worker = fixture.workers[0];
+    assert.equal(worker.messages.length, 1);
+    assert.equal(worker.messages[0].payload.runtime.moduleUrl, runtime.moduleUrl);
+    assert.equal(worker.messages[0].storedResources, false);
+    finishFixtureLoad(worker);
+    await loading;
+    client.dispose();
+    assert.deepEqual(urls.created, []);
+    assert.deepEqual(urls.revoked, []);
+});
+
 test('decision resource store stays outside Worker configuration and receives cancellation', async function decisionStore(context) {
     const fixture = createWorkerFixture(context);
     let aborted;
@@ -451,6 +735,9 @@ test('decision resource store stays outside Worker configuration and receives ca
     const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
     const store = {
         async fetchResource(input, {signal}) {
+            if (input === 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js') {
+                return storedRuntimeResponse();
+            }
             assert.equal(input, 'https://models.example.test/dragon/model.onnx_data');
             signal.addEventListener('abort', function resourceAborted() { aborted(); }, {once: true});
             started();
@@ -464,6 +751,7 @@ test('decision resource store stays outside Worker configuration and receives ca
     const loading = client.load();
     const failed = assert.rejects(loading, /unloaded/u);
     const worker = fixture.workers[0];
+    await worker.waitForLoad();
     assert.equal(worker.messages[0].storedResources, true);
     assert.equal(Object.hasOwn(worker.messages[0].payload, 'store'), false);
     worker.reply({arcaneModelResource: true, resourceId: 1, op: 'fetch',

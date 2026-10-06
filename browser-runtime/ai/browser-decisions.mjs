@@ -204,6 +204,9 @@ class BrowserDecisionModel {
             pending: new Map(),
             evaluations: new Set(),
             resources: null,
+            runtimeController: null,
+            runtimePreparation: null,
+            runtimeUrl: null,
             cleanup: null,
             reason: undefined
         };
@@ -263,9 +266,58 @@ class BrowserDecisionModel {
             }
             const id = this.#nextId++;
             activation.pending.set(id, activation.load);
-            worker.postMessage(
-                {id, op: 'load', payload: this.#configuration, storedResources: this.#store !== null}
-            );
+            if (this.#store) {
+                activation.runtimeController = new AbortController();
+                // Retain the operation before a store progress callback can
+                // synchronously unload this activation.
+                activation.runtimePreparation = Promise.resolve().then(
+                    async function prepareDecisionRuntimeEntry() {
+                        if (!model.#isCurrent(activation)) return;
+                        const configuration = model.#configuration;
+                        const sourceUrl = new URL(configuration.runtime.moduleUrl, import.meta.url).href;
+                        const response = await model.#store.fetchResource(sourceUrl, {
+                            signal: activation.runtimeController.signal,
+                            onProgress: function reportRuntimeEntryProgress(progress) {
+                                if (!model.#isCurrent(activation)) return;
+                                model.#progress = progress;
+                                model.#publish();
+                            }
+                        });
+                        if (!model.#isCurrent(activation)) return;
+                        if (response.status < 200 || response.status >= 300) {
+                            const error = new Error(
+                                `The decision runtime returned HTTP ${response.status} ${response.statusText}.`
+                            );
+                            error.code = 'ARCANE_DECISION_RUNTIME_DOWNLOAD_FAILED';
+                            error.response = response;
+                            throw error;
+                        }
+                        // Import the complete stored module without source
+                        // rewriting. This activation owns its URL until stop.
+                        activation.runtimeUrl = URL.createObjectURL(
+                            new Blob([response.file], {type: 'text/javascript'})
+                        );
+                        worker.postMessage({
+                            id,
+                            op: 'load',
+                            payload: {
+                                ...configuration,
+                                runtime: {...configuration.runtime, moduleUrl: activation.runtimeUrl}
+                            },
+                            storedResources: true
+                        });
+                    }
+                );
+                activation.runtimePreparation.catch(
+                    function stopFailedRuntimePreparation(error) {
+                        if (model.#isCurrent(activation)) model.#stop(activation, error, 'error');
+                    }
+                );
+            } else {
+                worker.postMessage(
+                    {id, op: 'load', payload: this.#configuration, storedResources: false}
+                );
+            }
         } catch (error) {
             this.#stop(activation, error, 'error');
         }
@@ -333,11 +385,42 @@ class BrowserDecisionModel {
         this.#state = state;
         this.#progress = null;
         this.#error = reason;
-        if (activation.resources) {
+        const cleanup = [];
+        activation.runtimeController?.abort(reason);
+        if (activation.runtimePreparation) {
+            cleanup.push(activation.runtimePreparation.catch(
+                function preserveRuntimePreparationFailure(error) {
+                    if (error === reason || error?.name === 'AbortError') return;
+                    throw error;
+                }
+            ));
+        }
+        if (activation.resources) cleanup.push(activation.resources.close(reason));
+        if (activation.worker) {
+            for (const [type, listener] of Object.entries(activation.listeners ?? {})) {
+                activation.worker.removeEventListener(type, listener);
+            }
+            activation.worker.terminate();
+        }
+        if (activation.runtimeUrl !== null) {
+            try {
+                URL.revokeObjectURL(activation.runtimeUrl);
+            } catch (error) {
+                cleanup.push(Promise.reject(error));
+            }
+            activation.runtimeUrl = null;
+        }
+        if (cleanup.length > 0) {
             const model = this;
-            activation.cleanup = activation.resources.close(reason).catch(
-                function preserveResourceCleanupFailure(error) {
-                    activation.reason = new AggregateError([reason, error], 'Unable to settle decision model resources.');
+            activation.cleanup = Promise.allSettled(cleanup).then(
+                function settleDecisionResourceCleanup(results) {
+                    const failures = results.filter(function failedCleanup(result) {
+                        return result.status === 'rejected';
+                    }).map(function cleanupReason(result) {
+                        return result.reason;
+                    });
+                    if (failures.length === 0) return;
+                    activation.reason = new AggregateError([reason, ...failures], 'Unable to settle decision model resources.');
                     throw activation.reason;
                 }
             );
@@ -349,12 +432,6 @@ class BrowserDecisionModel {
                     } else globalThis.console?.error('Decision model resource cleanup failed.', error);
                 }
             );
-        }
-        if (activation.worker) {
-            for (const [type, listener] of Object.entries(activation.listeners ?? {})) {
-                activation.worker.removeEventListener(type, listener);
-            }
-            activation.worker.terminate();
         }
         activation.load.reject(reason);
         for (const operation of activation.pending.values()) operation.reject(reason);

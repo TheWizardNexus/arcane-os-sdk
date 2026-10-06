@@ -68,9 +68,9 @@ it does not substitute a quantized graph or another model.
 | `revision` | Upstream revision, default `main`; select a stable revision when repeatable model selection is needed. |
 | `device` | Transformers.js backend, default `webgpu`; an explicit supported alternative is caller-owned. No automatic backend fallback. |
 | `dtype` | Exact upstream precision selection; defaults to `fp16` for Laya and `fp32` for Julia. For Laya FP32, supply `dtype: 'fp32'`. Unsupported selections fail at the selected upstream loader rather than being replaced. |
-| `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. |
+| `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. With `store`, the SDK stores and materializes the complete selected entry for that activation. |
 | `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. |
-| `store` | Optional existing SDK DBOPFS model or speech artifact store exposing `fetchResource()`. The store remains outside Worker configuration; the SDK bridges the loader's actual resource requests to it. |
+| `store` | Optional existing SDK DBOPFS model or speech artifact store exposing `fetchResource()`. The store remains outside Worker configuration; the SDK uses it for the runtime entry and bridges the loader's actual resource requests to it. |
 
 Without `store`, the runtime, tokenizer and weights use normal upstream loading
 and caching. With `store`, the selected loader still owns filenames and model
@@ -110,17 +110,27 @@ await decisions.load();
 ```
 
 The same `store` may serve other SDK model clients. The application supplies no
-tokenizer/configuration/graph manifest and performs no file routing. Inside the
-dedicated decision Worker, Transformers.js's public `env.fetch` hook routes the
+tokenizer/configuration/graph manifest and performs no file routing. Explicit
+activation first opens `runtime.moduleUrl` through `store.fetchResource()`.
+The SDK materializes the complete stored entry as a JavaScript object URL for
+the dedicated Worker, without rewriting its content. The configured source URL
+is retained for later activations, so they reuse the same stored resource rather
+than saving a temporary object URL. Construction still starts no download.
+
+Inside the dedicated decision Worker, Transformers.js's public `env.fetch` hook routes the
 actual selected tokenizer, configuration, ONNX graph and external-data requests
 to `store.fetchResource(input, options)`. Its competing browser, custom and
 filesystem model caches are disabled only for this explicit stored mode. The
 default upstream ONNX WASM binary and factory preloads use this same hook.
 Native support-file fetches in the dedicated Worker also use the store. The
-runtime module itself still loads from `runtime.moduleUrl` through normal module
-loading. Native ESM imports remain browser-owned: an upstream custom factory
-import outside its preload path is not claimed as a DBOPFS resource. No second
-application cache or model substitution is introduced.
+default runtime entry is self-contained. Entry materialization does not rewrite
+dependency imports in custom modules or preserve their original `import.meta.url`
+base. Custom stored entries must work from an object URL; relative imports or
+support-file URLs resolved against that module's original location require a
+compatible self-contained entry. Native absolute ESM dependencies and an upstream
+custom factory import outside its preload path remain browser-owned. No second
+application cache or model substitution is introduced. Without `store`, the
+configured runtime URL keeps its direct native module-loading behavior.
 
 The store returns `{file, status, statusText, headers, url, redirected}`. The
 Worker reconstructs the complete response with its actual HTTP status and
@@ -138,9 +148,14 @@ url}`. `completed` counts closed persistent shards; `total` is `null` until the
 resource finishes. This progress carries no network-size, rate or ETA fields.
 Cancellation aborts the owned fetch and joins reader/writer cleanup before the
 resource owner becomes available to a later request. Interrupted closed shards
-are retained. `unload()` and `dispose()` still acknowledge their lifecycle
-transition synchronously; outstanding `load()`/`evaluate()` calls settle after
-their resource cleanup.
+are retained. Each activation owns its runtime object URL and revokes it after
+terminating the Worker on cancellation, failure, unload or disposal. A cancelled
+runtime-entry fetch is joined before its waiting calls settle; a late response
+cannot activate a replacement Worker. Runtime-entry HTTP failures retain the
+complete stored response in `error.response` for developer diagnostics.
+`unload()` and `dispose()` still acknowledge their lifecycle transition
+synchronously; outstanding `load()`/`evaluate()` calls settle after their
+resource cleanup.
 
 ## Complete rows and results
 
