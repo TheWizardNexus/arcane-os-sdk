@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.71.0",
+  "sdkVersion": "0.71.1",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -1185,7 +1185,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Headless toolchain operations",
-      "summary": "Starts one owned browser development server for the selected application.",
+      "summary": "Starts one owned browser development server for the selected application, including native worker retirement when standalone source PWA is explicitly disabled and its root worker is absent.",
       "availability": "Node; selected operation may produce browser or native output",
       "protocol": "Shared headless operation API + arcane-cli-events/1",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"
@@ -2446,7 +2446,7 @@
       ],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
-      "summary": "Starts an owned source or packaged browser server with complete selected routes, HTTPS by default, explicit HTTP selection, listener readiness and shutdown.",
+      "summary": "Starts an owned source or packaged browser server with complete selected routes, HTTPS by default, explicit HTTP selection, listener readiness and shutdown; explicitly disabled standalone source PWA retires an absent root worker through its native lifecycle.",
       "availability": "Node control plane; browser data plane",
       "protocol": "Node ESM",
       "normalization": "SDK-normalized inputs, errors, events, and documented result"

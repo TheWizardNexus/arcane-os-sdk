@@ -43,6 +43,7 @@ alone does not make bare module names resolve in a browser.
 | Use the `arcane` command | [CLI reference](cli.md) |
 | Install an app and cache selected resources offline | [Progressive web applications](pwa.md) |
 | Disable source PWA generation or explicitly retire confirmed generated output | [Source PWA retirement](pwa.md#disable-source-pwa-generation-and-retire-generated-output) |
+| Retire the prior worker after explicitly disabling standalone source PWA | [Disabled-worker browser lifecycle](pwa.md#disabled-worker-retirement-on-the-source-server) |
 | Generate named browser imports or inspect the selected physical runtime | [`arcane import-map`](cli.md#arcane-import-map) and [browser runtime delivery](protocols.md#browser-runtime-delivery) |
 | Connect an application through the shared WebSocket transport | [Shared WebSocket clients](websocket-client.md) |
 | Choose browser, native, cloud, or cross-host behavior | [Availability and normalization](availability-and-normalization.md) |
