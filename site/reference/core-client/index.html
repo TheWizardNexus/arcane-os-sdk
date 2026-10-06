@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.57.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="./" aria-current="page">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
 <code>createCoreClient</code>, <code>createCoreFacade</code>, <code>installCoreClient</code> and
 <code>getInstalledCoreClient</code>.
 <code>arcane-os/core/contracts</code> exports <code>CORE_PROTOCOL</code>, <code>CORE_READY_EVENTS</code>,
@@ -120,6 +120,92 @@ code receive the adapter&#39;s bridge-call failure code. Keep those details in
 developer diagnostics, rather than ordinary
 product status surfaces. The optional <code>onError(error)</code> callback observes
 transport/event-owner failures outside individual request promises.</p>
+<h2 id="optional-webkit-document-lifetime">Optional WebKit document lifetime</h2>
+<p><code>webKitDocumentLifecycle:true</code> on <code>createCoreClient</code>, <code>installCoreClient</code> or
+<code>createCoreClassicSource</code> selects document lifetime handling for the native
+WebKit <code>arcane</code> handler with replies. It defaults to <code>false</code>; existing WebKit
+plain-JSON and alternate acknowledgement transports, WebView2, Android,
+development HTTP and supplied transports keep their existing behavior. The
+selected host must implement this contract and the existing <code>runtime.replay</code>
+control. Install the classic source at document start in the page&#39;s world.</p>
+<p>The client owns a fresh activation for the current JavaScript realm and each
+restoration from the browser&#39;s page cache. WithReply receives these transport
+records; the Core JSON string remains unchanged in its separate <code>json</code> field:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Record</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{type:&#39;activate&#39;, activation}</code></td>
+<td>Attach this activation before sending its Core frames.</td>
+</tr>
+<tr>
+<td><code>{type:&#39;frame&#39;, activation, json}</code></td>
+<td>Send the complete serialized Core request or control.</td>
+</tr>
+<tr>
+<td><code>{type:&#39;retire&#39;, activation, json}</code></td>
+<td>Retire this activation; <code>json</code> is the existing <code>requests.cancelAll</code> control.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Reply with <code>{accepted:true}</code> or <code>{accepted:false,error}</code> on the initiating
+WithReply promise. Frame and retirement acceptance follows the actual complete
+process write. Queue admission alone is insufficient. Activation acceptance
+follows the host&#39;s current-realm probe and any required prior-owner cancellation.
+Only this activation&#39;s outgoing frames wait for attachment; page rendering,
+facade installation and independent Core startup remain concurrent.
+An aborted, timed-out or otherwise cancelled request awaiting attachment is
+never submitted afterward; its existing cancellation control remains observable.</p>
+<p>The host calls <code>__arcaneWebKitDocumentCurrent(activation)</code> in the current main
+document&#39;s page world to probe a candidate. A token or native frame descriptor
+alone does not identify the active document. Serialize candidate probes and
+Core ingress ownership changes: finish each candidate&#39;s probe before processing
+the next announcement, and leave the current owner unchanged when a probe is
+false. Announcement arrival order cannot establish document order. A true
+probe establishes the realm at that execution instant; every later delivery
+still checks its target at execution time.</p>
+<p>Before accepting a replacement activation, write the existing
+<code>requests.cancelAll</code> control for the prior ingress owner. Do not wait for a
+retirement announcement that a destroyed document may never send. Write a
+retirement record&#39;s JSON only while that activation still owns ingress;
+reject a late retirement without cancelling the replacement&#39;s requests.
+Record request-ID-to-origin-activation correlation before submitting each
+request to Core. Responses retain that origin. Existing generic service events
+remain broadcasts to the current activation; no request association is added.
+Complete native diagnostics retain frames received while no document is active;
+restoration uses current-state replay rather than historical event delivery.</p>
+<p>Deliver through <code>__arcaneReceive(json, activation)</code> and
+<code>__arcaneTransportFailed(error, activation)</code>, passing payloads as native
+JavaScript call arguments. Both return <code>false</code> for a retired or different
+activation. Receive also returns <code>false</code> for an unrecognized frame or a
+response with no pending request; <code>true</code> means the client accepted delivery,
+which may still await its shared event owner. Failure returns <code>true</code> when it
+ends that active installation. Preserve actual evaluation failures through the
+native diagnostic owner; a <code>false</code> result is not a JavaScript exception.
+<code>client.acceptsNativeDelivery(activation)</code> exposes the same synchronous lifetime
+predicate. It accepts any activation while a client using an ordinary transport
+is live. Direct owner calls to <code>client.failTransport(error)</code> retain their
+existing terminal-failure semantics.</p>
+<p>Page hide synchronously retires the activation even with no pending requests.
+It clears completed ready state and rejects every pending renderer promise with
+the existing <code>ARCANE_REQUEST_ABORTED</code>/<code>AbortError</code>. This ends the page&#39;s wait;
+the runtime&#39;s cancellation skips service-lifetime work, so an accepted save
+continues and participates in graceful drain. Its eventual response stays with
+the retired activation and cannot settle a restored page&#39;s request. The client
+does not claim that cancellation rolled back persistence.</p>
+<p>Persisted page restoration creates a fresh activation and sends exactly one
+<code>runtime.replay</code> after native attachment. Initial attachment sends that replay
+only when <code>replayRuntimeState:true</code>. Application subscriptions survive page
+hide and restoration, including registrations awaiting the shared event owner
+and ready listeners awaiting their replay microtask. Queued deliveries from a
+retired activation are no longer applicable to those subscriptions. Replay
+supplies current Core/service state, not prior responses or request promises.
+Closing the client retires once, removes lifecycle listeners and restores its
+owned callbacks. It does not close the process or control application shutdown.</p>
 <h2 id="classic-native-host-injection">Classic native-host injection</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreClassicSource} from &#39;arcane-os/core/classic-source&#39;;
 
@@ -153,9 +239,9 @@ Core runtime and selected app services without a native-provider checkout.
 It does not distribute a Core executable or change OS callers. Executable
 platform hosts and their cutover remain separately owned work.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.57.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

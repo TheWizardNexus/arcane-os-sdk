@@ -2,27 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.">
+  <meta name="description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Portable Core packaging · Arcane OS SDK"><meta property="og:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Portable Core packaging · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Portable Core packaging · Arcane OS SDK"><meta property="og:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Portable Core packaging · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Portable Core packaging | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections remain Windows and Linux. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.57.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="./" aria-current="page">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
 package. It does not load Arcane OS source, choose models or compile an
 executable. An application&#39;s explicit <code>native.localAI</code> selection can include
 its selected upstream runtimes through the SDK local-AI installer. Without that
 selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this
 Node-based payload; Android needs its separate native host adaptation. The
-current CLI&#39;s portable platform selections remain Windows and Linux. A portable
+current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable
 artifact is not a Windows executable, Linux package or Android application.</p>
 <p><code>loadArcaneNativeProvider({target:&#39;portable&#39;})</code> selects the installed SDK provider
 without an <code>arcaneRoot</code>. Supplying an explicit <code>arcaneRoot</code> retains the existing
@@ -31,10 +31,14 @@ described below. Other native targets remain with their actual platform
 providers; the loader does not substitute this payload for an unavailable host.</p>
 <h2 id="provider-and-selected-input">Provider and selected input</h2>
 <p>The default export and <code>arcaneNativeBuilderProvider</code> are the same provider.
-<code>createPortableNativeProvider({services})</code> creates one with application-owned
+<code>createPortableNativeProvider({services,packagedWeb=false,webKitDocumentLifecycle=false})</code> creates one with application-owned
 service configuration. Without that override, the provider uses the selected
 app descriptor&#39;s <code>native.services</code>, or an empty selection when omitted. An
 explicit <code>services:[]</code> overrides the descriptor with no app services.
+The Mac provider selects <code>packagedWeb:true</code> to compose the SDK&#39;s packaged-web
+Core service and <code>webKitDocumentLifecycle:true</code> for the canonical classic-client
+activation/replay contract. Both default to false, preserving ordinary portable
+and Windows composition.
 All implement <code>arcane-native-builder/1</code>:</p>
 <ul>
 <li><code>describe()</code> identifies the portable target and <code>executable:false</code>.</li>
@@ -224,6 +228,12 @@ configuration. It passes the complete authored <code>native.localAI</code> recor
 factory. Applications without that selection have no generated local-AI import
 or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.</p>
+<p>Selected <code>onnx</code> bundles its complete managed <code>onnxruntime-node</code> dependency tree.
+Its <code>modulePath</code> resolves against the artifact root just as a server runtime&#39;s
+<code>executable</code> does. Library/module records need no executable. The generated Core
+service exposes retained worker sessions through <code>onnx.load/run/unload/status</code>;
+model files remain caller-selected application resources. See
+<a href="../local-ai/#native-onnx-sessions">native ONNX sessions</a>.</p>
 <h2 id="windows-executable">Windows executable</h2>
 <p>The ordinary application command is:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">npm exec -- arcane build --target windows-x64
@@ -311,13 +321,80 @@ synchronous rejection. Write completion means the frame reached stdin, not that
 the RPC succeeded. <code>closeInput</code> rejects new sends, finishes accepted writes and
 closes stdin, then keeps observing output and child exit without a forced
 termination deadline. The delegate is retained through final completion.
-This is delivered source, not a macOS WebView bridge, CLI target, executable or
-installer. Compilation and execution on macOS remain separate evidence from the
-selected Windows output.</p>
+The AppKit <code>ArcaneHost</code> and launcher compose that source as described below.
+Compilation and execution on macOS remain separate evidence from the selected
+Windows output.</p>
+<h2 id="macos-application-composition">macOS application composition</h2>
+<p><code>arcane-os/native/macos-provider</code> exports
+<code>createMacOSNativeProvider({services,hostDirectory}={})</code>, its named
+<code>arcaneNativeBuilderProvider</code>, and the same provider as default. The six-method
+contract accepts <code>macos-arm64</code> or <code>macos-x64</code>, <code>platform:&#39;macos&#39;</code>, <code>format:&#39;app&#39;</code>
+and the existing unsigned local development selection. Ordinary CLI routing
+uses the SDK package, not an Arcane OS checkout:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">npm exec -- arcane build --target macos-arm64
+npm exec -- arcane run --target macos-arm64
+</code></pre></div>
+<p>Select <code>macos-x64</code> for Intel. The descriptor must declare the selected target.
+Source implementation does not establish that an architecture&#39;s host artifact
+has been built, executed or published. Consumer assembly needs the exact numeric
+SDK release asset <code>arcane-native-macos-&lt;architecture&gt;.tar.gz</code>; unavailable assets
+produce their actual download error. SDK collaborators may select an existing
+<code>hostDirectory</code> explicitly. There is no fallback to source checkout, another
+version, another architecture or a browser-only artifact.</p>
+<p>The complete unchanged portable payload lives at
+<code>&lt;app-id&gt;.app/Contents/Resources/</code>. That directory remains <code>target.rootDir</code> and
+contains <code>arcane-native.json</code>, <code>app/</code>, dependency releases, installed SDK files,
+Core entry/client and <code>runtime/node</code>. The additive <code>bundleRoot</code> identifies the
+<code>.app</code> directory. <code>Contents/MacOS/Arcane</code> and <code>Contents/Info.plist</code> belong to the
+bundle rather than the web root; the Mac owner checks these separately from the
+Resources file inventory. Application identity supplies the stable bundle ID
+<code>org.arcane.&lt;app-id&gt;</code>. Executable permissions are preserved for the launcher and
+selected Node runtime.</p>
+<p>The launcher opens its window immediately and starts one Core child. The
+generated Core entry starts the <code>packaged-web</code> service alongside application
+services, without waiting for models. Only <code>core.web.ready</code>, emitted after the
+actual listener is ready and the initial port is saved, supplies the application
+URL to WebKit. It serves the complete <code>manifest.webRoot</code> at <code>/</code> and resolves the
+complete <code>manifest.start</code>, including query and fragment, against that origin.
+The classic client selects current-document activation and sticky state replay;
+navigation does not restart the Core service or replay retired requests.
+The host&#39;s main-thread readonly <code>isClosing</code> accessor exposes its existing close
+intent; an unsolicited Core exit is therefore reported separately from an
+ordinary user-requested drain, even when the process exits successfully.</p>
+<p><code>createPackagedWebService({artifactRoot}, context={})</code> is available from
+<code>arcane-os/core/packaged-web</code>. It uses the existing
+<code>startDevServer({mode:&#39;packaged&#39;,http:true,host:&#39;127.0.0.1&#39;,port,releaseRoot})</code>
+owner and published <code>node-http-server</code>, not a second HTTP implementation.
+<code>context.stateRoot</code> takes precedence over the launcher&#39;s separate
+<code>--arcane-host-state-root</code> argument. The launcher defaults to
+<code>~/Library/Application Support/Arcane/&lt;app-id&gt;</code>; an explicitly supplied launch
+file remains unchanged and is forwarded to Core. The first successful listener
+stores its selected port in <code>packaged-web-origin.json</code>. Later launches reuse it;
+a port conflict or unreadable saved record is reported without changing origins
+or discarding stored state.</p>
+<p>The app&#39;s persistent default <code>WKWebsiteDataStore</code> uses its bundle identity.
+<code>stateRoot</code> selects Core state and diagnostics, not a custom WebKit profile
+directory. Browser API availability, OPFS and secure-context behavior remain
+WebKit-owned and require actual Mac verification; the SDK bypasses no browser
+policy. Startup failures use <code>core.service.state</code> for <code>name:&#39;packaged-web&#39;</code>;
+unexpected listener closure or failure uses <code>core.web.failed</code> with the complete
+serialized error. Native alerts show a concise outcome, with full diagnostics
+outside the conversation. Core drains accepted work and the listener before
+the native close completes. The optional runner stdin-EOF signal uses that same
+path; ordinary double-click startup does not wait on stdin.</p>
+<p><code>tools/build-core-macos-host.mjs</code> is SDK host-release tooling, not an application
+compiler requirement. It accepts an explicit Darwin Node executable and its
+license, compiler path, <code>arm64</code> or <code>x64</code>, and output directory. It uses Objective-C
+ARC/blocks and Apple&#39;s Foundation, AppKit and WebKit frameworks. The host source
+targets macOS 11; the selected Node runtime may require a newer macOS version.
+Its actual runtime/platform/architecture and the SDK Node engine requirement
+must agree. Compiler/runtime execution and redistribution belong to the
+separately authorized selected host output. This source increment runs none of
+them and claims no Mac build or execution result.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.57.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

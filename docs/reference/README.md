@@ -53,8 +53,12 @@ alone does not make bare module names resolve in a browser.
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
+| Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
+| Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
+| Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
+| Compose a Mac application with an architecture-matched host | [macOS application composition](core-native-packaging.md#macos-application-composition) |
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
 | Choose a normalized typed browser decision surface | [Browser typed decisions](ai/browser-decisions.md) |

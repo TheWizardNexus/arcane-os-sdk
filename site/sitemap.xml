@@ -25,6 +25,7 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/cli/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-client/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-native-packaging/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-preferences/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core-runtime/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/arcane-ai-contracts/</loc></url>
@@ -41,7 +42,9 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/namespaces/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/platform-installation-users-system/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/core/reference/arcane-api/session-provisioning-diagnostics-development/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/diarization/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/event-manager/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/git-text-snapshot/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/inventory/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/local-ai/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/mail/</loc></url>

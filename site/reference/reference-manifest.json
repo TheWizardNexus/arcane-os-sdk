@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.57.0",
+    "sdk": "0.58.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 36,
+    "markdownPages": 39,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 133,
+    "htmlPages": 136,
     "inventories": 4
   },
   "pages": [
@@ -86,6 +86,12 @@
       "source": "docs/reference/core-native-packaging.md",
       "output": "site/reference/core-native-packaging/index.html",
       "route": "reference/core-native-packaging/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/core-preferences.md",
+      "output": "site/reference/core-preferences/index.html",
+      "route": "reference/core-preferences/",
       "kind": "markdown"
     },
     {
@@ -185,9 +191,21 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/diarization.md",
+      "output": "site/reference/diarization/index.html",
+      "route": "reference/diarization/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/event-manager.md",
       "output": "site/reference/event-manager/index.html",
       "route": "reference/event-manager/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/git-text-snapshot.md",
+      "output": "site/reference/git-text-snapshot/index.html",
+      "route": "reference/git-text-snapshot/",
       "kind": "markdown"
     },
     {

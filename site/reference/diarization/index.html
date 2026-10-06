@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The native diarization API uses the NVIDIA Nemotron-3-Diarization.q80.gguf model through the official NeMo-Speech.cpp 0.2.0 CPU libraries. It returns generic, one-based speaker labels and timed segments, independently of speech recognition. A speaker label does not identify a person. The model supports eight speaker channels; the helper reports the loaded model&#39;s actual channel count and output cadence.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/diarization/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Nemotron 3 speaker diarization · Arcane OS SDK"><meta property="og:description" content="The native diarization API uses the NVIDIA Nemotron-3-Diarization.q80.gguf model through the official NeMo-Speech.cpp 0.2.0 CPU libraries. It returns generic, one-based speaker labels and timed segments, independently of speech recognition. A speaker label does not identify a person. The model supports eight speaker channels; the helper reports the loaded model&#39;s actual channel count and output cadence."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/diarization/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Nemotron 3 speaker diarization · Arcane OS SDK"><meta name="twitter:description" content="The native diarization API uses the NVIDIA Nemotron-3-Diarization.q80.gguf model through the official NeMo-Speech.cpp 0.2.0 CPU libraries. It returns generic, one-based speaker labels and timed segments, independently of speech recognition. A speaker label does not identify a person. The model supports eight speaker channels; the helper reports the loaded model&#39;s actual channel count and output cadence."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Nemotron 3 speaker diarization | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Nemotron 3 speaker diarization</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="nemotron-3-speaker-diarization">Nemotron 3 speaker diarization</h1><p class="doc-lead">The native diarization API uses the NVIDIA Nemotron-3-Diarization.q80.gguf model through the official NeMo-Speech.cpp 0.2.0 CPU libraries. It returns generic, one-based speaker labels and timed segments, independently of speech recognition. A speaker label does not identify a person. The model supports eight speaker channels; the helper reports the loaded model&#39;s actual channel count and output cadence.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/diarization.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#runtime-and-helper">Runtime and helper</a><a href="#retained-model-and-audio-streams">Retained model and audio streams</a><a href="#probabilities-callbacks-and-cancellation">Probabilities, callbacks, and cancellation</a><a href="#core-service">Core service</a><a href="#shared-process-transport">Shared process transport</a><a href="#upstream-contracts">Upstream contracts</a></nav></details><p>The native diarization API uses the NVIDIA <code>Nemotron-3-Diarization.q8_0.gguf</code>
+model through the official NeMo-Speech.cpp 0.2.0 CPU libraries. It returns
+generic, one-based speaker labels and timed segments, independently of speech
+recognition. A speaker label does not identify a person. The model supports
+eight speaker channels; the helper reports the loaded model&#39;s actual channel
+count and output cadence.</p>
+<h2 id="runtime-and-helper">Runtime and helper</h2>
+<p>Select the <code>nemo-speech</code> runtime through the existing local-AI installer. Keep
+its complete upstream <code>bin</code>/<code>lib</code>/<code>include</code> and CMake layout. Model storage is
+separate and caller-selected. Obtain the selected GGUF from the
+<a href="https://huggingface.co/nvidia/Nemotron-3-Diarization" target="_blank" rel="noreferrer">official NVIDIA model repository</a>.
+This API does not select an ASR model, install Python, or enable a GPU backend.</p>
+<p><code>buildDiarizationHelper({runtime,outputRoot,signal,onEvent})</code> builds the
+first-party helper for the current host with installed CMake and its C++17
+toolchain. <code>runtime.cmakeDirectory</code> is the installer-discovered CMake package
+directory, passed as <code>NeMoSpeech_DIR</code> without assuming an archive root. The result
+is <code>{platform,architecture,root,executable,diagnostics}</code>; diagnostics retain the
+complete configure/compile/install process results. The installed helper is under
+<code>outputRoot/bin</code>; its build directory is under <code>outputRoot/build</code>. The helper
+links the upstream <code>NeMoSpeech::Diarization</code> component and is separate from
+the downloaded runtime. No compiler is downloaded by this function.</p>
+<p>Official 0.2.0 CPU archives cover Windows x64, Linux x64/ARM64, and macOS
+x64/ARM64. Linux requires glibc 2.31 or later. Android needs a host-adapted
+runtime/helper; this release&#39;s official inventory does not supply an Android
+or Windows ARM64 archive. Source portability is distinct from execution on an
+actual platform.</p>
+<p>The public Node flow uses the existing installer and one first-party helper:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ensureLocalAIRuntimes} from &#39;arcane-os/local-ai&#39;;
+import {buildDiarizationHelper} from &#39;arcane-os/diarization/build&#39;;
+import {createDiarization} from &#39;arcane-os/diarization&#39;;
+
+const [runtime] = await ensureLocalAIRuntimes({
+    runtimes: [{id: &#39;nemo-speech&#39;, version: &#39;0.2.0&#39;}],
+    directory: selectedRuntimeDirectory
+});
+const helper = await buildDiarizationHelper({runtime, outputRoot: selectedHelperDirectory});
+</code></pre></div>
+<p>Keep the selected directories and model path under their application/host
+owner. A native artifact can place the first-party executable under
+<code>runtime/diarization/bin</code>, independently of the complete upstream library tree
+under <code>runtime/local-ai/nemo-speech</code>.</p>
+<h2 id="retained-model-and-audio-streams">Retained model and audio streams</h2>
+<p><code>createDiarization({executable,modelPath,runtime,onEvent})</code> returns immediately
+and starts its owned helper. Supply absolute helper/model paths and the
+installer&#39;s absolute <code>runtime.binaryDirectory</code>/<code>runtime.libraryDirectory</code> paths. They configure the
+child&#39;s platform library search path; the parent environment is unchanged.</p>
+<p>The returned model has <code>ready</code>, <code>completion</code>, <code>current()</code>,
+<code>subscribe(listener,{emitCurrent=true,signal})</code>, <code>openStream(options)</code>,
+<code>diarize(options)</code>, and <code>close()</code>. <code>ready</code> resolves when the actual model is
+loaded; a failed load rejects. <code>completion</code> covers the complete helper lifetime.
+The sticky state is <code>loading</code>, <code>ready</code>, <code>closing</code>, <code>closed</code>, or <code>error</code>.
+Subscribe to this owner instead of polling or delaying unrelated UI startup.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const diarization = createDiarization({
+    executable: helper.executable,
+    modelPath: selectedModelPath,
+    runtime
+});
+
+const stream = await diarization.openStream({
+    sampleRate: 16000,
+    onUpdate: function showSpeakers(result) {
+        renderSpeakerTimeline(result.segments);
+    }
+});
+
+await stream.push(firstMonoSamples);
+await stream.push(nextMonoSamples);
+const final = await stream.finish();
+await diarization.close();
+</code></pre></div>
+<p><code>push(audio)</code> accepts mono <code>Float32Array</code> samples and preserves their float32
+representation. The caller owns decoding an encoded recording and choosing
+its mono channel; this API does not alter the source recording, mix channels,
+normalize amplitudes, or capture a microphone. Keep the supplied array stable
+until <code>push</code> settles. Each stream accepts one fixed sample rate: 8000–96000 Hz,
+or <code>0</code> for model-rate samples. The default is 16000 Hz. Upstream owns necessary
+resampling. Await each push for backpressure; independent streams share the
+retained model without sharing speaker/session state. Upstream serializes
+model compute internally.</p>
+<p><code>openStream({sampleRate,onUpdate,onProbabilities,signal})</code> returns a stream with
+<code>push</code>, <code>finish</code>, <code>cancel</code>, <code>completion</code>, and <code>current()</code>. A push resolves to
+its latest segment snapshot, or <code>null</code> until native frames are available. <code>finish()</code>
+flushes all remaining audio and resampler output, returns the complete final
+result, and releases the native stream. It is idempotent. <code>current()</code> retains
+only the latest successful snapshot. Results have:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{final, speakers, secondsPerFrame, frameCount,
+ segments:[{speaker,startTime,endTime}, ...]}
+</code></pre></div>
+<p>Times are seconds from the start of that caller&#39;s stream. Intermediate segment
+snapshots may revise earlier segment boundaries. Replace the displayed
+snapshot; do not append whole snapshots as new segments. Final results include
+all upstream segments, including those finalized before upstream probability
+compaction. The API adds no diarization thresholds or segment filtering.</p>
+<p>For recorded mono samples, <code>await diarization.diarize({audio,sampleRate,signal, onUpdate,onProbabilities})</code> uses the same complete streaming path, then finishes
+and closes that stream. It does not use upstream&#39;s length-constrained stateless
+offline operation.</p>
+<h2 id="probabilities-callbacks-and-cancellation">Probabilities, callbacks, and cancellation</h2>
+<p>Supply <code>onProbabilities</code> to receive every available probability frame as
+<code>{startFrame,values,speakers,secondsPerFrame}</code>. Values are frame-major, with one
+value per speaker channel per frame. Frame indices are absolute within the
+stream. The adapter reads between 160 ms input pushes, before upstream&#39;s old
+probability buffer can be compacted. It reports an error if an upstream gap is
+ever observed; it does not manufacture missing values. Without this callback,
+the helper does not request raw probabilities.</p>
+<p>Callbacks are awaited and their failures propagate. The caller owns retaining
+probability history, audio, and any earlier snapshots it needs. The SDK does
+not accumulate a second transcript of continuous protocol output. <code>onEvent</code>
+receives ordinary process lifecycle events and complete stderr diagnostics;
+raw stdout protocol belongs to the result callbacks instead. Keep engineering
+diagnostics in a selected developer surface, outside ordinary UI/chat history.</p>
+<p><code>cancel(reason)</code> and the stream&#39;s abort signal stop subsequent pushes and
+suppress later result commits for that stream. Cancellation closes the stream
+after native commands already ahead of its close have returned; the C ABI
+does not offer an immediate interrupt. Other streams keep their own state.
+An already-running caller callback finishes under its caller&#39;s ownership.
+<code>cancel()</code> can be awaited inside a callback. Await the same stream&#39;s <code>push()</code>,
+<code>finish()</code>, or model <code>close()</code>
+only after the callback returns; a recursive wait reports
+<code>DIARIZATION_CALLBACK_WAIT</code> instead of deadlocking. Stream <code>completion</code>
+retains finish/cancellation cleanup failures.</p>
+<p><code>close()</code> stops new streams, drains in-flight openings and accepted stream work,
+finishes the remaining streams, closes helper stdin, and waits for native
+cleanup/process exit. The model always outlives its streams. Complete failures
+from an operation and its cleanup remain available together.</p>
+<h2 id="core-service">Core service</h2>
+<p>Import the named or default factory from <code>arcane-os/core/diarization</code>.</p>
+<p><code>createDiarizationService({executable,modelPath,runtime,onEvent},launchContext)</code>
+is a synchronous <code>native.services</code> factory. Relative executable/model paths
+resolve against explicit <code>launchContext.workspaceRoot</code>, otherwise the native
+launcher&#39;s <code>appRoot</code> (or the current directory for standalone factories). Model loading is lazy at the
+first diarization operation, not a prerequisite for Core startup. The returned
+service implements <code>drain()</code> and <code>dispose()</code> and the following methods:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Input / result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>diarization.status</code></td>
+<td>Current model lifecycle snapshot.</td>
+</tr>
+<tr>
+<td><code>diarization.load</code></td>
+<td>Load the configured model; return readiness.</td>
+</tr>
+<tr>
+<td><code>diarization.open</code></td>
+<td><code>{sampleRate,probabilities}</code> → <code>{streamId,sampleRate}</code>.</td>
+</tr>
+<tr>
+<td><code>diarization.push</code></td>
+<td><code>{streamId,audio}</code> → current timed segment snapshot.</td>
+</tr>
+<tr>
+<td><code>diarization.finish</code></td>
+<td><code>{streamId}</code> → complete final result, releasing the stream.</td>
+</tr>
+<tr>
+<td><code>diarization.cancel</code></td>
+<td><code>{streamId}</code> → cleanup completion for that stream.</td>
+</tr>
+<tr>
+<td><code>diarization.recording</code></td>
+<td><code>{audio,sampleRate}</code> → complete final result.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Core audio is <code>{encoding:&#39;f32le&#39;,data:BASE64}</code>: transport encoding of the exact
+little-endian float32 samples, with control metadata outside the audio. The
+service emits <code>diarization.state</code>, <code>diarization.update</code> with <code>{streamId,result}</code>,
+and optional <code>diarization.probabilities</code> with the stream ID and frame data.
+Subscribe before opening a stream. Session operations have service lifetime;
+renderer request cancellation does not discard accepted audio. Call the
+explicit cancel method for a session. A recording operation has request
+lifetime and its cancellation closes only that recording&#39;s stream.</p>
+<h2 id="shared-process-transport">Shared process transport</h2>
+<p>The existing internal <code>runProcess</code> owner accepts scalar input as before and
+also an <code>AsyncIterable&lt;string|Uint8Array&gt;</code>. Iteration is backpressured by the
+child&#39;s stdin writes; iterable completion sends EOF, including in <code>close-input</code>
+mode. Cancellation/early child exit calls the iterator&#39;s <code>return()</code> and waits
+for input cleanup. The producer must make a pending <code>next()</code> settle when it is
+returned/cancelled. The diarization-owned producer does this explicitly.</p>
+<p><code>onOutput({stream,chunk})</code> receives complete decoded UTF-8 chunks with original
+delimiters and is awaited per stream. It is not a binary stdout interface.
+<code>captureOutput</code> and <code>emitOutputEvents</code> default to <code>true</code>; each also accepts
+<code>{stdout,stderr}</code> overrides. Disabling capture requires an output consumer and
+returns <code>null</code> for that process-result field; it does not return a shortened
+transcript. Disabling output events leaves those events absent. Existing
+scalar input, full text results and ordinary event defaults remain unchanged.
+Failed output callbacks retain their complete input chunk and cause in the
+process error, including when successful output is caller-owned.</p>
+<h2 id="upstream-contracts">Upstream contracts</h2>
+<p>The implementation follows the <a href="https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/include/nemo_speech/diar.h" target="_blank" rel="noreferrer">stable C ABI</a>,
+<a href="https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/docs/sdk.md" target="_blank" rel="noreferrer">SDK linkage guide</a>,
+and <a href="https://github.com/NVIDIA/NeMo-Speech.cpp/releases/tag/v0.2.0" target="_blank" rel="noreferrer">official 0.2.0 release</a>.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#runtime-and-helper">Runtime and helper</a><a href="#retained-model-and-audio-streams">Retained model and audio streams</a><a href="#probabilities-callbacks-and-cancellation">Probabilities, callbacks, and cancellation</a><a href="#core-service">Core service</a><a href="#shared-process-transport">Shared process transport</a><a href="#upstream-contracts">Upstream contracts</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

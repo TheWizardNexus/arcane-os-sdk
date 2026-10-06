@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Availability and normalization</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="availability-and-normalization">Availability and normalization</h1><p class="doc-lead">Use this page to choose an API by capability. The compact labels tell you where it runs; the protocol guide contains the implementation detail.</p><div class="doc-meta"><span>SDK 0.57.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Availability and normalization</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="availability-and-normalization">Availability and normalization</h1><p class="doc-lead">Use this page to choose an API by capability. The compact labels tell you where it runs; the protocol guide contains the implementation detail.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="./" aria-current="page">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/availability-and-normalization.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#shared-type-predicates">Shared type predicates</a><a href="#availability-labels">Availability labels</a><a href="#capability-first-matrix">Capability-first matrix</a><a href="#the-normalized-application-path">The normalized application path</a><a href="#normalization-levels">Normalization levels</a><a href="#no-implicit-protocol-or-provider-fallback">No implicit protocol or provider fallback</a></nav></details><aside class="callout callout-info"><strong>Normalized AI comes first.</strong> Ordinary applications start with <a href="../ai/"><code>AI.js</code> or <code>globalThis.Arcane.ai</code></a>. Use Ollama APIs only when provider-native fields or an admitted provider-specific operation is intentional.</aside><p>Use this page to choose an API by capability. The compact labels tell you where
@@ -88,12 +88,12 @@ false when a probe throws; SDK branching continues through its owning error path
 <p>“Available” never means “authorized.” App grants, method allowlists, host
 policy, package-owned model policy, platform support, and dependency readiness
 are independent checks.</p>
-<p>Windows x64 has an SDK-owned precompiled WebView2/SEA host; Linux and Android
-retain their explicit checkout providers where listed. The SDK also includes
-macOS Foundation process-adapter source, separately from an executable target,
-renderer bridge, artifact or run command. A composed macOS host may combine that
-source with the reusable Node Core runtime, stdio transport and portable payload.
-Source availability does not establish macOS compilation or execution.</p>
+<p>Windows x64 and macOS ARM64/x64 have SDK-owned provider and host composition
+source. Their assembly paths require the matching numeric release&#39;s native
+host archive; npm publication alone does not supply that archive or establish
+platform execution. The macOS provider composes AppKit, WebKit and the shared
+Node Core payload. Linux and Android retain their explicit checkout providers
+where listed. See <a href="../core-native-packaging/">native output and host requirements</a>.</p>
 <h2 id="capability-first-matrix">Capability-first matrix</h2>
 <div class="table-wrap" data-columns="4" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -221,7 +221,7 @@ Source availability does not establish macOS compilation or execution.</p>
 <tr>
 <td>Assemble a portable Core payload from the installed SDK</td>
 <td><code>arcane-os/native/portable-provider</code></td>
-<td><strong>Node</strong>; portable platform selection is currently Windows or Linux, while separately composed hosts may use the payload</td>
+<td><strong>Node</strong>; explicit Windows, Linux or macOS platform selection</td>
 <td>The provider copies the selected app, dependencies, installed SDK runtime, Core client/runtime, and explicit service composition into a non-executable directory. It uses no <code>arcaneRoot</code> by default and does not prove host behavior or supply a platform bridge.</td>
 </tr>
 <tr>
@@ -231,10 +231,40 @@ Source availability does not establish macOS compilation or execution.</p>
 <td>Uses the installed SDK version&#39;s precompiled release asset and explicit app services. Complete diagnostics and accepted service work drain on run cancellation; no OS checkout or application-side native compiler is required.</td>
 </tr>
 <tr>
+<td>Compose a macOS application bundle</td>
+<td><a href="../core-native-packaging/#macos-application-composition"><code>arcane-os/native/macos-provider</code></a></td>
+<td><strong>Node</strong> assembly with matching host archive; matching Darwin ARM64/x64 for execution</td>
+<td>Complete portable content stays in Resources. AppKit/WebKit launch, stable packaged origin, document activation and graceful Core drain remain host-owned. Source implementation is separate from a built/published host archive or actual Mac execution.</td>
+</tr>
+<tr>
+<td>Persist application-owned Core preferences</td>
+<td><a href="../core-preferences/"><code>arcane-os/core/preferences</code></a></td>
+<td><strong>Node</strong> Core service; renderer uses existing <code>Arcane.preferences</code> methods</td>
+<td>Application-selected file and exact keys/JSON values, ordered in-process writes and service-lifetime drain. Unreadable storage remains untouched; saved values do not set operating-system preferences.</td>
+</tr>
+<tr>
+<td>Read complete selected text from Git</td>
+<td><a href="../git-text-snapshot/"><code>createGitTextSnapshot</code></a> from <code>arcane-os</code></td>
+<td><strong>Node</strong> with Git on Windows, Linux or macOS; Android requires host adaptation</td>
+<td>One selected revision, complete UTF-8 content and independent result copies. A dedicated bare object cache leaves working checkouts untouched; shared refresh and drain own actual completion.</td>
+</tr>
+<tr>
 <td>Use application-selected llama.cpp/Ollama through Core</td>
 <td><a href="../local-ai/"><code>arcane-os/core/local-ai</code>, <code>arcane-os/ai/core-local</code></a></td>
 <td><strong>Node</strong> native service; <strong>Browser / native WebView</strong> provider through an explicit Core connection</td>
 <td>Independent runtime/model lifecycle, complete streaming and cancellation. Official runtime preparation follows explicit app requirements; model selection and business policy stay app-owned.</td>
+</tr>
+<tr>
+<td>Run native ONNX tensors</td>
+<td><a href="../local-ai/#native-onnx-sessions"><code>arcane-os/local-ai/onnx</code>, <code>arcane-os/ai/core-onnx</code></a></td>
+<td><strong>Node</strong> Windows/Linux/macOS x64/arm64; <strong>Browser / native WebView</strong> through available Core</td>
+<td>Explicit graph loading, retained workers and complete tensor outputs. Android requires host adaptation. Native calls can delay worker termination; cleanup observes actual exit.</td>
+</tr>
+<tr>
+<td>Label speakers in caller-fed mono audio</td>
+<td><a href="../diarization/"><code>arcane-os/diarization</code>, <code>arcane-os/core/diarization</code></a></td>
+<td><strong>Node</strong> with built helper, selected official NeMo libraries and Nemotron model; official CPU archives cover Windows x64 and Linux/macOS x64/arm64</td>
+<td>Independent retained streams, complete timed segments and optional probability frames. Generic labels are not personal identities or speech transcripts; cancellation and close observe native cleanup. Android needs host adaptation.</td>
 </tr>
 <tr>
 <td>Use local AI without coupling app code to Ollama HTTP</td>
@@ -461,6 +491,6 @@ native host.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#shared-type-predicates">Shared type predicates</a><a href="#availability-labels">Availability labels</a><a href="#capability-first-matrix">Capability-first matrix</a><a href="#the-normalized-application-path">The normalized application path</a><a href="#normalization-levels">Normalization levels</a><a href="#no-implicit-protocol-or-provider-fallback">No implicit protocol or provider fallback</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.57.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

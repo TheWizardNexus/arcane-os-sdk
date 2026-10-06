@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="createGitTextSnapshot from arcane-os reads application-selected UTF-8 text from one fetched Git revision. It uses a dedicated bare object cache, not a clone with a working checkout. It never reads uncommitted application files, checks out files, modifies a user checkout/index, or creates another worktree. Construction performs no I/O. The native host needs Git available on its PATH; Git owns remote access, authentication and its actual failures.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/git-text-snapshot/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Complete Git text snapshots · Arcane OS SDK"><meta property="og:description" content="createGitTextSnapshot from arcane-os reads application-selected UTF-8 text from one fetched Git revision. It uses a dedicated bare object cache, not a clone with a working checkout. It never reads uncommitted application files, checks out files, modifies a user checkout/index, or creates another worktree. Construction performs no I/O. The native host needs Git available on its PATH; Git owns remote access, authentication and its actual failures."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/git-text-snapshot/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Complete Git text snapshots · Arcane OS SDK"><meta name="twitter:description" content="createGitTextSnapshot from arcane-os reads application-selected UTF-8 text from one fetched Git revision. It uses a dedicated bare object cache, not a clone with a working checkout. It never reads uncommitted application files, checks out files, modifies a user checkout/index, or creates another worktree. Construction performs no I/O. The native host needs Git available on its PATH; Git owns remote access, authentication and its actual failures."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Complete Git text snapshots | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Complete Git text snapshots</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="complete-git-text-snapshots">Complete Git text snapshots</h1><p class="doc-lead">createGitTextSnapshot from arcane-os reads application-selected UTF-8 text from one fetched Git revision. It uses a dedicated bare object cache, not a clone with a working checkout. It never reads uncommitted application files, checks out files, modifies a user checkout/index, or creates another worktree. Construction performs no I/O. The native host needs Git available on its PATH; Git owns remote access, authentication and its actual failures.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/git-text-snapshot.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#api-and-lifecycle">API and lifecycle</a><a href="#complete-text-and-observable-failures">Complete text and observable failures</a><a href="#core-service-composition">Core service composition</a></nav></details><p><code>createGitTextSnapshot</code> from <code>arcane-os</code> reads application-selected UTF-8 text
+from one fetched Git revision. It uses a dedicated <strong>bare object cache</strong>, not a
+clone with a working checkout. It never reads uncommitted application files,
+checks out files, modifies a user checkout/index, or creates another worktree.
+Construction performs no I/O. The native host needs Git available on its PATH;
+Git owns remote access, authentication and its actual failures.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createGitTextSnapshot} from &#39;arcane-os&#39;;
+
+const snapshot = createGitTextSnapshot({
+    cacheDirectory: applicationCacheDirectory,
+    remote: applicationRepository,
+    ref: applicationRef,
+    selectPath: function selectMoonDispatches(filename) {
+        return filename.startsWith(&#39;dispatches/&#39;) &amp;&amp; filename.endsWith(&#39;.md&#39;);
+    }
+});
+
+const {revision, files} = await snapshot.refresh({signal});
+// files: [{path: &#39;dispatches/cheese-emergency.md&#39;, content: completeText}]
+await snapshot.close();
+</code></pre></div>
+<p>The application owns its remote, ref, path policy, repository identity, refresh
+schedule and Core service factory. The SDK does not select <code>main</code>, poll, parse
+Markdown/YAML, label or rewrite documents, or choose a product RPC method.
+<code>selectPath(path)</code> may return a boolean or a promise of one. It receives each
+complete repository-relative leaf path in Git tree order. Keep the selector&#39;s
+policy stable for the lifetime of its snapshot owner.</p>
+<h2 id="api-and-lifecycle">API and lifecycle</h2>
+<p><code>createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,onEvent,run})</code>
+returns <code>{refresh,close,drain,dispose}</code>. <code>run</code> defaults to the SDK&#39;s existing
+<code>runProcess</code>; applications normally omit it. It is the same process adapter
+contract, not a second process supervisor. <code>onEvent</code> is the ordinary SDK event
+callback and follows its asynchronous completion/error contract.</p>
+<ul>
+<li><code>refresh({signal}={})</code> fetches the selected ref and returns
+<code>{revision,files:[{path,content}]}</code>. <code>revision</code> is Git&#39;s opaque selected commit
+name, not an SDK integrity record. Every file comes from that exact revision,
+even if the remote moves during retrieval. Order follows Git&#39;s tree listing.</li>
+<li>Concurrent calls share the active refresh. A later call fetches again; when
+the selected revision is unchanged, it reuses the completed text retrieval.
+Returned arrays and records are independent copies, so caller edits do not
+alter retained results. Failed refreshes report errors, never stale success.</li>
+<li>A caller&#39;s abort cancels only that caller&#39;s wait. Accepted shared refresh
+continues, including when every caller leaves. There is no incomplete result
+presented as a complete snapshot. A pre-aborted call starts no work.</li>
+<li><code>close()</code>, <code>drain()</code> and <code>dispose()</code> are the same idempotent operation. They
+stop acceptance and await accepted refresh work and its process/event cleanup.
+Calls after close reject with <code>CORE_CLOSING</code>. A failure during drain rejects
+close. Connect this hook to the Core service&#39;s <code>drain</code>/<code>dispose</code> lifecycle;
+do not terminate its process before accepted work settles.</li>
+</ul>
+<p>One application service owns each cache directory. Sharing that mutable bare
+cache across independent instances or processes requires coordination by its
+application owner; this factory does not install a daemon or cross-process lock.
+An empty cache is initialized once. An existing non-bare checkout is rejected
+without repurposing it. The cache is retained when the owner closes.</p>
+<h2 id="complete-text-and-observable-failures">Complete text and observable failures</h2>
+<p>Content is the exact Git blob text, including whitespace, CRLF, newlines,
+leading BOM and embedded NUL characters. No checkout filters, <code>textconv</code>,
+normalization, trimming, truncation, freezing or application size gate applies.
+Symlink blobs expose their stored target text; they are never followed.
+Selected submodules are not text blobs and produce an explicit error rather
+than being skipped or fetched as another repository. A selected path or blob
+that cannot be decoded as UTF-8 fails with <code>ARCANE_GIT_SNAPSHOT_NOT_TEXT</code> instead
+of silently substituting replacement characters. Git errors and complete
+diagnostics remain available to the caller and the existing process event owner.</p>
+<p><code>git.snapshot.refreshing</code>, <code>git.snapshot.completed</code> and <code>git.snapshot.failed</code>
+describe the shared operation. Completion data contains <code>{revision,reused}</code>;
+failure data contains the actual error. These events supplement the complete
+result, never replace it. An event callback must not await a new refresh of the
+same owner from inside the operation it is currently observing.</p>
+<p>Initial refresh performs bare initialization/role discovery, then fetch,
+revision resolution, one tree listing and one batched blob process. Later
+unchanged revisions need only fetch and revision resolution. A changed revision
+uses one tree process and one blob process regardless of the selected file
+count. An empty selection needs no blob process. Blob requests use the shared
+async process-input owner; raw stdout is consumed by the Git parser with
+backpressure. Git&#39;s encoded body extent and object names remain local to its
+<a href="https://git-scm.com/docs/git-cat-file#_batch_output" target="_blank" rel="noreferrer">batch protocol</a>; they do
+not become product metadata, byte progress, admission or integrity policy.</p>
+<h2 id="core-service-composition">Core service composition</h2>
+<p>The application wraps this mechanism in its own service factory and supplies its
+own public method and result fields. The handler can pass <code>context.signal</code> to
+<code>refresh</code> for request cancellation, then map <code>revision</code> to its chosen remote-ref
+field without changing any <code>content</code>. Return the snapshot owner&#39;s <code>drain</code> and
+<code>dispose</code> hooks from that service. Native launch configuration selects the
+cache location; browser code does not launch Git or reconstruct its protocol.</p>
+<p>This contract is portable Node source for Windows, Linux and macOS. Android
+requires a host that supplies the same Git/process capability; it is not a
+claim that every Android host ships Git.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#api-and-lifecycle">API and lifecycle</a><a href="#complete-text-and-observable-failures">Complete text and observable failures</a><a href="#core-service-composition">Core service composition</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

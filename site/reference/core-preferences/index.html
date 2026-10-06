@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="createPreferencesService({file}) from arcane-os/core/preferences supplies the existing Arcane.preferences RPC methods to a native Core host. The default export is the same factory. Construction performs no filesystem work. The application selects its writable file and owns preference names, defaults and schemas; this service does not invent them or alter operating-system settings.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-preferences/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Core preferences service · Arcane OS SDK"><meta property="og:description" content="createPreferencesService({file}) from arcane-os/core/preferences supplies the existing Arcane.preferences RPC methods to a native Core host. The default export is the same factory. Construction performs no filesystem work. The application selects its writable file and owns preference names, defaults and schemas; this service does not invent them or alter operating-system settings."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/core-preferences/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Core preferences service · Arcane OS SDK"><meta name="twitter:description" content="createPreferencesService({file}) from arcane-os/core/preferences supplies the existing Arcane.preferences RPC methods to a native Core host. The default export is the same factory. Construction performs no filesystem work. The application selects its writable file and owns preference names, defaults and schemas; this service does not invent them or alter operating-system settings."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Core preferences service | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core preferences service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-preferences-service">Core preferences service</h1><p class="doc-lead">createPreferencesService({file}) from arcane-os/core/preferences supplies the existing Arcane.preferences RPC methods to a native Core host. The default export is the same factory. Construction performs no filesystem work. The application selects its writable file and owns preference names, defaults and schemas; this service does not invent them or alter operating-system settings.</p><div class="doc-meta"><span>SDK 0.58.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-preferences.md"><p><code>createPreferencesService({file})</code> from <code>arcane-os/core/preferences</code> supplies the
+existing <code>Arcane.preferences</code> RPC methods to a native Core host. The default
+export is the same factory. Construction performs no filesystem work. The
+application selects its writable file and owns preference names, defaults and
+schemas; this service does not invent them or alter operating-system settings.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import path from &#39;node:path&#39;;
+import {createPreferencesService} from &#39;arcane-os/core/preferences&#39;;
+
+export default function createMoonPreferences(options, context) {
+    return createPreferencesService({
+        file: path.join(context.stateRoot, &#39;moon-preferences.json&#39;)
+    });
+}
+</code></pre></div>
+<p>Select this application-owned factory through <code>native.services</code>, and include it
+in <code>package.nativeResources</code>. Supply the application&#39;s selected <code>stateRoot</code>
+through the explicit launch configuration. See <a href="../core-native-packaging/#launch-time-locations">native packaging</a>.</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Input</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>preferences.list</code></td>
+<td><code>{}</code></td>
+<td><code>{keys}</code> in sorted order</td>
+</tr>
+<tr>
+<td><code>preferences.get</code></td>
+<td><code>{key}</code></td>
+<td><code>{key,found,value}</code>; missing value is <code>null</code></td>
+</tr>
+<tr>
+<td><code>preferences.set</code></td>
+<td><code>{key,value}</code></td>
+<td><code>{key,value}</code> after file replacement</td>
+</tr>
+<tr>
+<td><code>preferences.setMany</code></td>
+<td><code>{entries}</code></td>
+<td><code>{keys,count}</code> after file replacement</td>
+</tr>
+<tr>
+<td><code>preferences.delete</code></td>
+<td><code>{key}</code></td>
+<td><code>{key,deleted}</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>Storage remains <code>{schemaVersion:1,entries}</code>. Exact keys, complete JSON values and
+additional existing document metadata are retained. A missing file starts with
+empty entries; reading it does not create a file. Unreadable or malformed files
+report their real errors and are not replaced with an empty record. Values that
+JSON cannot represent completely fail before replacement. There is no migration,
+truncation, namespace rewrite, default injection or frozen result.</p>
+<p>Operations selecting the same resolved filename share one ordered queue within
+the Core process. This is not a cross-process file lock. Writes flush their new
+content and replace the selected file before acknowledgment. Filesystem failures
+remain observable, including cleanup errors; this is not a claim of survival
+across every hardware or operating-system failure.</p>
+<p><code>set</code>, <code>setMany</code> and <code>delete</code> use <code>lifetime:&#39;service&#39;</code>: renderer cancellation does
+not discard accepted writes. <code>drain()</code> and <code>dispose()</code> stop acceptance and wait
+for accepted operations; later calls reject with <code>CORE_CLOSING</code>. Read operations
+observe their request cancellation. Use the existing Core host shutdown owner
+so saved preferences finish before the native process exits.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><p class="toc-more">This collection is fully listed in the main content.</p></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.58.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

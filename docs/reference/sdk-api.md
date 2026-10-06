@@ -58,6 +58,10 @@ runtime layouts.
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
+| `arcane-os/core/preferences` | Existing preference RPC methods with an application-selected file, ordered writes and owned drain. |
+| `arcane-os/core/diarization` | Lazy native speaker-diarization service, explicit stream methods and lifecycle/result events. |
+| `arcane-os/diarization` | Retained Nemotron model helper and independent caller-fed audio streams. |
+| `arcane-os/diarization/build` | First-party helper compilation against explicitly installed NeMo-Speech.cpp libraries. |
 | `arcane-os/core/local-ai` | Native llama.cpp, Ollama and ONNX Core service, model readiness, complete responses and owned lifecycle. See [local AI through Core](local-ai.md). |
 | `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX requirements and NeMo libraries. |
 | `arcane-os/local-ai/onnx` | Retained native ONNX worker sessions with explicit graph loading and complete tensor inference. |
@@ -389,6 +393,12 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/macos-provider` | macOS native provider | Node assembly; matching Darwin architecture and selected host asset |
 | `createPackagedWebService()` | function | `arcane-os/core/packaged-web` | Native packaged web serving | Node Core lifetime; actual listener readiness before navigation |
+| `createPreferencesService()` | function | `arcane-os/core/preferences` | Core preference persistence | Node Core runtime with an application-selected file |
+| `createPreferencesService default export` | function | `arcane-os/core/preferences` | Core preference persistence | Same Core service factory |
+| `createDiarization()` | function | `arcane-os/diarization` | Native speaker diarization | Node with a built helper, selected NeMo libraries and caller-selected model |
+| `buildDiarizationHelper()` | function | `arcane-os/diarization/build` | Native speaker diarization | Node with installed CMake/C++17 toolchain and selected runtime |
+| `createDiarizationService()` | function | `arcane-os/core/diarization` | Native speaker diarization | Node Core runtime with explicitly selected helper, runtime and model |
+| `createDiarizationService default export` | function | `arcane-os/core/diarization` | Native speaker diarization | Same Core service factory |
 | `createCoreLocalAIProvider()` | function | `arcane-os/ai/core-local` | Core local AI | Browser/native WebView with an available Core connection |
 | `createLocalAIService()` | function | `arcane-os/core/local-ai` | Core local AI | Node with selected llama.cpp/Ollama/ONNX runtimes |
 | `createONNXRuntime()` | function | `arcane-os/local-ai/onnx` | Core local AI | Node with prepared Microsoft ONNX runtime |
@@ -7414,6 +7424,137 @@ errors, with no silent new origin. Startup rejection belongs to the Core
 `core.web.failed` with the complete serialized error. Drain owns listener close
 and lifecycle completion. No application launch payload is rewritten, no model
 is loaded, and the ordinary server's HTTPS default is unchanged.
+
+## createPreferencesService()
+
+### Overview
+
+Supplies the five existing `Arcane.preferences` methods using an application-selected
+JSON file. Construction performs no filesystem work. Preference names, defaults,
+schemas and writable location remain application-owned.
+
+### Signature and result
+
+```text
+createPreferencesService({file}={})
+```
+
+Import from `arcane-os/core/preferences`. The returned Core service exposes
+`preferences.list/get/set/setMany/delete`, `drain()` and `dispose()`. Writes use
+`lifetime:'service'`, preserve complete JSON values and existing document metadata,
+and acknowledge after the new content is flushed and the selected file replaced.
+Operations selecting the same resolved filename share an ordered in-process queue.
+Unreadable or malformed files report their errors without being replaced; a missing
+file starts with empty entries. Unrepresentable JSON values fail before replacement.
+
+```javascript
+import {createPreferencesService} from 'arcane-os/core/preferences';
+
+const preferences = createPreferencesService({file: selectedPreferenceFile});
+```
+
+Register the service with the existing Core owner. Its drain/dispose stops new
+acceptance, waits for accepted work and exposes failures; subsequent calls reject
+with `CORE_CLOSING`. See [method results, storage and service composition](core-preferences.md).
+
+## createPreferencesService default export
+
+The default export from `arcane-os/core/preferences` is the same
+`createPreferencesService` factory, with identical arguments, method results
+and lifecycle:
+
+```javascript
+import createPreferencesService from 'arcane-os/core/preferences';
+```
+
+## createDiarization()
+
+### Overview
+
+Retains one caller-selected Nemotron model in its first-party native helper and
+accepts independent mono-audio streams. Results contain generic timed speaker
+labels; they do not identify people or perform speech recognition.
+
+### Signature and result
+
+```text
+createDiarization({executable,modelPath,runtime,onEvent}={})
+```
+
+Import from `arcane-os/diarization`. Supply absolute helper/model paths and the
+selected runtime's library locations. The returned owner starts the helper and
+exposes `ready`, `completion`, `current()`, replaying `subscribe()`,
+`openStream()`, `diarize()` and `close()`. Readiness resolves only after model
+loading. Each stream owns `push`, `finish`, `cancel`, `completion` and `current`;
+pushes preserve mono float32 input, use backpressure and return the latest timed
+segment snapshot. Caller callbacks may receive every probability frame.
+
+```javascript
+import {createDiarization} from 'arcane-os/diarization';
+
+const speakers = createDiarization({executable, modelPath, runtime});
+const result = await speakers.diarize({audio: monoSamples, sampleRate: 16000});
+await speakers.close();
+```
+
+Load, callback, process and cleanup failures remain observable. Cancellation
+suppresses later results for its stream and closes it after accepted native
+commands; the C ABI supplies no immediate interrupt. Close drains owned work
+and observes helper exit. See [complete audio, callback and cancellation contracts](diarization.md).
+
+## buildDiarizationHelper()
+
+```text
+async buildDiarizationHelper({runtime,outputRoot,signal,onEvent}={})
+```
+
+Import from `arcane-os/diarization/build`. Builds the first-party helper for the
+current host using installed CMake/C++17 tools and the selected runtime's
+`cmakeDirectory`. Returns `{platform,architecture,root,executable,diagnostics}`
+after configure, compile and install, retaining complete command diagnostics.
+Missing inputs or actual tool failures reject through the shared process owner;
+no compiler, model or runtime is downloaded by this function.
+
+```javascript
+import {buildDiarizationHelper} from 'arcane-os/diarization/build';
+
+const helper = await buildDiarizationHelper({runtime, outputRoot: helperDirectory});
+```
+
+See [runtime preparation, helper placement and platform support](diarization.md#runtime-and-helper).
+
+## createDiarizationService()
+
+```text
+createDiarizationService(options={},launch={})
+```
+
+Import from `arcane-os/core/diarization`. This synchronous `native.services`
+factory accepts `{executable,modelPath,runtime,onEvent}` and the native launch
+context. Relative executable/model paths use `workspaceRoot`, then `appRoot`,
+then the current directory. It supplies `diarization.status`, `diarization.load`,
+`diarization.open`, `diarization.push`, `diarization.finish`, `diarization.cancel`
+and `diarization.recording`, state/update/probability events and drain/dispose hooks.
+The first actual operation loads the model, independently of Core startup.
+
+```javascript
+import {createDiarizationService} from 'arcane-os/core/diarization';
+
+const service = createDiarizationService({executable, modelPath, runtime}, launch);
+```
+
+Session audio has service lifetime and explicit cancellation; a recording's
+request cancellation closes only that recording. Complete float32 samples use
+the documented Core transport framing. See [inputs, results, events and lifetime](diarization.md#core-service).
+
+## createDiarizationService default export
+
+The default binding from `arcane-os/core/diarization` is exactly the named
+`createDiarizationService` factory, with the same selection and service lifecycle:
+
+```javascript
+import createDiarizationService from 'arcane-os/core/diarization';
+```
 
 ## readCoreLaunchContext()
 
