@@ -8,7 +8,8 @@ import {
 const is=new Is(false);
 
 const dbopfsEventTypes={
-    ready:'dbopfs-ready'
+    ready:'dbopfs-ready',
+    change:'dbopfs-change'
 };
 const dbopfsReasons={
     ready:'opfs-database-ready'
@@ -117,6 +118,13 @@ if(navigator.storage?.persist){
 class DBOPFS {
 
     #events;
+    #changeChannel=null;
+    #changeOriginId=globalThis.crypto?.randomUUID?.()
+        ||`dbopfs-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    #changeSequence=0;
+    #changeWindow=window;
+    #changesSuspended=false;
+    #cacheStates=new Map();
 
     /** @type {FileSystemDirectoryHandle|Object} */
     #db={}
@@ -286,6 +294,113 @@ class DBOPFS {
         return `${tableName}:${fileName}`
     }
 
+    #fileCacheState(tableName,fileName){
+        const directoryName=directoryNameForTable(tableName);
+        let table=this.#cacheStates.get(directoryName);
+        if(!table){
+            table=new Map();
+            this.#cacheStates.set(directoryName,table);
+        }
+        let state=table.get(fileName);
+        if(!state){
+            state={revision:0};
+            table.set(fileName,state);
+        }
+        return state;
+    }
+
+    #forgetFile(tableName,fileName,retire=false){
+        const directoryName=directoryNameForTable(tableName);
+        const registeredTableName=tableNameForDirectory(directoryName);
+        const states=this.#cacheStates.get(directoryName);
+        const state=states?.get(fileName);
+        if(state)state.revision+=1;
+        if(retire&&states){
+            states.delete(fileName);
+            if(states.size===0)this.#cacheStates.delete(directoryName);
+        }
+        for(const name of new Set([tableName,directoryName,registeredTableName])){
+            if(this.#tables[name])delete this.#tables[name][fileName];
+        }
+    }
+
+    #openChangeChannel(){
+        if(this.#changesSuspended||this.#changeChannel||!this.#applicationId)return;
+        const Channel=this.#changeWindow.BroadcastChannel;
+        if(!is.function(Channel))return;
+        try{
+            const channel=new Channel(`arcane.dbopfs.changes:${this.#storagePath}`);
+            const database=this;
+            channel.onmessage=function receiveCommittedChange(event){
+                const change=event.data;
+                if(!change||change.applicationId!==database.#applicationId
+                    ||change.storagePath!==database.#storagePath
+                    ||change.originId===database.#changeOriginId)return;
+                if(!['write','append','delete','table-delete'].includes(change.action)
+                    ||typeof change.tableName!=='string'
+                    ||typeof change.directoryName!=='string'
+                    ||typeof change.changeId!=='string'
+                    ||(change.action!=='table-delete'&&typeof change.fileName!=='string'))return;
+                database.#receiveChange(change);
+            };
+            channel.onmessageerror=function reportChangeMessageError(event){
+                arcaneLogging.error('DBOPFS could not receive a committed-change notification.',event);
+            };
+            this.#changeChannel=channel;
+        }catch(error){
+            arcaneLogging.error('DBOPFS cross-document notifications are unavailable; local storage remains available.',error);
+        }
+    }
+
+    #closeChangeChannel(){
+        if(!this.#changeChannel)return;
+        this.#changeChannel.onmessage=null;
+        this.#changeChannel.onmessageerror=null;
+        this.#changeChannel.close();
+        this.#changeChannel=null;
+    }
+
+    #receiveChange(change){
+        if(change.action==='table-delete'){
+            this.#forgetTable(change.tableName,change.directoryName,tableNameForDirectory(change.directoryName));
+        }else{
+            this.#forgetFile(change.tableName,change.fileName,change.action==='delete');
+        }
+        this.#events.dispatch(dbopfsEventTypes.change,{...change,remote:true},{operationId:change.changeId});
+    }
+
+    #commitChange(tableName,fileName,action){
+        const directoryName=directoryNameForTable(tableName);
+        const registeredTableName=tableNameForDirectory(directoryName);
+        if(action==='table-delete'){
+            this.#forgetTable(tableName,directoryName,registeredTableName);
+        }else{
+            this.#forgetFile(tableName,fileName,action==='delete');
+        }
+        this.#changeSequence+=1;
+        const change={
+            applicationId:this.#applicationId,
+            storagePath:this.#storagePath,
+            tableName:registeredTableName,
+            directoryName,
+            fileName,
+            action,
+            originId:this.#changeOriginId,
+            sequence:this.#changeSequence,
+            changeId:`${this.#changeOriginId}:${this.#changeSequence}`
+        };
+        // Notify the remote transport before synchronous local observers can
+        // start another mutation. Transport failure cannot undo a saved record.
+        if(this.#changeChannel){
+            try{
+                this.#changeChannel.postMessage(change);
+            }catch(error){
+                arcaneLogging.error('DBOPFS saved a change whose cross-document notification failed.',error);
+            }
+        }
+        this.#events.dispatch(dbopfsEventTypes.change,{...change,remote:false},{operationId:change.changeId});
+    }
+
     /**
      * Invalidates every known cache key for one logical/physical table pair.
      * @private
@@ -294,6 +409,7 @@ class DBOPFS {
      * @param {string} registeredTableName
      */
     #forgetTable(tableName,directoryName,registeredTableName){
+        this.#cacheStates.delete(directoryName);
         for(const name of new Set([
             tableName,
             directoryName,
@@ -320,6 +436,22 @@ class DBOPFS {
             source:'dbopfs',
             eventTypes:Object.values(dbopfsEventTypes)
         });
+        const database=this;
+        this.#changeWindow.addEventListener('pagehide',function suspendDBOPFSChanges(){
+            database.#changesSuspended=true;
+            database.#closeChangeChannel();
+        });
+        this.#changeWindow.addEventListener('pageshow',function resumeDBOPFSChanges(){
+            if(!database.#changesSuspended)return;
+            database.#changesSuspended=false;
+            // Notifications have no history. Discard only this page's cached
+            // views after suspension; storage and committed events are unchanged.
+            database.#tables={};
+            database.#tableHandles={};
+            database.#tableHandlePromises={};
+            database.#cacheStates.clear();
+            database.#openChangeChannel();
+        });
         this.readyPromise=this.#init(options);
     }
 
@@ -340,6 +472,7 @@ class DBOPFS {
         this.#applicationId=scope.applicationId;
         this.#storagePath=scope.path;
         this.#db=scope.directory;
+        this.#openChangeChannel();
 
         this.ready=true;
 
@@ -380,6 +513,17 @@ class DBOPFS {
      */
     get storagePath(){
         return this.#storagePath;
+    }
+
+    /**
+     * Observes committed record/table changes through the canonical event owner.
+     * Subscription is live-only; it does not replay records or load a table.
+     * @param {function} listener Receives an event whose detail is change metadata.
+     * @param {{signal?:AbortSignal,once?:boolean}} options
+     * @returns {function} Idempotent unsubscribe with a matching dispose method.
+     */
+    subscribeChanges(listener,options={}){
+        return this.#events.subscribe(dbopfsEventTypes.change,listener,options);
     }
 
     /**
@@ -444,7 +588,9 @@ class DBOPFS {
                 {create:true}
             ).then(
                 function registerRequestedTable(handle){
-                    this.#tableHandles[registeredTableName]=handle;
+                    if(this.#tableHandlePromises[registeredTableName]===handlePromise){
+                        this.#tableHandles[registeredTableName]=handle;
+                    }
                     return handle;
                 }.bind(this)
             );
@@ -489,6 +635,10 @@ class DBOPFS {
                     dataToWrite=JSON.stringify(dataToWrite)
                 }
 
+                const cacheState=this.#fileCacheState(tableName,fileName);
+                const cacheRevision=cacheState.revision;
+                const result=append?true:parseFileValue(fileName,String(dataToWrite));
+
                 try{
                     await this.writeFile(
                         tableName,
@@ -497,20 +647,20 @@ class DBOPFS {
                         append
                     );
 
-                    if(append){
-                        delete this.#tables[tableName][fileName];
-                    }else{
-                        this.#tables[tableName][fileName]=parseFileValue(
-                            fileName,
-                            String(dataToWrite)
-                        );
+                    if(!append&&this.#fileCacheState(tableName,fileName)===cacheState
+                        &&cacheState.revision<=cacheRevision+1){
+                        if(!this.#tables[tableName])this.#tables[tableName]={};
+                        this.#tables[tableName][fileName]=result;
+                    }
+                    if(append&&cacheState.revision===cacheRevision){
+                        this.#forgetFile(tableName,fileName);
                     }
                 }catch(error){
                     arcaneLogging.error(`Error writing file '${fileName}' to table '${tableName}':`,error)
                     throw error
                 }
 
-                return append?true:this.#tables[tableName][fileName]
+                return result
             }.bind(this)
         )
 
@@ -547,12 +697,14 @@ class DBOPFS {
         );
 
         if(!is.function(handle.createWritable)){
-            return this.#writeFileWithWorker(
+            await this.#writeFileWithWorker(
                 table.name,
                 fileName,
                 fileData,
                 append
             );
+            this.#commitChange(tableName,fileName,append?'append':'write');
+            return true;
         }
 
         const writable=await handle.createWritable(
@@ -572,6 +724,7 @@ class DBOPFS {
 
         await writable.write(blob);
         await writable.close();
+        this.#commitChange(tableName,fileName,append?'append':'write');
 
         return true
     }
@@ -669,6 +822,8 @@ class DBOPFS {
      */
     async get(tableName='',fileName='',force=false){
         if(force||!this.#tables[tableName]?.[fileName]){
+            const cacheState=this.#fileCacheState(tableName,fileName);
+            const cacheRevision=cacheState.revision;
             try{
                 const file=await this.readFile(tableName,fileName)
                 const textContent=await file.text()
@@ -677,12 +832,15 @@ class DBOPFS {
                     this.#tables[tableName]={}
                 }
 
-                this.#tables[tableName][fileName]=parseFileValue(
-                    fileName,
-                    textContent
-                );
+                const value=parseFileValue(fileName,textContent);
+                if(this.#fileCacheState(tableName,fileName)===cacheState
+                    &&cacheState.revision===cacheRevision){
+                    this.#tables[tableName][fileName]=value;
+                }
+                return value;
             }catch(error){
                 if(error.name==='NotFoundError'){
+                    this.#forgetFile(tableName,fileName,true);
                     return null
                 }
 
@@ -788,15 +946,13 @@ class DBOPFS {
 
         try{
             await table.removeEntry(fileName)
+            this.#commitChange(tableName,fileName,'delete');
         }catch(error){
             if(error.name!=='NotFoundError'){
                 arcaneLogging.error(error)
                 throw error
             }
-        }
-
-        if(this.#tables[tableName]){
-            delete this.#tables[tableName][fileName]
+            this.#forgetFile(tableName,fileName,true);
         }
 
         return true
@@ -831,13 +987,9 @@ class DBOPFS {
 
         try{
             await this.#db.removeEntry(directoryName,{recursive:true})
-
-            delete this.#tables[tableName]
-            delete this.#tables[directoryName]
-            delete this.#tables[registeredTableName]
-            delete this.#tableHandles[registeredTableName]
-            delete this.#tableHandlePromises[registeredTableName]
+            this.#commitChange(tableName,null,'table-delete');
         }catch(error){
+            if(error.name==='NotFoundError')this.#forgetTable(tableName,directoryName,registeredTableName);
             arcaneLogging.error(error)
         }
 
@@ -894,7 +1046,7 @@ class DBOPFS {
             }
         }
 
-        this.#forgetTable(tableName,directoryName,registeredTableName)
+        this.#commitChange(tableName,null,'table-delete');
 
         return {
             status:'removed',
@@ -916,11 +1068,13 @@ class DBOPFS {
 
         for await(const [name]of this.#db.entries()){
             await this.#db.removeEntry(name,{recursive:true})
+            this.#commitChange(name,null,'table-delete');
         }
 
         this.#tables={}
         this.#tableHandles={}
         this.#tableHandlePromises={}
+        this.#cacheStates.clear();
         this.#writeLocks={}
 
         return this

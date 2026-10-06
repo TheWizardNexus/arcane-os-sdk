@@ -2203,6 +2203,59 @@ default `DBOPFS`; installs `window.dbopfs`, emits `dbopfs-ready`; table/file/bac
 
 Exact exports: `DBOPFS_EVENT_TYPES`, `DBOPFS_REASONS`, `default`.
 
+`subscribeChanges(listener, {signal, once})` observes
+`DBOPFS_EVENT_TYPES.change` (`dbopfs-change`) through the existing canonical
+`arcane-os/event-manager` source. It returns an idempotent unsubscribe function
+with `.dispose()`; aborting the supplied signal also removes the subscription.
+Each listener receives an event whose `detail` contains:
+
+| Field | Meaning |
+| --- | --- |
+| `applicationId`, `storagePath` | Existing application identity and `apps/<application-id>` OPFS scope. |
+| `tableName`, `directoryName` | Logical table and physical directory; `memories` / `memory` retain their existing alias. |
+| `fileName` | Complete record filename, or `null` for a removed table. |
+| `action` | `write`, `append`, `delete`, or `table-delete`. A write does not claim whether a record was newly created. |
+| `originId`, `sequence`, `changeId` | Per-document origin and incrementing committed occurrence, shared by local and remote notifications for that occurrence. These are correlation fields, separate from realm-local canonical event-source IDs. |
+| `remote` | `false` at the writing DBOPFS source, `true` when received from another live document. |
+
+A write is published after writable-stream `close()` succeeds, or after the
+existing OPFS worker acknowledges its completed write/flush/close. A removal
+is published after OPFS removes the record or table. The affected cached record
+or table, including alias keys and removed-table handles, is invalidated before
+listeners run. A read already in progress may still resolve its earlier
+snapshot; it cannot repopulate the cache after an intervening delivered change.
+Notification metadata does not contain, rewrite, or reread record bodies.
+
+`set()` and raw `writeFile()` publish one occurrence per completed write;
+`setMany()`, `deleteMany()`, clear operations, and restore retain their existing
+per-record results and publish only their actual successful mutations. A
+partial batch is not a transaction: successful records are announced even when
+siblings fail. Missing records, absent/non-empty empty-table removal, failed
+writes/removals, and reads emit no committed-change event. `deleteTable()` keeps
+its existing return/error-reporting behavior; its returned `true` alone does
+not imply that a committed-change event was emitted.
+
+Within one document, subscribe through this source or the canonical event
+manager, rather than consuming both as separate changes. Across documents,
+DBOPFS owns one native `BroadcastChannel` named from the application storage
+path. Native storage-partition matching plus that path selects the receiving
+documents. A remote receiver invalidates its affected cache before publishing
+locally and never rebroadcasts the occurrence. There is no echo back to the
+writing DBOPFS source. Ordinary storage success remains success if a transport
+notification fails; the notification error is reported separately.
+
+Subscriptions are live-only: subscribe before the application's initial read,
+then let the application map the table/file/action to its own records and UI.
+DBOPFS performs no polling, initial full-table read, automatic picker refresh,
+or event-history replay. The channel lasts for the owning page, independent of
+individual listener lifetimes, so a document that only writes still announces
+its commits. `pagehide` closes the channel; `pageshow` after suspension reopens
+it and clears only that document's in-memory caches. Resuming a page does not
+fabricate a storage mutation. Applications own any resume-time view refresh.
+Missed events during suspension, process termination, or realm loss are not
+replayed; the stored records remain the authority. Direct OPFS writes made
+outside DBOPFS are not observed by this contract.
+
 `createCompressedPNG({tableNames, additionalTables, signal})` returns an
 `image/png` Blob without downloading or writing records. Omitted `tableNames`
 selects all discovered saved tables; `[]` selects none. Named absent tables
@@ -2244,16 +2297,35 @@ unreadable row remains in its original string form so the owning application
 can display, diagnose, or recover it without silent data loss. DOM and storage
 errors remain observable. The logical `memories` table continues to map to the
 physical `memory` directory, and successful or already-absent empty-table
-removal invalidates both alias and cached-handle state. Transport: OPFS,
-DBOPFSWorker, Compression Streams.
+removal invalidates both alias and cached-handle state. Cross-document change
+delivery requires native `BroadcastChannel` in the same origin and storage
+partition, with the same application scope; separate WebView profiles do not
+share this transport. If it is unavailable, local change subscriptions and
+ordinary DBOPFS storage continue, without cross-document notification or a
+polling replacement. Transport: OPFS, DBOPFSWorker, Compression Streams, native
+BroadcastChannel, and the existing event-pubsub-backed canonical event owner.
 [Deep protocol details](protocols.md).
 
 ### Example
 
 ```javascript
-import * as module from '/arcane/modules/DBOPFS.js';
+import '/arcane/modules/DBOPFS.js';
 
-console.log(Object.keys(module));
+await dbopfs.readyPromise;
+const lifetime = new AbortController();
+const stop = dbopfs.subscribeChanges(function showCommittedParade(event) {
+  const change = event.detail;
+  if (change.tableName === 'moon_bus') {
+    console.log(change.action, change.fileName, change.remote);
+  }
+}, {signal: lifetime.signal});
+
+await dbopfs.set('moon_bus', 'squid-parade.json', {
+  destination: 'The moon', passengers: ['Captain Squid', 'One confused lobster']
+});
+// Another live page using this app/storage scope receives the same occurrence.
+// The application can read that one record when its view needs the body.
+stop(); // lifetime.abort() is the equivalent subscription cleanup.
 ```
 
 ## DBOPFSDocumentLibrary.js
