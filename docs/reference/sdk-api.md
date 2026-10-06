@@ -8903,8 +8903,11 @@ document operations. No application is launched, no desktop window is activated,
 and no automatic reconnect or action retry occurs.
 
 `status(options)` reports current app/window/document readiness.
-`inspect(parameters={},options)` returns complete selected light-DOM HTML/text
-and live control state. `capture(parameters={},options)` returns a full base64 PNG
+`inspect(parameters={},options)` returns complete selected DOM HTML/text
+and live control state. Inspection and actions accept optional `shadowPath`, an
+ordered array of unique CSS host selectors through open shadow roots; their
+`selector` resolves inside the final root. Omission retains top-level light DOM.
+Closed roots remain unavailable. `capture(parameters={},options)` returns a full base64 PNG
 of the rendered viewport. `act(parameters,options)` requires a returned
 `documentGeneration`, one CSS selector, and `click`, `fill`, `select` or `scroll`
 fields. Options preserve the Core client signal/timeout contract. `close()`

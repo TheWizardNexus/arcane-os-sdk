@@ -15,6 +15,9 @@ acknowledgement to stderr, then complete result JSON to stdout, or complete erro
 JSON to stderr and a nonzero exit. Capture writes its image to the explicit
 `--output` filename and returns metadata. Its options are scoped to that command;
 the general output-format parser below applies to the other commands.
+Inspection accepts either `--selector` or `--request <json-file>`; the latter
+reads the complete inspection object, including an explicit `shadowPath` through
+open shadow roots. Actions continue to use `--request` for their complete object.
 
 ## Command inventory
 

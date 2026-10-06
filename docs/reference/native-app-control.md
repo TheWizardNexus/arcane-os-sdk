@@ -74,9 +74,9 @@ connection or other business result.
 | --- | --- |
 | `connectAppControl({endpoint, signal?, onError?})` | Connect once to the explicit running host. It never launches an app, creates Core, changes a profile or reconnects automatically. |
 | `status(options?)` | Returns app identity, platform/host, current URL, document generation, readiness, window title/state/client dimensions and available operations. Readiness describes the document, not models or application services. |
-| `inspect(parameters={}, options?)` | Optional CSS `selector` selects zero or more roots; omission selects the document. Optional `documentGeneration` selects the expected document. Returns complete HTML/text, live control state and DOM-derived role/name hints. |
+| `inspect(parameters={}, options?)` | Optional `shadowPath` selects an open shadow root. Optional CSS `selector` selects zero or more elements within the selected root; omission selects the whole root. Optional `documentGeneration` selects the expected document. Returns complete HTML/text, live control state and DOM-derived role/name hints. |
 | `capture(parameters={}, options?)` | Returns `{mimeType:'image/png', data, documentGeneration, url}`. `data` contains the complete base64 PNG. Optional `documentGeneration` selects the expected document. |
-| `act(parameters, options?)` | Requires `documentGeneration`, one unambiguous CSS `selector`, and the action fields below. |
+| `act(parameters, options?)` | Requires `documentGeneration`, one unambiguous CSS `selector` within the root selected by optional `shadowPath`, and the action fields below. |
 | `close()` | Closes this caller's connection and cancels its pending requests. It never closes the app or Core. Returns the connection's completion promise. |
 | `closed` | Connection lifetime promise; actual transport failures remain observable. |
 | `endpoint` | The caller-selected local endpoint. |
@@ -90,19 +90,69 @@ is retained in the host diagnostics instead of being represented as delivered.
 
 ## Document operations
 
-Inspection covers the top-level light DOM. Its result contains `scope`, `title`,
+Inspection defaults to the top-level light DOM. Its result contains `scope`, `title`,
 `readyState`, `doctype`, `roots`, `controls`, `frames`, `shadowHosts`,
 `activeElement`, `scrollingElement`, `selection`, `documentGeneration`, and
 `url`. Each root retains its complete `html` and `text`; controls retain their
 attributes and current form, selection, disabled, scrolling and related state.
 Generated CSS selectors are useful for the inspected document; a later DOM edit
 can change their meaning. Application-authored stable selectors are preferable
-when available.
+when available. Component replacement or mutation can make a selector stale
+without changing the native document generation.
+
+### Open shadow roots
+
+`inspect` and `act` accept `shadowPath`, an ordered array of CSS host selectors.
+The first selector resolves inside the top-level document; each later selector
+resolves inside the preceding host's open shadow root. Every host selector must
+match exactly one element. The operation's `selector` then resolves only inside
+the final root. An omitted or empty `shadowPath` retains the ordinary light-DOM
+scope. Selecting a root never recursively enters its nested shadow roots.
+
+```js
+const shadowPath = ['#appearance-panel', 'theme-switcher'];
+const panel = await app.inspect({shadowPath});
+await app.act({
+    documentGeneration: panel.documentGeneration,
+    shadowPath,
+    selector: 'button[data-theme="dark"]',
+    action: 'click'
+});
+```
+
+Shadow inspection returns `scope:'open-shadow-root'` and the selected
+`shadowPath`. Its element selectors are local to that root. With no `selector`,
+`roots` contains one complete root record with `selector:null`, its full
+`innerHTML` as `html`, its full `textContent` as `text`, and `state:null`; a
+ShadowRoot itself is not an element or an action target. With a selector, roots
+retain their element HTML and state. Controls, frames and open-shadow hosts are
+described within this selected tree. Each `shadowHosts` descriptor retains its
+local `selector` and `mode`, and adds the full `shadowPath` needed to inspect
+that host's shadow root, including nested hosts. Pass that path to the next
+inspection; pair selectors from its result with that same path for actions.
+
+`activeElement` comes from the selected root. `scrollingElement` is `null` for a
+shadow-root scope because the root has no document scrolling element; scroll
+actions still target elements. `selection.text`, `title`, `readyState`, `doctype`
+and native URL/generation remain document-level information. Role/name label
+references resolve within the element's own tree. Inspection follows the DOM
+tree, not the composed rendering tree: slot-assigned light-DOM nodes remain in
+their own containing DOM tree and are not duplicated inside the selected shadow
+root.
+
+A missing or ambiguous host returns `ARCANE_APP_CONTROL_TARGET_COUNT` with the
+complete path, zero-based `index`, `selector` and match count. Invalid path or
+CSS input reports its actual error before any action. A host without an
+accessible open root returns `ARCANE_APP_CONTROL_UNSUPPORTED` with the path and
+failing step. Closed roots cannot be discovered, entered, or distinguished from
+absent roots through this API. No closed-root interception is installed.
+Shadow actions add the selected `shadowPath` to their result and retain the
+actual target state after dispatch, including disconnection by the action.
 
 Role/name hints are derived from DOM attributes and labels, not a native
-accessibility-tree computation. Frame documents and shadow-root contents are
-outside this selector scope. Frame elements and open-shadow hosts are described;
-closed shadow roots cannot be discovered. Capture is the current rendered
+accessibility-tree computation. Frame documents and unselected shadow-root
+contents are outside the selected scope. Frame elements and open-shadow hosts
+are described; closed shadow roots cannot be discovered. Capture is the current rendered
 viewport, not an offscreen full-document rendering. Covered and minimized-window
 capture behavior requires execution evidence in the selected environment.
 
@@ -130,13 +180,18 @@ markers are transient document lifecycle state and are not written to saved data
 ```powershell
 arcane app-control status --endpoint '\\.\pipe\arcane-pm-control'
 arcane app-control inspect --endpoint '\\.\pipe\arcane-pm-control' --selector '#pm-content'
+arcane app-control inspect --endpoint '\\.\pipe\arcane-pm-control' --request '.arcane\inspection.json'
 arcane app-control capture --endpoint '\\.\pipe\arcane-pm-control' --output '.arcane\view.png'
 arcane app-control act --endpoint '\\.\pipe\arcane-pm-control' --request '.arcane\action.json'
 ```
 
 The action file is the complete action parameter object, including the actual
-`documentGeneration` returned by the preceding status or inspection. The CLI
-reads that file completely. Paths are relative to the current directory. Capture
+`documentGeneration` returned by the preceding status or inspection. Inspection
+also accepts `--request` for a complete parameter object, such as
+`{"shadowPath":["#appearance-panel","theme-switcher"]}` or the same object with
+`selector` and `documentGeneration`. Inspection's `--request` and `--selector`
+options are mutually exclusive. The CLI reads the selected file completely.
+Paths are relative to the current directory. Capture
 writes the PNG to the explicitly selected file and prints its metadata. The other
 operations print complete JSON. `app-control --help` describes this command's
 options; other Arcane commands retain their existing global output-format option.

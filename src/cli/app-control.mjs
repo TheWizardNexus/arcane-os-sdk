@@ -5,7 +5,7 @@ import {CoreError, serializeCoreError} from '../../browser-runtime/core/contract
 
 const HELP_TEXT=`Usage:
   arcane app-control status --endpoint <pipe-or-socket>
-  arcane app-control inspect --endpoint <pipe-or-socket> [--selector <css-selector>]
+  arcane app-control inspect --endpoint <pipe-or-socket> [--selector <css-selector> | --request <json-file>]
   arcane app-control capture --endpoint <pipe-or-socket> --output <png-file>
   arcane app-control act --endpoint <pipe-or-socket> --request <json-file>
 
@@ -14,6 +14,8 @@ Capture writes the PNG to --output and prints its metadata. Request and output
 filenames are relative to the current directory. This command does not launch
 an application or change its profile. --output selects the capture filename;
 the other Arcane commands retain their existing output-format option.
+Inspect --request reads the complete parameter object, including shadowPath and
+optional documentGeneration. It cannot be combined with --selector.
 `;
 
 function usage(message) {
@@ -25,7 +27,7 @@ function parseArguments(argv) {
     const [action] = argv;
     const allowed = {
         status: ['endpoint'],
-        inspect: ['endpoint', 'selector'],
+        inspect: ['endpoint', 'selector', 'request'],
         capture: ['endpoint', 'output'],
         act: ['endpoint', 'request']
     }[action];
@@ -47,6 +49,9 @@ function parseArguments(argv) {
     if (!values.endpoint) usage('App control requires --endpoint <pipe-or-socket>.');
     if (action === 'capture' && !values.output) usage('App-control capture requires --output <png-file>.');
     if (action === 'act' && !values.request) usage('App-control act requires --request <json-file>.');
+    if (action === 'inspect' && values.request !== undefined && values.selector !== undefined) {
+        usage('App-control inspect accepts --selector or --request, not both.');
+    }
     return {action, ...values};
 }
 
@@ -71,7 +76,7 @@ export async function runAppControlCli(argv, {cwd = process.cwd(), stdout = proc
         stderr.write(`${JSON.stringify({status: 'running', operation: selection.action,
             endpoint: selection.endpoint})}\n`);
         const signal = controller.signal;
-        const parameters = selection.action === 'act'
+        const parameters = selection.request !== undefined
             ? JSON.parse(await readFile(path.resolve(cwd, selection.request), {encoding: 'utf8', signal}))
             : selection.selector === undefined ? {} : {selector: selection.selector};
         connection = await connectAppControl({endpoint: selection.endpoint, signal, onError: failed});

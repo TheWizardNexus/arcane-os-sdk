@@ -2,14 +2,16 @@
  * Runs inside the existing app document. The native host serializes this named
  * function with toString(), so all helpers must remain inside its lexical scope.
  *
- * inspect({selector?}) reads the top-level light DOM. Omission selects the whole
- * document; a CSS selector may select any number of roots. HTML, textContent,
- * attributes and live control state are returned completely. Frame documents
- * and shadow-root contents are outside this CSS scope; frame elements and open
- * shadow hosts are identified only. Closed shadow roots cannot be discovered.
+ * inspect({selector?,shadowPath?}) reads the top-level light DOM or the open
+ * shadow root selected by an ordered array of unique host selectors. Omission
+ * of selector selects that whole root; a CSS selector may select any number of
+ * elements within it. HTML, textContent, attributes and live control state are
+ * returned completely. Frame documents and unselected shadow-root contents stay
+ * outside this scope. Closed shadow roots cannot be discovered or entered.
  * domRole/domName are DOM-derived hints, not an accessibility-tree computation.
  *
- * act({action,selector,...}) requires one current CSS match. fill uses an exact
+ * act({action,selector,shadowPath?,...}) requires one current CSS match in the
+ * selected root. fill uses an exact
  * string value; select uses either value:string or values:string[]. scroll uses
  * absolute left/top CSS-pixel offsets, preserving any omitted axis. Actions use
  * DOM APIs and untrusted events without focus or desktop input. Results describe
@@ -57,19 +59,56 @@ export function runAppControl(operation, params = {}) {
         throw error;
     }
 
-    function queryElements(selector) {
+    function queryElements(selector, root = document) {
         if (typeof selector !== 'string') {
             fail('INVALID_ARGUMENT', 'selector must be a CSS selector string.');
         }
-        return Array.from(document.querySelectorAll(selector));
+        return Array.from(root.querySelectorAll(selector));
+    }
+
+    function selectedRoot() {
+        const shadowPath = params.shadowPath === undefined ? [] : params.shadowPath;
+        if (!Array.isArray(shadowPath)) {
+            fail('INVALID_ARGUMENT', 'shadowPath must be an array of CSS host selectors.');
+        }
+        let root = document;
+        for (let index = 0; index < shadowPath.length; index += 1) {
+            const selector = shadowPath[index];
+            let hosts;
+            try {
+                hosts = queryElements(selector, root);
+            } catch (error) {
+                error.details = {shadowPath, index, selector};
+                throw error;
+            }
+            if (hosts.length !== 1) {
+                fail(
+                    'ARCANE_APP_CONTROL_TARGET_COUNT',
+                    'Each shadowPath selector requires exactly one matching host.',
+                    {shadowPath, index, selector, matches: hosts.length}
+                );
+            }
+            const shadowRoot = hosts[0].shadowRoot;
+            if (!shadowRoot) {
+                fail(
+                    'ARCANE_APP_CONTROL_UNSUPPORTED',
+                    'The selected host has no accessible open shadow root. Closed and absent roots cannot be distinguished.',
+                    {shadowPath, index, selector}
+                );
+            }
+            root = shadowRoot;
+        }
+        return {root, shadowPath};
     }
 
     function inspectDocument() {
+        const {root, shadowPath} = selectedRoot();
+        const isDocument = root === document;
         const roots = params.selector === undefined
-            ? (document.documentElement ? [document.documentElement] : [])
-            : queryElements(params.selector);
+            ? (isDocument ? (document.documentElement ? [document.documentElement] : []) : [root])
+            : queryElements(params.selector, root);
         const rootSet = new Set(roots);
-        const elements = Array.from(document.querySelectorAll('*'));
+        const elements = Array.from(root.querySelectorAll('*'));
         const idCounts = new Map();
         const childCounts = new Map();
         const childIndexes = new Map();
@@ -88,7 +127,7 @@ export function runAppControl(operation, params = {}) {
             const index = (childCounts.get(parent) ?? 0) + 1;
             childCounts.set(parent, index);
             childIndexes.set(element, index);
-            if (rootSet.has(element) || scope.has(parent)) {
+            if (rootSet.has(element) || rootSet.has(element.parentNode) || scope.has(parent)) {
                 scope.add(element);
             }
         }
@@ -105,14 +144,16 @@ export function runAppControl(operation, params = {}) {
                 shadowHosts.push(
                     {
                         selector: uniqueSelector(element),
-                        mode: element.shadowRoot.mode
+                        mode: element.shadowRoot.mode,
+                        shadowPath: [...shadowPath, uniqueSelector(element)]
                     }
                 );
             }
         }
 
         return {
-            scope: 'top-level-light-dom',
+            scope: isDocument ? 'top-level-light-dom' : 'open-shadow-root',
+            ...(isDocument ? {} : {shadowPath}),
             title: document.title,
             readyState: document.readyState,
             doctype: document.doctype
@@ -122,16 +163,19 @@ export function runAppControl(operation, params = {}) {
             controls,
             frames,
             shadowHosts,
-            activeElement: document.activeElement
-                ? describeElement(document.activeElement, uniqueSelector(document.activeElement))
+            activeElement: root.activeElement
+                ? describeElement(root.activeElement, uniqueSelector(root.activeElement))
                 : null,
-            scrollingElement: document.scrollingElement
+            scrollingElement: isDocument && document.scrollingElement
                 ? uniqueSelector(document.scrollingElement)
                 : null,
             selection: {text: document.getSelection()?.toString() ?? ''}
         };
 
         function describeRoot(element) {
+            if (element === root && !isDocument) {
+                return {selector: null, html: root.innerHTML, text: root.textContent, state: null};
+            }
             return {
                 selector: uniqueSelector(element),
                 html: element.outerHTML,
@@ -141,7 +185,7 @@ export function runAppControl(operation, params = {}) {
         }
 
         function uniqueSelector(element) {
-            if (!element.isConnected || element.getRootNode() !== document) return null;
+            if (!element.isConnected || element.getRootNode() !== root) return null;
             const path = [];
             let current = element;
             let prefix = '';
@@ -161,7 +205,10 @@ export function runAppControl(operation, params = {}) {
             for (let index = path.length - 1; index >= 0; index -= 1) {
                 const part = path[index];
                 const segment = `*:nth-child(${childIndexes.get(part)})`;
-                prefix = prefix ? `${prefix} > ${segment}` : ':root';
+                // A ShadowRoot is not an element matched by :root or :scope.
+                // The parent exclusion anchors its top-level child in this tree.
+                prefix = prefix ? `${prefix} > ${segment}`
+                    : isDocument ? ':root' : `${segment}:not(* > *)`;
                 selectors.set(part, prefix);
             }
             return prefix;
@@ -190,7 +237,7 @@ export function runAppControl(operation, params = {}) {
         if (labelledBy) {
             const labels = [];
             for (const id of labelledBy.split(/\s+/u)) {
-                const label = document.getElementById(id);
+                const label = element.getRootNode().getElementById?.(id);
                 if (label) labels.push(label.textContent);
             }
             if (labels.length) return {source: 'aria-labelledby', value: labels.join(' ')};
@@ -274,7 +321,8 @@ export function runAppControl(operation, params = {}) {
     }
 
     function actOnElement() {
-        const targets = queryElements(params.selector);
+        const {root, shadowPath} = selectedRoot();
+        const targets = queryElements(params.selector, root);
         if (targets.length !== 1) {
             fail(
                 'ARCANE_APP_CONTROL_TARGET_COUNT',
@@ -328,6 +376,7 @@ export function runAppControl(operation, params = {}) {
             action,
             method,
             invoked: true,
+            ...(root === document ? {} : {shadowPath}),
             eventsDispatched,
             target: describeElement(target, params.selector)
         };
