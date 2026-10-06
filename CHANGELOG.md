@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.71.1
+
+- Correct explicit disabled PWA lifecycle in standalone source development by
+  serving a retirement worker when the root worker file is absent. Native
+  installation requests activation and unregisters only its own registration,
+  preserving saved data, authored workers, open-page content and other modes.
+  Browser update timing remains native; no page reload or polling is added.
+
 ## 0.71.0
 
 - Add public theme-switcher CSS properties for group radius, option radius,
