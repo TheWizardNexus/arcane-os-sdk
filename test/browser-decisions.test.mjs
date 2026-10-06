@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from '../src/testing.mjs';
 import {createBrowserDecisionModel} from '../browser-runtime/ai/browser-decisions.mjs';
-import {encodeDecisionRows, loadDecisionRuntime} from '../browser-runtime/ai/decision-runtime.mjs';
+import {createDecisionInputs, encodeDecisionRows, loadDecisionRuntime} from '../browser-runtime/ai/decision-runtime.mjs';
 
 // Synthetic tokenizers, tensors and Workers exercise SDK boundaries without
 // downloading a runtime/model or claiming real inference or accelerator proof.
@@ -152,8 +152,8 @@ export const PreTrainedModel = {
 test(
     'selected runtime receives exact precision and graph tensors and preserves complete model outputs',
     async function selectedRuntimeContracts() {
-        for (const family of ['laya', 'julia']) {
-            const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#${family}`;
+        for (const [family, dtype] of [['laya', undefined], ['julia', undefined], ['laya', 'fp32']]) {
+            const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#${family}-${dtype}`;
             const namespace = await import(moduleUrl);
             const {fixture, Tensor} = namespace;
             const phases = [];
@@ -162,6 +162,7 @@ test(
                 model: `fixture/${family}`,
                 revision: 'fixture-revision',
                 device: 'wasm',
+                dtype,
                 runtime: {moduleUrl, wasmPaths: 'https://runtime.example.test/wasm/'}
             };
             const engine = await loadDecisionRuntime(
@@ -178,7 +179,7 @@ test(
                 {loader: 'tokenizer', repository: configuration.model, options: {revision: 'fixture-revision'}}
             );
             const expectedOptions = family === 'laya'
-                ? {revision: 'fixture-revision', device: 'wasm', dtype: 'fp16', use_external_data_format: true}
+                ? {revision: 'fixture-revision', device: 'wasm', dtype: dtype ?? 'fp16', use_external_data_format: true}
                 : {
                     revision: 'fixture-revision',
                     device: 'wasm',
@@ -332,6 +333,22 @@ test(
         }
     }
 );
+
+test('shared decision tensors preserve complete native records and browser precision selection', function decisionTensorRecords() {
+    const records = createDecisionInputs(
+        [{ids: [1, 2, 3], markers: [2], qtype: 0}, {ids: [4], markers: [0], qtype: 2}],
+        9
+    );
+    assert.deepEqual(records.input_ids, {type: 'int64', data: new BigInt64Array([1n, 2n, 3n, 4n, 9n, 9n]), dims: [2, 3]});
+    assert.deepEqual(records.attention_mask.data, new BigInt64Array([1n, 1n, 1n, 1n, 0n, 0n]));
+    assert.deepEqual(records.marker_pos, {type: 'int64', data: new BigInt64Array([2n, 0n]), dims: [2, 1]});
+    assert.deepEqual(records.marker_mask, {type: 'bool', data: new Uint8Array([1, 1]), dims: [2, 1]});
+    assert.deepEqual(records.qtype, {type: 'int64', data: new BigInt64Array([0n, 2n]), dims: [2]});
+    const selected = createBrowserDecisionModel({family: 'laya', model: 'fixture/laya', dtype: 'fp32'});
+    assert.equal(selected.status().dtype, 'fp32');
+    assert.equal(selected.status().state, 'unloaded');
+    selected.dispose();
+});
 
 function createWorkerFixture(context) {
     const originalWorker = Object.getOwnPropertyDescriptor(globalThis, 'Worker');

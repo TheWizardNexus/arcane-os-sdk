@@ -74,7 +74,8 @@ class BrowserDecisionModel {
     #error = null;
     #disposed = false;
 
-    constructor({family, model, revision = 'main', device = 'webgpu', runtime = {}} = {}) {
+    constructor({family, model, revision = 'main', device = 'webgpu',
+        dtype = family === 'laya' ? 'fp16' : 'fp32', runtime = {}} = {}) {
         if (family !== 'laya' && family !== 'julia') {
             throw new TypeError('family must be "laya" or "julia".');
         }
@@ -89,7 +90,7 @@ class BrowserDecisionModel {
             model: requiredText(model, 'model'),
             revision: requiredText(revision, 'revision'),
             device: requiredText(device, 'device'),
-            dtype: family === 'laya' ? 'fp16' : 'fp32',
+            dtype: requiredText(dtype, 'dtype'),
             runtime: {...runtime, moduleUrl: requiredText(moduleUrl, 'runtime.moduleUrl')}
         };
         this.#events = createArcaneEventSource(

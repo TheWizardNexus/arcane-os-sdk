@@ -1,7 +1,8 @@
 # Browser typed decisions
 
-`arcane-os/ai/browser-decisions` owns browser-local Laya typed-decisions FP16
-and Julia-1 FP32 inference. It is separate from chat and speech because these
+`arcane-os/ai/browser-decisions` owns browser-local Laya typed decisions
+and Julia-1 inference. Laya defaults to FP16 and Julia to FP32; an explicit
+`dtype` is forwarded unchanged to the selected upstream loader. It is separate from chat and speech because these
 models score caller-supplied options instead of generating conversational text.
 Applications supply the model repository, state, questions, option meanings and
 policy; the SDK owns the reusable tokenizer, tensors, inference and lifecycle.
@@ -66,6 +67,7 @@ it does not substitute a quantized graph or another model.
 | `model` | Required upstream repository/base URL accepted by Transformers.js. The application owns its selection. |
 | `revision` | Upstream revision, default `main`; select a stable revision when repeatable model selection is needed. |
 | `device` | Transformers.js backend, default `webgpu`; an explicit supported alternative is caller-owned. No automatic backend fallback. |
+| `dtype` | Exact upstream precision selection; defaults to `fp16` for Laya and `fp32` for Julia. For Laya FP32, supply `dtype: 'fp32'`. Unsupported selections fail at the selected upstream loader rather than being replaced. |
 | `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. |
 | `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. |
 
@@ -75,10 +77,11 @@ network, cross-origin and backend availability still apply. WebGPU needs a
 compatible browser/device context. Unsupported precision or backend errors
 are returned, not replaced with a different model, backend or precision.
 
-Laya selects `dtype: 'fp16'`, loading `onnx/model_fp16.onnx` and its
+Laya defaults to `dtype: 'fp16'`, loading `onnx/model_fp16.onnx` and its
 `model_fp16.onnx_data` companion through Transformers.js. The published mixed
 precision graph retains selected operations/outputs in FP32; FP16 selection
-does not claim every graph operation runs in half precision.
+does not claim every graph operation runs in half precision. Explicit
+`dtype: 'fp32'` selects the repository's FP32 graph through that same loader.
 
 Julia selects `dtype: 'fp32'`, loading root `model.onnx` with the exact
 `model.onnx.data` external-data name. Its custom five-input graph is loaded

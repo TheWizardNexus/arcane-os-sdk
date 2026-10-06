@@ -82,7 +82,8 @@ export function encodeDecisionRows(tokenizer, rows, family) {
     return {encoded, pad};
 }
 
-function decisionInputs(Tensor, encoded, pad) {
+/** Plain tensor records shared by browser and native ONNX execution owners. */
+export function createDecisionInputs(encoded, pad) {
     let sequenceLength = 0;
     let optionCount = 0;
     for (const row of encoded) {
@@ -108,26 +109,11 @@ function decisionInputs(Tensor, encoded, pad) {
         types[rowIndex] = BigInt(row.qtype);
     }
     return {
-        input_ids: new Tensor(
-            'int64', ids,
-            [batch, sequenceLength]
-        ),
-        attention_mask: new Tensor(
-            'int64', attention,
-            [batch, sequenceLength]
-        ),
-        marker_pos: new Tensor(
-            'int64', positions,
-            [batch, optionCount]
-        ),
-        marker_mask: new Tensor(
-            'bool', mask,
-            [batch, optionCount]
-        ),
-        qtype: new Tensor(
-            'int64', types,
-            [batch]
-        )
+        input_ids: {type: 'int64', data: ids, dims: [batch, sequenceLength]},
+        attention_mask: {type: 'int64', data: attention, dims: [batch, sequenceLength]},
+        marker_pos: {type: 'int64', data: positions, dims: [batch, optionCount]},
+        marker_mask: {type: 'bool', data: mask, dims: [batch, optionCount]},
+        qtype: {type: 'int64', data: types, dims: [batch]}
     };
 }
 
@@ -210,7 +196,8 @@ export function decodeDecisionOutputs(rows, outputs) {
 }
 
 export async function loadDecisionRuntime(configuration, report) {
-    const {family, model: repository, revision = 'main', device = 'webgpu', runtime} = configuration;
+    const {family, model: repository, revision = 'main', device = 'webgpu',
+        dtype = family === 'laya' ? 'fp16' : 'fp32', runtime} = configuration;
     report(
         {phase: 'loading-runtime'}
     );
@@ -219,7 +206,7 @@ export async function loadDecisionRuntime(configuration, report) {
         namespace.env.backends.onnx.wasm.wasmPaths = runtime.wasmPaths;
     }
     const {AutoTokenizer, AutoModel, PreTrainedModel, Tensor} = namespace;
-    const options = {revision, device, dtype: family === 'laya' ? 'fp16' : 'fp32'};
+    const options = {revision, device, dtype};
     // No progress_callback: upstream 4.3 otherwise performs file-size
     // aggregation. This owner reports actual semantic lifecycle transitions.
     report(
@@ -261,7 +248,10 @@ export async function loadDecisionRuntime(configuration, report) {
     async function evaluate(rows) {
         const {encoded, pad} = encodeDecisionRows(tokenizer, rows, family);
         if (encoded.length === 0) return {decisions: [], outputs: {}};
-        const inputs = decisionInputs(Tensor, encoded, pad);
+        const inputs = {};
+        for (const [name, record] of Object.entries(createDecisionInputs(encoded, pad))) {
+            inputs[name] = new Tensor(record.type, record.data, record.dims);
+        }
         let output;
         try {
             output = await model(inputs);
