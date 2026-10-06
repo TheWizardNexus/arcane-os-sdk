@@ -1906,6 +1906,20 @@ default class PreferenceStore extends EventTarget
 subpath and managed browser key both resolve directly to the canonical runtime
 module. Deep protocol: [Browser runtime delivery](protocols.md#browser-runtime-delivery).
 
+The default adapter recognizes an absent optional preferences namespace only
+from the exact Core lookup tuple `code:'METHOD_NOT_ALLOWED'`,
+`reason:'core-namespace-unavailable'`, `namespace:'preferences'`, and the
+matching `method:'preferences.<operation>'`. Single `get`, `set`, and `delete`
+operations then retry once through the existing app-scoped local adapter after
+checking disposal and cancellation, preserving complete values and operation
+context. The existing Android unsupported-capability route is unchanged.
+An advertised `setMany` batch rejected for that exact absence retains its
+original rejection and performs no serial retry; subsequent operations use the
+selected local adapter.
+Partial-service, permission, persistence, transport and cancellation failures
+remain errors. Explicit adapters retain their own behavior. See the
+[complete PreferenceStore contract](runtime-modules.md#preferencestorejs).
+
 ### Example
 
 ```javascript
@@ -7324,6 +7338,15 @@ The `runtime.replay` control publishes current dispatcher and service state
 without restarting services. Its snapshot preserves complete service errors
 and active request state; see [runtime replay](core-runtime.md#state-and-frames)
 for authoritative readiness and reentrant lifecycle ordering.
+
+An unregistered method returns `METHOD_NOT_ALLOWED` with its exact `method`,
+first dotted `namespace`, and `reason:'core-namespace-unavailable'` when that
+namespace has neither a named service nor any registered method. Otherwise
+the reason is `core-method-unavailable`; built-in `system`, `app` and `version`
+namespaces count as present. This is a lookup result before handler or
+permission decisions. Handler/startup errors and older unmarked errors do not
+establish namespace absence. The dispatcher does not choose a replacement
+service; optional browser adapters own their documented response to absence.
 
 ### Availability and normalization
 

@@ -49,6 +49,8 @@ alone does not make bare module names resolve in a browser.
 | Import a shipped renderer module | [Runtime module catalog](runtime-modules.md) |
 | Use a shared entity | [Runtime entity modules](runtime-entities.md) and [exact export contracts](core/arcane-entities.md) |
 | Load a reusable HTML component | [Runtime component catalog](runtime-components.md) |
+| Present Light / Dark / System choices with complete labels | [Theme-switcher configuration](runtime-components.md#theme-switcherhtml) |
+| Use optional Core preferences and appearance without masking real failures | [PreferenceStore](runtime-modules.md#preferencestorejs), [SystemAppearance](runtime-modules.md#systemappearancejs), and [Core lookup errors](core-runtime.md#state-and-frames) |
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
 | Call `globalThis.Arcane` | [Arcane Core API](core/arcane-api.md) |
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.67.0",
+  "sdkVersion": "0.68.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -1891,7 +1891,7 @@
       "summary": "Default binding for the canonical PreferenceStore runtime class in Node and managed browsers.",
       "availability": "Node with injected adapters, or browser/native WebView storage",
       "protocol": "Node ESM / authenticated managed browser import map",
-      "normalization": "Binding identity and namespace come directly from the canonical runtime module"
+      "normalization": "Canonical runtime binding. Default adapter recognizes only exact absent preferences namespace/matching method or existing Android unsupported capability; single operations retry once through existing app-scoped local storage after disposal/cancellation checks, preserving complete values and context. An advertised rejected batch is never retried serially; its original rejection remains before later local operations. Explicit adapters and partial-service/genuine failures retain their behavior."
     },
     {
       "id": "preference-store:PREFERENCE_STORE_ERROR_CODES",
@@ -4318,7 +4318,7 @@
       "summary": "Creates an app-neutral Core dispatcher with explicit services, request lifetimes, events and graceful drain.",
       "availability": "Node on Windows, Linux and macOS native hosts; Android requires its host adaptation",
       "protocol": "arcane/1 dispatcher and service lifecycle",
-      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order"
+      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order. Missing dispatch retains METHOD_NOT_ALLOWED with exact method/namespace and core-namespace-unavailable or core-method-unavailable; named services, registered methods and built-in namespaces establish presence. Handler/startup/permission errors remain unchanged."
     },
     {
       "id": "core-stdio:encodeCoreFrame",
