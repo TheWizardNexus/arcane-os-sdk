@@ -32,6 +32,11 @@ export const CORE_METHOD_CONTRACTS={
     'preferences.set':{input:'{key,value}',output:'{key,value}'},
     'preferences.setMany':{input:'{entries}',output:'preference-batch-result'},
     'preferences.delete':{input:'{key}',output:'{key,deleted}'},
+    'window.setTheme': {
+        input: '{backgroundColor?,textColor?}: null reset or {red,green,blue,alpha}',
+        output: '{platform,supported,applied,unsupported}',
+        meaning: 'Current host window only. Omitted colors stay unchanged; applied records platform-accepted values, not measured pixels or an atomic operation.'
+    },
     'terminal.start':{input:'terminal-start-v1',output:'terminal-session-v1'},
     'terminal.list':{input:'empty-object-v1',output:'terminal-list-v1'},
     'terminal.write':{input:'terminal-write-v1',output:'terminal-write-result-v1'},

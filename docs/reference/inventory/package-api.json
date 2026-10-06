@@ -3898,7 +3898,7 @@
       "summary": "Projects a Core client into the established application-facing Arcane namespace.",
       "availability": "Browser and native WebView JavaScript hosts with a Core client",
       "protocol": "arcane/1 compatibility facade",
-      "normalization": "Routes existing namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation"
+      "normalization": "Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance"
     },
     {
       "id": "core-client:installCoreClient",

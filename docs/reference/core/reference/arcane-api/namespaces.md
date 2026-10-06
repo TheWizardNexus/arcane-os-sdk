@@ -1038,6 +1038,20 @@ const canReadPreferences = access.methods.includes('preferences.list');
 console.log('Preference inventory admitted:', canReadPreferences);
 ```
 
+## Arcane.window
+
+The SDK client exposes `Arcane.window.setTheme(presentation, {signal}?)` for
+the window hosting the calling document. The optional `backgroundColor` and
+`textColor` accept numeric RGBA records or `null` for platform-default reset.
+The host reports each applied or unsupported field independently. Rendering
+and browser theme changes continue without waiting for this request.
+
+Shared ThemeBootstrap forwards the app's computed semantic colors through
+this method when a native host is present. It does not change OS-user
+appearance. See the [current-window contract](../../../core-client.md#current-window-theme)
+for complete usage, accepted channel values, cancellation and current adapter
+availability. A facade method alone does not establish host support.
+
 ## Arcane.appearance
 
 ### Overview

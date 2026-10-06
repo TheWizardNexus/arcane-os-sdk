@@ -48,6 +48,7 @@ This inventory covers every enumerable, non-method member exposed directly or th
 | `Arcane.filesystem` | Namespace | Native filesystem selection operations. |
 | `Arcane.storage` | Namespace | App-scoped native key/value storage. |
 | `Arcane.preferences` | Namespace | App-scoped preference reads and atomic writes. |
+| `Arcane.window` | Namespace | SDK host window presentation for the calling document; adapter availability is independent of the OS-user appearance service. |
 | `Arcane.appearance` | Namespace | Native appearance state and application. |
 | `Arcane.session` | Namespace | Current Arcane session lifecycle. |
 | `Arcane.provisioning` | Namespace | Provisioning-plan operations. |
@@ -437,6 +438,16 @@ The native desktop contract retains the technical compatibility values `platform
 The canonical authority registry in `machine_bundles/arcane-os-machine-bundle/src/api/method-policies.json` defines the current RPC surface. The canonical semantic definitions for the shared or contract-bound methods live in `machine_bundles/arcane-os-machine-bundle/src/api/method-contracts.json`. They are deliberately separate from method authority policy: semantic effect metadata cannot grant a capability, admit an application or host, or imply privilege. Core executes the closed input/output validators at its request and response boundaries. Android consumes separately generated semantic constants for its admitted cross-host subset and validates or constructs the corresponding results; Core alone consumes the fixed-loopback mail contract. The exact unsigned-debug Android distribution now has Kotlin build parity and API 35 Launcher, Browser, and Terminal instrumentation evidence. The registry remains a partial vertical slice: privacy-safe audit and confirmation infrastructure, definitions for the remaining Core-only methods, production signing, real-device conformance, and candidate review are still required.
 
 ## Filesystem, storage, preferences, and appearance
+
+The SDK's additive `Arcane.window.setTheme(presentation, {signal}?)` controls
+the current host window's `backgroundColor` and `textColor`, with per-field
+accepted/unsupported results. See the [window contract](../core-client.md#current-window-theme)
+for numeric RGBA, reset, cancellation, navigation and platform availability.
+It does not call the OS-user `appearance.apply` service described below.
+
+| SDK window method | Parameters | Return | Description |
+|---|---|---|---|
+| `Arcane.window.setTheme(presentation, options?)` | Optional `backgroundColor`/`textColor`: `{red,green,blue,alpha}` or `null`; `options.signal?` | `Promise<{platform,supported,applied,unsupported}>` | Applies supported colors only to the caller's native window, preserving omitted fields. Uses ordinary request cancellation and reports actual per-field acceptance. See the linked contract for adapter availability. |
 
 | Method | Parameters | Return | Description |
 |---|---|---|---|

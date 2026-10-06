@@ -299,12 +299,13 @@ test('bootstrap observes existing profile readiness, replays ready state, and di
     let starts = 0;
     const bootstrap = Function(
         'Is', 'arcaneLogging', 'applyUserSkin', 'loadAndApplyTheme',
-        'createArcaneEventSource', 'globalThis',
+        'arcaneEvents', 'createArcaneEventSource', 'globalThis',
         fixtureModule(source).replace(/^export default arcaneThemeReady;\r?$/mu, '')
             + '\nreturn {arcaneThemeReady,bootstrapArcaneTheme,disposeArcaneThemeBootstrap};'
     )(
         FixtureIs, current.arcaneLogging, current.applyUserSkin,
         function startTheme() {starts += 1; return current.loadAndApplyTheme({manager: pending.instance});},
+        {subscribe(){assert.fail('A browser-only bootstrap has no native window subscription.');}},
         current.createArcaneEventSource, current.scope
     );
     assert.equal(current.root.dataset.userSkin, undefined);
@@ -326,6 +327,298 @@ test('bootstrap observes existing profile readiness, replays ready state, and di
     skin.resolve({'appearance.activeSkin': '', 'appearance.customSkin': ''});
     await bootstrap.arcaneThemeReady;
 });
+
+async function windowBootstrapFixture({native=true}={}) {
+    const source=await readFile(
+        new URL('modules/ThemeBootstrap.js',runtime),
+        'utf8'
+    );
+    const scope=new EventTarget();
+    const document=new EventTarget();
+    const root={};
+    const colors=new Map(
+        [
+            ['--background','rgb(29, 22, 19)'],
+            ['--text-color','rgba(248, 239, 229, 0.999)']
+        ]
+    );
+    const children=new Set();
+    const body={
+        appendChild(node){
+            children.add(node);
+        }
+    };
+    Object.assign(
+        document,
+        {documentElement:root,body}
+    );
+    const media=new Map();
+    const observers=[];
+    const subscribers=new Set();
+    const calls=[];
+    const warnings=[];
+    const ready=deferred();
+    let starts=0;
+    let conversions=0;
+    document.createElement=function createElement(tag){
+        assert.equal(native,true,'Ordinary browsers install no native sampler.');
+        if(tag==='canvas'){
+            return {
+                getContext(kind,options){
+                    assert.equal(kind,'2d');
+                    assert.equal(options.colorSpace,'srgb');
+                    return {
+                        fillStyle:'',
+                        clearRect(){},
+                        fillRect(){conversions+=1;},
+                        getImageData(){return {data:[255,0,64,255]};}
+                    };
+                }
+            };
+        }
+        const properties=new Map();
+        const node={
+            properties,
+            style:{
+                setProperty(key,value){properties.set(key,value);}
+            },
+            remove(){children.delete(node);}
+        };
+        return node;
+    };
+    Object.assign(
+        scope,
+        {
+            document,
+            CSS:{
+                supports(property,value){
+                    assert.equal(property,'color');
+                    return !value.startsWith('invalid');
+                }
+            },
+            getComputedStyle(target){
+                if(target===body) return {getPropertyValue(name){return colors.get(name)??'';}};
+                return {color:target.properties.get('color')};
+            },
+            matchMedia(query){
+                if(!media.has(query)){
+                    const selected=new EventTarget();
+                    selected.matches=false;
+                    media.set(query,selected);
+                }
+                return media.get(query);
+            },
+            MutationObserver:class FixtureMutationObserver{
+                constructor(callback){
+                    this.callback=callback;
+                    this.targets=[];
+                    observers.push(this);
+                }
+                observe(target){this.targets.push(target);}
+                disconnect(){this.targets=[];}
+            },
+            Arcane:{
+                runtime:{current(){return {native};}},
+                window:{
+                    setTheme(presentation,{signal}){
+                        return new Promise(
+                            function pendingWindow(resolve,reject){
+                                calls.push(
+                                    {presentation,signal,resolve,reject}
+                                );
+                                signal.addEventListener(
+                                    'abort',
+                                    function cancel(){
+                                        const error=new Error('Cancelled window wait');
+                                        error.name='AbortError';
+                                        error.code='ARCANE_REQUEST_ABORTED';
+                                        reject(error);
+                                    },
+                                    {once:true}
+                                );
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    );
+    const api=Function(
+        'Is','arcaneLogging','applyUserSkin','loadAndApplyTheme','arcaneEvents','createArcaneEventSource','globalThis',
+        fixtureModule(source).replace(/^export default arcaneThemeReady;\r?$/mu,'')
+            +'\nreturn {arcaneThemeReady,bootstrapArcaneTheme,disposeArcaneThemeBootstrap};'
+    )(
+        FixtureIs,
+        {
+            warn(message,error){
+                warnings.push(
+                    {message,error}
+                );
+            }
+        },
+        function unusedSkin(){},
+        function load(){
+            starts+=1;
+            return ready.promise;
+        },
+        {
+            subscribe(type,callback){
+                assert.equal(type,'arcane-theme-change');
+                subscribers.add(callback);
+                return function unsubscribe(){subscribers.delete(callback);};
+            }
+        },
+        function source(){return {instanceId:'window-theme-fixture',dispatch(){}};},
+        scope
+    );
+    function changed(){
+        for(const callback of subscribers) callback(
+            {detail:{complete:'theme state'}}
+        );
+    }
+    async function flush(){for(let turn=0;turn<6;turn+=1)await Promise.resolve();}
+    return {
+        ...api,scope,document,root,body,colors,children,media,observers,subscribers,calls,warnings,ready,changed,flush,
+        starts(){return starts;},
+        conversions(){return conversions;}
+    };
+}
+
+test(
+    'native window sampling remains independent, deduplicates colors and owns page lifecycle',
+    async function nativeWindowLifecycle(){
+        const current=await windowBootstrapFixture();
+        assert.equal(current.bootstrapArcaneTheme(),current.arcaneThemeReady);
+        assert.equal(current.starts(),1);
+        await current.flush();
+        assert.equal(current.calls.length,1,'Colors are sent while preferences and host completion remain pending.');
+        assert.deepEqual(
+            current.calls[0].presentation,
+            {
+                backgroundColor:{red:29,green:22,blue:19,alpha:1},
+                textColor:{red:248,green:239,blue:229,alpha:0.999}
+            }
+        );
+        assert.equal(current.children.size,0,'The CSS resolution element is released after sampling.');
+        current.changed();
+        current.observers[0].callback();
+        await current.flush();
+        assert.equal(current.calls.length,1);
+        current.colors.set('--background','rgb(3, 4, 5)');
+        current.changed();
+        await current.flush();
+        assert.equal(current.calls.length,2);
+        assert.equal(current.calls[0].signal.aborted,true);
+        current.scope.dispatchEvent(
+            new Event('pagehide')
+        );
+        current.colors.set('--background','rgb(7, 8, 9)');
+        current.changed();
+        await current.flush();
+        assert.equal(current.calls[1].signal.aborted,true);
+        assert.equal(current.calls.length,2);
+        current.scope.dispatchEvent(
+            new Event('pageshow')
+        );
+        await current.flush();
+        assert.equal(current.calls.length,3);
+        assert.equal(current.calls[2].presentation.backgroundColor.red,7);
+        const print=current.media.get('print');
+        print.matches=true;
+        current.colors.set('--background','rgb(255, 255, 255)');
+        current.changed();
+        await current.flush();
+        assert.equal(current.calls.length,3);
+        print.matches=false;
+        current.colors.set('--background','rgb(7, 8, 9)');
+        print.dispatchEvent(
+            new Event('change')
+        );
+        await current.flush();
+        assert.equal(current.calls.length,3);
+        assert.equal(current.disposeArcaneThemeBootstrap(),true);
+        assert.equal(current.calls[2].signal.aborted,true);
+        assert.equal(current.subscribers.size,0);
+        assert.deepEqual(
+            current.observers[0].targets,
+            []
+        );
+        current.ready.resolve(
+            {manager:null}
+        );
+        current.scope.dispatchEvent(
+            new Event('pageshow')
+        );
+        await current.flush();
+        assert.equal(current.calls.length,3);
+        assert.deepEqual(
+            current.warnings,
+            []
+        );
+    }
+);
+
+test(
+    'modern CSS conversion retains resolved alpha and missing colors remain omitted',
+    async function modernWindowColors(){
+        const current=await windowBootstrapFixture();
+        current.colors.set('--background','color(display-p3 1 0 0.25 / 0.999)');
+        current.colors.delete('--text-color');
+        current.changed();
+        await current.flush();
+        assert.deepEqual(
+            current.calls.at(-1).presentation,
+            {backgroundColor:{red:255,green:0,blue:64,alpha:0.999}}
+        );
+        assert.ok(current.conversions()>0);
+        assert.equal(current.colors.get('--background'),'color(display-p3 1 0 0.25 / 0.999)');
+        assert.equal(current.children.size,0);
+        current.disposeArcaneThemeBootstrap();
+        current.ready.resolve(
+            {manager:null}
+        );
+        await current.flush();
+    }
+);
+
+test(
+    'browser-only bootstrap stays silent and older native method absence stops only forwarding',
+    async function windowAvailability(){
+        const browser=await windowBootstrapFixture(
+            {native:false}
+        );
+        await browser.flush();
+        assert.deepEqual(
+            browser.calls,
+            []
+        );
+        assert.deepEqual(
+            browser.observers,
+            []
+        );
+        assert.equal(browser.subscribers.size,0);
+        browser.ready.resolve(
+            {manager:null}
+        );
+        browser.disposeArcaneThemeBootstrap();
+        const native=await windowBootstrapFixture();
+        await native.flush();
+        const error={code:'METHOD_NOT_ALLOWED',message:'Core does not expose window.setTheme.',details:{complete:'host diagnostic'}};
+        native.calls[0].reject(error);
+        await native.flush();
+        assert.equal(native.warnings[0].error,error);
+        assert.equal(native.subscribers.size,0);
+        native.changed();
+        native.colors.set('--background','rgb(7, 8, 9)');
+        native.ready.resolve(
+            {manager:null}
+        );
+        await native.flush();
+        assert.equal(native.calls.length,1);
+        assert.equal(native.warnings.length,1);
+        native.disposeArcaneThemeBootstrap();
+    }
+);
 
 test('all named palettes share root and scoped swatch declarations for explicit and device schemes', async function paletteSourceContract() {
     const [theme, layout] = await Promise.all([

@@ -4168,7 +4168,9 @@ creating a profile or migrating saved data.
 Exact exports: `arcaneThemeReady`, `bootstrapArcaneTheme`, `default`, and
 `disposeArcaneThemeBootstrap`.
 
-`disposeArcaneThemeBootstrap()` removes both bootstrap-owned subscriptions.
+`disposeArcaneThemeBootstrap()` removes bootstrap-owned subscriptions,
+native-window theme observers and listeners, and cancels its pending window
+request.
 The cache is a presentation hint, not the authority for preferences or user
 data. Preference loading and User readiness independently reconcile it; cache
 failures are logged without blocking the page.
@@ -4177,6 +4179,29 @@ Module evaluation follows its import graph, so importing ThemeBootstrap alone
 does not establish restoration before the first paint. Use the classic
 [ThemePresentation head entry](#themepresentationjs) before CSS for that early
 restoration. Neither entry imports User or starts its storage lifecycle.
+
+When a native host exposes `Arcane.window.setTheme`, the shared bootstrap
+samples the app body's inherited `--background` and `--text-color`. It resolves
+CSS variables, named colors, HSL and other browser-supported color forms through
+computed style. Modern color spaces use the browser's sRGB canvas conversion;
+the resolved alpha is retained separately, including translucency close to one.
+Authored styles remain unchanged. Missing semantic properties are omitted.
+
+One listener on the shared `arcane-theme-change` owner, root/body presentation
+attribute observers, stylesheet-load events and device-color-scheme changes
+schedule samples. Identical channel values do not issue another request.
+Initial sampling and preference/profile reconciliation run independently of
+rendering and native completion. Page hide cancels the pending renderer wait;
+page restoration samples again. Print presentation is excluded. The host keeps
+its last accepted colors across navigation until the next document changes
+them. No additional theme bus, polling, storage or system-appearance mutation is
+introduced by this forwarding path.
+
+Ordinary browsers and facades without the window method install no native
+sampler. An older host's unavailable-method response is recorded once in
+developer diagnostics and stops that sampler; genuine bridge failures retain
+their complete diagnostics. See the [current-window contract](core-client.md#current-window-theme)
+for per-field results, cancellation and actual adapter availability.
 
 ### Availability and normalization
 

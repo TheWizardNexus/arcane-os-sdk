@@ -91,6 +91,70 @@ pre-aborted signal sends no transcription request; an in-flight abort sends
 `request.cancel` and suppresses late responses. The registered transcription
 service owns interruption and release of its actual engine operation.
 
+## Current-window theme
+
+`Arcane.window.setTheme(presentation, {signal}?)` changes only the window
+hosting the calling document. It uses the existing `window.setTheme` request
+and response correlation; it neither calls `appearance.apply` nor changes the
+operating-system user's appearance. The complete presentation object reaches
+the host unchanged.
+
+Each optional `backgroundColor` and `textColor` is either `null` to restore the
+platform default or `{red, green, blue, alpha}`. All four channels are numbers:
+finite sRGB red/green/blue from 0 through 255 and alpha from 0 through 1.
+Omitting a field leaves its current value unchanged. There is no scheme field.
+
+```js
+const host=globalThis.Arcane;
+if(host?.runtime?.current().native&&host.window?.setTheme){
+    host.window.setTheme(
+        {
+            backgroundColor:{red:29,green:22,blue:19,alpha:1},
+            textColor:{red:248,green:239,blue:229,alpha:1}
+        }
+    ).then(
+        function reportWindowColors(result){
+            console.log('Moon observatory window colors:',result);
+        }
+    ).catch(
+        function reportWindowFailure(error){
+            console.error('Window color update failed.',error);
+        }
+    );
+}
+// Page rendering continues independently of the host request.
+```
+
+The result is `{platform, supported, applied, unsupported}`. `applied` contains
+only requested fields the platform accepted in this call, including `null`
+for an accepted default reset. `unsupported` lists requested fields the adapter
+cannot apply. `supported` is true when at least one field was applied. These
+are accepted settings, not measured pixels, and the operation is not atomic.
+Malformed arguments reject with `INVALID_ARGUMENT`; native API failures reject
+with `ARCANE_WINDOW_THEME_FAILED`, preserving the native error and
+`details.applied`/`details.unsupported` for earlier results in this call.
+
+The Windows host maps background/text to DWM caption/text attributes supported
+on Windows 11 build 22000 and later, retaining normal system window controls.
+It rounds RGB channels to the nearest integer, with midpoint values rounded
+up, and returns those actual accepted values. Translucent colors remain
+unsupported without changing the existing field. Older Windows reports those
+fields unsupported. This contract makes no promise about caption-button colors.
+The current macOS and Linux hosts have no implementation of this method;
+their ordinary unavailable-method response remains observable. A new facade
+alone does not add the operation to an older native executable. Use the
+matching published host artifact for the selected SDK version.
+
+Cancellation uses the normal request lifetime and suppresses late responses;
+it does not roll back a setting the host already accepted. Window settings
+survive document navigation until a subsequent document changes them or the
+window closes. Responses belong to their originating document.
+
+The shared [ThemeBootstrap](runtime-modules.md#themebootstrapjs) automatically
+forwards the app's computed `--background` and `--text-color` in native hosts.
+Applications using that owner need no duplicate theme listener. Ordinary
+browsers keep their CSS presentation without making a native request.
+
 ## Events and request lifetime
 
 `events.on(name, listener)`, `once(name, listener)` and

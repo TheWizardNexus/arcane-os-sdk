@@ -616,6 +616,14 @@ export function createCoreFacade(client){
         storage:{list:()=>invoke('storage.list'),get:key=>invoke('storage.get',{key}),set:(key,value)=>invoke('storage.set',{key,value}),delete:key=>invoke('storage.delete',{key})},
         preferences:{list:()=>invoke('preferences.list'),get:key=>invoke('preferences.get',{key}),set:(key,value)=>invoke('preferences.set',{key,value}),
             setMany:entries=>invoke('preferences.setMany',{entries}),delete:key=>invoke('preferences.delete',{key})},
+        window: {
+            setTheme(presentation, options) {
+                return invoke(
+                    'window.setTheme', presentation,
+                    {signal: options?.signal}
+                );
+            }
+        },
         appearance:{current:()=>invoke('appearance.current'),apply:appearance=>invoke('appearance.apply',appearance??{})},session:{logout:()=>invoke('session.logout')},
         provisioning:{plan:usernames=>invoke('provisioning.plan',{usernames:Array.isArray(usernames)?usernames:[usernames].filter(Boolean)})},
         diagnostics:{recentErrors:()=>invoke('diagnostics.recent'),get:diagnosticId=>invoke('diagnostics.get',{diagnosticId})},

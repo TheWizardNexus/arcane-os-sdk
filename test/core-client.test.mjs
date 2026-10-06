@@ -91,6 +91,68 @@ test('Core current ready state is synchronous and replays once with unsubscribe'
     assert.equal(Object.isFrozen(ready),false);
 });
 
+test(
+    'window theme facade preserves presentation, partial results and request cancellation',
+    async function windowTheme(t){
+        const {client,frames,receive}=fixture(t);
+        const facade=createCoreFacade(client);
+        const presentation={backgroundColor:{red:17.5,green:34,blue:51,alpha:0.999},textColor:null};
+        const operation=facade.window.setTheme(presentation);
+        assert.equal(frames[0].method,'window.setTheme');
+        assert.equal(frames[0].parameters,presentation);
+        const result={platform:'windows',supported:true,applied:{textColor:null},unsupported:['backgroundColor']};
+        receive(
+            {protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result}
+        );
+        assert.equal(await operation,result);
+        const controller=new AbortController();
+        const cancelled=facade.window.setTheme(
+            presentation,
+            {signal:controller.signal}
+        );
+        const request=frames[1];
+        controller.abort();
+        await assert.rejects(
+            cancelled,
+            {code:'ARCANE_REQUEST_ABORTED'}
+        );
+        assert.deepEqual(
+            frames[2],
+            {protocol:CORE_PROTOCOL,type:'control',control:'request.cancel',requestId:request.id}
+        );
+        const late=receive(
+            {protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result}
+        );
+        assert.equal(late,false);
+        const before=frames.length;
+        const preAborted=facade.window.setTheme(
+            presentation,
+            {signal:controller.signal}
+        );
+        await assert.rejects(
+            preAborted,
+            {code:'ARCANE_REQUEST_ABORTED'}
+        );
+        assert.equal(frames.length,before);
+        const failed=facade.window.setTheme(
+            {textColor:null},
+            null
+        );
+        const error={code:'ARCANE_WINDOW_THEME_FAILED',message:'Complete native failure',nativeCode:7,
+            details:{applied:{backgroundColor:{red:18,green:34,blue:51,alpha:1}},unsupported:['textColor']}};
+        receive(
+            {protocol:CORE_PROTOCOL,type:'response',id:frames.at(-1).id,ok:false,error}
+        );
+        await assert.rejects(
+            failed,
+            function completeNativeError(value){
+                for(const [key,item] of Object.entries(error))assert.deepEqual(value[key],item);
+                return true;
+            }
+        );
+    }
+);
+
 test('cancellation owns completion before a transport can reply to its control',async t=>{
     let receive;
     let requestId;
