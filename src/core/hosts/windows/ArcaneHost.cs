@@ -26,6 +26,10 @@ namespace Arcane.Core.Hosts.Windows
         public string CoreExecutable { get; set; }
         public string CoreArguments { get; set; }
         public string CoreWorkingDirectory { get; set; }
+        /// <summary>Optional initial client dimensions in logical pixels at 96 DPI.</summary>
+        public double? InitialClientWidth { get; set; }
+        public double? InitialClientHeight { get; set; }
+        public bool? Resizable { get; set; }
     }
 
     public static class ArcaneHost
@@ -128,6 +132,8 @@ namespace Arcane.Core.Hosts.Windows
         {
             if (options == null) throw new ArgumentNullException("options");
             if (onDiagnostic == null) throw new ArgumentNullException("onDiagnostic");
+            ValidateInitialDimension(options.InitialClientWidth, "InitialClientWidth");
+            ValidateInitialDimension(options.InitialClientHeight, "InitialClientHeight");
             this.options = options;
             this.onDiagnostic = onDiagnostic;
             this.onError = onError;
@@ -135,6 +141,11 @@ namespace Arcane.Core.Hosts.Windows
             completion.Task.ContinueWith(ObserveReportedFailure, TaskContinuationOptions.OnlyOnFaulted);
             Text = options.Title;
             AutoScaleMode = AutoScaleMode.Dpi;
+            if (options.Resizable.HasValue)
+            {
+                FormBorderStyle = options.Resizable.Value ? FormBorderStyle.Sizable : FormBorderStyle.FixedSingle;
+                MaximizeBox = options.Resizable.Value;
+            }
             webView = new WebView2 { Dock = DockStyle.Fill };
             Controls.Add(webView);
         }
@@ -145,11 +156,46 @@ namespace Arcane.Core.Hosts.Windows
 
         protected override void OnLoad(EventArgs args)
         {
+            // Apply the initial choice once. A composing launcher's Load handler
+            // can then restore its own saved state; later user sizing is untouched.
+            if (!started && !closing) ApplyInitialWindowSize();
             base.OnLoad(args);
             if (started || closing) return;
             started = true;
             initialization = InitializeAsync();
             initialization.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private static void ValidateInitialDimension(double? value, string name)
+        {
+            if (value.HasValue && (Double.IsNaN(value.Value) || Double.IsInfinity(value.Value)
+                || value.Value <= 0 || Math.Truncate(value.Value) != value.Value))
+                throw new ArgumentOutOfRangeException(name, "Select a positive integral logical client dimension.");
+        }
+
+        private void ApplyInitialWindowSize()
+        {
+            if ((!options.InitialClientWidth.HasValue && !options.InitialClientHeight.HasValue)
+                || WindowState != FormWindowState.Normal) return;
+
+            Rectangle workArea = Screen.FromControl(this).WorkingArea;
+            int availableWidth = Math.Max(1, workArea.Width - (Width - ClientSize.Width));
+            int availableHeight = Math.Max(1, workArea.Height - (Height - ClientSize.Height));
+            using (Graphics display = CreateGraphics())
+            {
+                double width = options.InitialClientWidth.HasValue
+                    ? options.InitialClientWidth.Value * display.DpiX / 96.0 : ClientSize.Width;
+                double height = options.InitialClientHeight.HasValue
+                    ? options.InitialClientHeight.Value * display.DpiY / 96.0 : ClientSize.Height;
+                // Fit before converting to native integer coordinates. This is
+                // an initial screen fit, not a persistent maximum window size.
+                ClientSize = new Size(
+                    (int)Math.Max(1, Math.Min(availableWidth, Math.Round(width))),
+                    (int)Math.Max(1, Math.Min(availableHeight, Math.Round(height))));
+            }
+            Location = new Point(
+                Math.Max(workArea.Left, Math.Min(Left, workArea.Right - Width)),
+                Math.Max(workArea.Top, Math.Min(Top, workArea.Bottom - Height)));
         }
 
         private async Task InitializeAsync()

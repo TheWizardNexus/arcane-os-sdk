@@ -372,6 +372,47 @@ observes complete diagnostics and exit. Cancelling that operation closes its
 input, allowing the window and accepted Core service work to drain without a
 forced process termination.
 
+### Initial native window size
+
+An application can select its initial client area and resizing behavior in
+`arcane-app.json`, independently of its page layout:
+
+```json
+{
+  "native": {
+    "type": "app",
+    "icon": "img/icon.png",
+    "order": 100,
+    "bundledApps": [],
+    "window": {"width": 1280, "height": 800, "resizable": true}
+  }
+}
+```
+
+This is the `native` portion of the existing app descriptor. Each `window`
+member is optional. `width` and `height` are positive integral client dimensions
+in logical pixels at 96 DPI; `resizable` is a boolean. Omitting a member retains
+the host's existing choice, and omitting `window` preserves existing startup.
+The native registry projection preserves the record; the browser package
+projection gains no window controls. Portable and Windows assembly copy the
+record to `arcane-native.json` as `window`, without changing page or service
+content.
+
+The matching Windows host applies the dimensions once on initial load, using
+the display DPI and fitting the outer window within the selected monitor's
+usable work area. This fit does not impose a persistent maximum size. Explicit
+`resizable:false` uses a fixed frame and disables the maximize control; `true`
+permits ordinary resizing and maximizing. Later app/user resizing remains
+untouched. A composing launcher's `Load` handler runs after this initial sizing
+and can restore its own saved window state. The SDK adds no saved-bounds store.
+
+Direct Windows host composition uses nullable `ArcaneHostOptions` members
+`InitialClientWidth`, `InitialClientHeight`, and `Resizable` with the same
+semantics. Older precompiled Windows hosts do not read these options; use the
+matching SDK host archive when rebuilding an application. The portable record
+is available to platform adapters; this addition implements its Windows host
+behavior and leaves window sizing on other platforms unchanged.
+
 ### Application icon and window colors
 
 `appDescriptor.native.icon` selects the application's existing app-relative

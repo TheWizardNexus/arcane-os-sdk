@@ -106,6 +106,18 @@ test('portable provider is package-owned and describes a payload rather than an 
     await assert.rejects(provider.run({artifact: {target: {rootDir: fixture.outputRoot}}}), {code: ERROR_CODES.nativeRunUnsupported});
 });
 
+test('portable assembly carries the optional native window configuration unchanged', async function nativeWindowManifest(t) {
+    const fixture = await createFixture(t);
+    const window = {width: 1280, height: 800, resizable: true};
+    const appDescriptor = {...application, native: {window}};
+    const artifact = await createPortableNativeProvider().build({...fixture.request, appDescriptor});
+    assert.deepEqual(artifact.manifest.window, window);
+    assert.deepEqual(artifact.manifest.app.native.window, window);
+    const saved = JSON.parse(await readFile(path.join(artifact.target.rootDir, 'arcane-native.json'), 'utf8'));
+    assert.deepEqual(saved.window, window);
+    assert.deepEqual(appDescriptor.native.window, {width: 1280, height: 800, resizable: true});
+});
+
 test('portable assembly preserves complete app and dependency files and authors service composition without executing it', async function completePayload(t) {
     const fixture = await createFixture(t);
     const dependencyRoot = path.join(fixture.root, 'selected-dependency');

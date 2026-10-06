@@ -48,6 +48,7 @@ namespace Arcane.Core.Hosts.Windows
                 Dictionary<string, object> manifest = ReadRecord(Path.Combine(directory, "arcane-native.json"));
                 Dictionary<string, object> app = RequiredRecord(manifest, "app");
                 Dictionary<string, object> client = RequiredRecord(manifest, "client");
+                Dictionary<string, object> windowOptions = manifest.ContainsKey("window") ? RequiredRecord(manifest, "window") : null;
                 string appId = RequiredString(app, "id");
                 object title;
                 string name = app.TryGetValue("displayName", out title) && title is string ? (string)title : appId;
@@ -71,6 +72,9 @@ namespace Arcane.Core.Hosts.Windows
                     OriginHost = "arcane.local",
                     ProfileDirectory = Path.Combine(profileParent, "WebView2"),
                     Title = name,
+                    InitialClientWidth = OptionalWindowDimension(windowOptions, "width"),
+                    InitialClientHeight = OptionalWindowDimension(windowOptions, "height"),
+                    Resizable = OptionalWindowResizable(windowOptions),
                     IconPath = String.IsNullOrEmpty(icon) ? null : Path.Combine(directory, icon),
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
                     CoreExecutable = Path.Combine(directory, "runtime", "ArcaneCore.exe"),
@@ -162,6 +166,23 @@ namespace Arcane.Core.Hosts.Windows
             string text = source.TryGetValue(name, out value) ? value as string : null;
             if (String.IsNullOrEmpty(text)) throw new FormatException("The native manifest needs a string at " + name + ".");
             return text;
+        }
+
+        private static double? OptionalWindowDimension(Dictionary<string, object> window, string name)
+        {
+            object value;
+            if (window == null || !window.TryGetValue(name, out value)) return null;
+            if (value is int || value is long || value is decimal || value is double)
+                return Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+            throw new FormatException("The native manifest needs a number at window." + name + ".");
+        }
+
+        private static bool? OptionalWindowResizable(Dictionary<string, object> window)
+        {
+            object value;
+            if (window == null || !window.TryGetValue("resizable", out value)) return null;
+            if (value is bool) return (bool)value;
+            throw new FormatException("The native manifest needs a boolean at window.resizable.");
         }
 
         private static string QuoteArgument(string value)

@@ -132,6 +132,16 @@
           }
         },
         "localAI": { "$ref": "#/$defs/localAI" },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Initial native client dimensions in logical pixels at 96 DPI, and whether the user can resize the window. Omitted fields retain the host defaults.",
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "resizable": { "type": "boolean" }
+          }
+        },
         "bundledApps": {
           "type": "array",
           "uniqueItems": true,

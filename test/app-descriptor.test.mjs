@@ -52,6 +52,48 @@ test('native service selection preserves complete options without loading app mo
     assert.equal(Object.hasOwn(validateAppDescriptor(descriptor()).native,'services'),false);
 });
 
+test('native window configuration preserves explicit choices and omitted defaults',function nativeWindowChoices(){
+    for(const window of [undefined,{}, {width:1280,height:800,resizable:true}, {width:640}, {resizable:false}]){
+        const authored=descriptor();
+        if(window!==undefined)authored.native.window=window;
+        const original=structuredClone(authored);
+        assert.deepEqual(validateAppDescriptor(authored).native.window,window);
+        assert.deepEqual(projectNativeDescriptor(authored).window,window);
+        assert.equal(Object.hasOwn(validateAppDescriptor(authored).native,'window'),window!==undefined);
+        assert.equal(Object.hasOwn(projectNativeDescriptor(authored),'window'),window!==undefined);
+        assert.equal(Object.hasOwn(projectPackageManifest(authored),'window'),false);
+        assert.deepEqual(authored,original);
+    }
+});
+
+test('native window configuration reports malformed public fields',function nativeWindowErrors(){
+    for(const window of [null,[],{width:0},{width:-1},{width:1.5},{width:'1280'},{height:NaN},{height:Infinity},{resizable:1},{resizable:'true'},{left:50}]){
+        const authored=descriptor();
+        authored.native.window=window;
+        assert.throws(function validateWindow(){
+            validateAppDescriptor(authored);
+        },{code:'ARCANE_APP_DESCRIPTOR_INVALID'});
+    }
+});
+
+test('native window selection survives registry descriptor synthesis',async function nativeWindowRegistry(t){
+    const workspaceRoot=await temporaryDirectory(t);
+    const appRoot=path.join(workspaceRoot,'apps','sample-app');
+    await mkdir(appRoot,{recursive:true});
+    const authored=descriptor();
+    authored.native.window={width:1280,height:800,resizable:true};
+    const registryRoot=path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle');
+    await mkdir(registryRoot,{recursive:true});
+    await writeFile(path.join(registryRoot,'arcane-apps.json'),JSON.stringify({
+        apps:{'sample-app':projectNativeDescriptor(authored)}
+    }));
+    const loaded=await loadAppDescriptor({
+        workspaceRoot,appRoot,appId:'sample-app',packageManifest:projectPackageManifest(authored)
+    });
+    assert.equal(loaded.source,'registry-projection');
+    assert.deepEqual(loaded.descriptor.native.window,authored.native.window);
+});
+
 test('canonical descriptor projects exact browser and native compatibility inputs',()=>{
     const value=validateAppDescriptor(descriptor(),{appId:'sample-app'});
     assert.deepEqual(projectPackageManifest(value),{

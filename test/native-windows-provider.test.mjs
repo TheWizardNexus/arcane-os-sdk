@@ -180,6 +180,19 @@ test('Windows assembly preserves complete selected payloads, app services and th
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
 
+test('Windows assembly forwards optional window sizing without replacing services', async function nativeWindowManifest(t) {
+    const fixture = await createFixture(t);
+    const window = {width: 1280, height: 800, resizable: false};
+    fixture.request.appDescriptor.native.window = window;
+    const provider = createWindowsNativeProvider({hostDirectory: fixture.hostDirectory});
+    const artifact = await provider.build(fixture.request);
+    assert.deepEqual(artifact.manifest.window, window);
+    assert.deepEqual(artifact.manifest.core.services, fixture.services);
+    const saved = JSON.parse(await readFile(path.join(artifact.target.rootDir, 'arcane-native.json'), 'utf8'));
+    assert.deepEqual(saved.window, window);
+    assert.deepEqual(saved.app.native.window, window);
+});
+
 test('Windows assembly reuses the exact SDK-version output cache and explicit empty services override app services', async function cachedHost(t) {
     const fixture = await createFixture(t);
     const metadata = JSON.parse(await readFile(path.join(sdkRoot, 'package.json'), 'utf8'));
