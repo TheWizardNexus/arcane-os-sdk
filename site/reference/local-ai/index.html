@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local AI through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-ai-through-core">Local AI through Core</h1><p class="doc-lead">Core owns native llama.cpp and Ollama processes, ONNX worker sessions, selected local image generation and retained Whisper transcription. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.</p><div class="doc-meta"><span>SDK 0.66.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Local AI through Core</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="local-ai-through-core">Local AI through Core</h1><p class="doc-lead">Core owns native llama.cpp and Ollama processes, ONNX worker sessions, selected local image generation and retained Whisper transcription. The browser retains its own Wllama and ONNX implementations, and can also use an explicitly connected Core when that system service is available. Runtime installation, model loading and inference are separate operations.</p><div class="doc-meta"><span>SDK 0.67.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="./" aria-current="page">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="./" aria-current="page">Local AI through Core</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/local-ai.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-onnx-sessions">Native ONNX sessions</a><a href="#native-bundling">Native bundling</a></nav></details><p>Core owns native llama.cpp and Ollama processes, ONNX worker sessions,
 selected local image generation and retained Whisper transcription. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
@@ -161,6 +161,28 @@ This factory accepts chat/ONNX requirements; the separate
 <a href="../local-image-generation/#core-service-and-transport"><code>createLocalImageService()</code></a>
 owns image requirements. The development and generated native composition
 split the shared application record accordingly.</p>
+<h3 id="native-service-owners">Native service owners</h3>
+<p>A native application service uses its Core lifecycle or request context to
+obtain the existing selected owner:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const localAI = await context.getService(&#39;local-ai&#39;);
+const onnx = localAI.getONNXRuntime();
+const modelAssets = await context.getService(&#39;model-assets&#39;);
+</code></pre></div>
+<p><code>getService()</code> awaits only that service&#39;s existing startup. The synchronous
+<code>getONNXRuntime()</code> returns its actual <code>load/run/unload/current/subscribe/close</code>
+owner; it neither prepares another runtime nor loads a model. An unselected
+engine reports <code>LOCAL_AI_RUNTIME_NOT_SELECTED</code>; an unavailable or recovering
+owner reports <code>LOCAL_AI_RUNTIME_UNAVAILABLE</code>, and an aborted service lifetime
+retains its abort reason. Development and generated native compositions register
+one shared model-assets service when ONNX or image generation is selected.</p>
+<p>Reacquire <code>getONNXRuntime()</code> on each explicit model load because runtime recovery
+replaces that owner. Retain the acquired handle for that session&#39;s cleanup and
+await its <code>unload({id})</code> without an already-aborted request signal before releasing
+the corresponding model-assets retain handle. The native ONNX owner joins actual
+worker exit; a cancelled request&#39;s rejection alone does not establish that exit.
+Core closes services concurrently, and the host can cancel in-flight native work
+at shutdown. These native members require no renderer readiness and introduce no
+second inference engine. See <a href="../core-runtime/#native-service-composition">native Core composition</a>.</p>
 <p><code>localai.status</code> returns <code>{runtimes}</code> and, when Ollama is selected, the existing
 <code>ollama</code> and <code>models.ollama</code> catalog fields. Runtime records distinguish
 <code>installed</code>, <code>available</code>, <code>state</code>, <code>models</code>, ownership and errors. A listening
@@ -210,6 +232,13 @@ background health polling.</p>
 </tr></tbody>
 </table>
 </div>
+<p><code>llama.status</code> and <code>llama.models</code> observe the selected service without loading,
+restarting or waiting for it. Starting, loading, stopped and failed services
+return their retained state/catalog; an available service supplies a fresh
+catalog observation. The llama.cpp runtime record includes <code>released: true</code>
+only after Core successfully closes its owned single-model server. Explicit
+load, inference or recovery can resume that engine; observation cannot.
+Status observation adds no background polling.</p>
 <p>The <code>payload</code> is the complete request. SDK option names are translated only at
 the upstream protocol boundary; messages, tool definitions and documents remain
 unchanged. An explicit <code>payload.model</code> selects that request&#39;s model. Core waits
@@ -223,7 +252,8 @@ stream errors remain visible as their original chunks and fail the request.
 observe load, sleep and unload changes. Direct servers expose readiness at
 request boundaries; they do not offer the router&#39;s passive model event stream.</p>
 <p>Unloading a model from an owned single-model server closes that owned process;
-a subsequent load can start it again. Releasing an externally owned direct
+a subsequent load can start it again. Repeating that unload returns the released
+state without restarting the process. Releasing an externally owned direct
 server returns <code>released: true, unloaded: false</code>, retaining the real catalog
 and leaving that server running.</p>
 <p>Ollama retains the existing Core calls for <code>version</code>, <code>models</code>/<code>list</code>, <code>running</code>,
@@ -287,6 +317,35 @@ runtime, then load it. <code>catalog()</code>, <code>status()</code>, <code>insp
 does not install software or select a model. A missing Core connection reports
 unavailability, leaving browser Wllama/ONNX routes available for the application
 to select.</p>
+<p>Omit <code>client</code> to follow the installed Core client through
+<a href="../core-client/"><code>subscribeCoreClient</code></a>: construction may precede installation.
+Each installation reads <code>llama.status</code> without selecting, downloading or loading
+a model. Retirement or replacement synchronously revokes this provider&#39;s
+<code>status().loaded</code>, cancels its owned operations and detaches the old lifecycle
+listener. Late results cannot restore the retired selection. Explicitly load
+the selection against the replacement client before inference. Passing a
+<code>client</code>, including <code>null</code>, keeps that caller-supplied connection fixed.</p>
+<p><code>status()</code> is this provider&#39;s current state. The <code>arcane-ai-provider/2</code> contract
+does not provide a provider-state subscription, so this installation handling
+alone does not update an idle AI runtime&#39;s retained role state. The provider
+runtime still reconciles the provider at its existing operation boundaries.
+<code>inspect()</code> reports whether an explicit load can proceed, separately from
+<code>status().loaded</code>. A genuine <code>starting</code> or <code>loading</code> service without an error
+permits that load preflight even before its catalog arrives; Core&#39;s <code>llama.load</code>
+waits for startup and verifies the exact requested model. An owned, successfully
+released service permits loading only a model retained in its actual catalog.
+An available service still requires that catalog membership. These observations
+do not fabricate model records or readiness, and unavailable external services,
+closed services and actual errors remain unavailable.</p>
+<p><code>dispose()</code> removes installation and service subscriptions and cancels owned
+operations synchronously, then attempts its actually retained model&#39;s release
+through its captured client. A configured selection alone does not own a native
+model: disposing before load or after successful unload sends no native release,
+including when the caller explicitly supplied <code>client: null</code>. A failed release
+rejects with the actual error even though the provider is disposed; disposal
+does not establish successful native unload.
+It never unloads a retired selection through a replacement client or closes the
+shared Core client.</p>
 <p>If a router evicts the primary model while serving a request-specific model,
 reload the primary selection before its next request. The provider does not
 silently change the application&#39;s saved model choice. Release registration
@@ -310,13 +369,43 @@ try {
 }
 </code></pre></div>
 <p>The factory accepts <code>{modulePath,signal?,onEvent?}</code> and starts no worker until
-<code>load({id,model,sessionOptions?,signal?})</code>. The model path is absolute for this
+<code>load({id,model,sessionOptions?,executionPreference?,signal?})</code>. The model path is absolute for this
 direct Node API. Session creation defaults to the CPU execution provider;
 explicit native session options remain caller-owned. The returned session
 record contains <code>id</code>, <code>model</code>, <code>state</code>, <code>loaded</code>, <code>error</code>, input/output names and
 metadata. A live ID requires explicit unload before replacement. An ID may be
 loaded again once its previous worker exits after a failed load or unload.
-A run error retains the loaded session so a corrected request can use it.</p>
+A run error retains the loaded session so a corrected request can use it.
+<code>current().sessions[].stopping</code> becomes <code>true</code> when terminal shutdown begins,
+including worker failure or explicit cancellation/unload. The session is then
+unavailable for new runs even while <code>loaded</code> remains <code>true</code> until actual exit.
+A recoverable run error keeps <code>stopping:false</code> and the loaded session usable.
+<code>current().sessions[].exited</code> reports actual worker exit, independently of a
+rejected load or inference. Unload joins worker exit and output delivery even
+when requesting termination fails; complete cleanup errors remain observable.</p>
+<p>Select <code>executionPreference: &#39;gpu&#39;</code> to try the installed runtime&#39;s advertised
+CUDA, TensorRT, DirectML, CoreML and WebGPU providers in that order, followed by
+CPU when no accelerator session can be created. Discovery runs once per load;
+each advertised candidate receives one actual session-creation attempt with CPU
+available for graph nodes that the accelerator cannot handle. No provider is
+downloaded by selection. The upstream <code>bundled</code> flag describes packaging and
+does not exclude separately installed CUDA or TensorRT libraries. An explicit
+<code>sessionOptions.executionProviders</code>, including an empty array, takes precedence
+and is passed unchanged without automatic discovery or retries. Automatic
+DirectML attempts default <code>enableMemPattern</code> to <code>false</code> and <code>executionMode</code> to
+<code>&#39;sequential&#39;</code> as required by that provider; explicit caller values remain
+unchanged, including on the final CPU attempt.</p>
+<p>Automatic GPU selection adds an <code>execution</code> record to the loaded session and
+its ordinary state events: <code>preference</code>, complete <code>supportedBackends</code>,
+<code>selectedProviders</code>, ordered <code>attempts</code> with their full errors, <code>fallback</code>, and
+<code>discoveryError</code>. Each attempt records <code>executionProviders</code>, <code>status</code>
+(<code>configured</code> or <code>failed</code>), and <code>error</code>. <code>fallback: true</code> means the SDK created
+the final CPU session after GPU preference, including when no GPU candidate was
+advertised. Successful creation establishes an accepted provider configuration;
+it does not establish that a GPU executed any graph nodes. If every attempt
+fails, the load error retains the complete attempt errors and <code>execution</code>
+record. Inference failures retain their existing behavior and do not replay
+inference on another provider.</p>
 <p><code>run({id,feeds,fetches?,runOptions?,signal?})</code> returns the complete output-name
 map of <code>{type,dims,data}</code> tensors. Input records use that same shape with native
 typed data or string arrays. Optional <code>fetches</code> selects output names or supplies
@@ -390,6 +479,14 @@ transport codec. <code>current()</code> adds <code>busy</code> and <code>closed<
 Closing the accessor cancels its requests and subscriptions; model unloading
 is explicit because other accessors may share the Core session. It never
 closes the shared Core client.</p>
+<p>Omitting <code>client</code> follows Core installation events with current-client replay,
+including installation after construction. Each new connection reads
+<code>onnx.status</code>; it does not install a runtime or load a model. Retirement or
+replacement immediately clears retained session readiness and cancels this
+accessor&#39;s operations. Late old-client state and results are ignored. Passing
+an explicit <code>client</code>, including <code>null</code>, retains caller ownership and does not
+follow global installation changes. <code>close()</code> also removes the installation
+subscription.</p>
 <p>Construction neither opens a connection nor installs a runtime. A browser needs
 an already available native Core service or the explicit development bridge.
 Unavailable native ONNX leaves browser ONNX/Wllama under the application&#39;s
@@ -450,6 +547,6 @@ integration.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-requirements">Application requirements</a><a href="#development">Development</a><a href="#core-service">Core service</a><a href="#browser-llamacpp-provider">Browser llama.cpp provider</a><a href="#native-onnx-sessions">Native ONNX sessions</a><a href="#native-bundling">Native bundling</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.66.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.67.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

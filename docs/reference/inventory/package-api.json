@@ -1,17 +1,59 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.66.0",
+  "sdkVersion": "0.67.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 290,
+  "memberCount": 293,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "local-ai-decisions:createNativeDecisionModel",
+      "name": "createNativeDecisionModel",
+      "displayName": "createNativeDecisionModel()",
+      "kind": "function",
+      "signature": "createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',signal}={})",
+      "entrypoints": ["arcane-os/local-ai/decisions"],
+      "primaryImport": "arcane-os/local-ai/decisions",
+      "group": "Native typed decisions",
+      "summary": "Explicit native Laya FP32 option scoring through an existing ONNX owner and a tokenizer Worker.",
+      "availability": "Node on Windows/Linux/macOS with selected ONNX Runtime and model files; Android needs host adaptation",
+      "protocol": "Shared browser/native decision encoding with native named tensor results",
+      "normalization": "Returns load/evaluate/classify/current/status/subscribe/unload/dispose; preserves complete separate state/question/options/type and original rows, raw scores and every graph output. Explicit load prepares selected upstream files or uses caller-owned paths; GPU preference attempts advertised providers then CPU. Cancellation retires the shared activation; files remain retained through actual ONNX and tokenizer Worker exit. No chat history or duplicate inference engine."
+    },
+    {
+      "id": "core-decisions:createNativeDecisionService",
+      "name": "createNativeDecisionService",
+      "displayName": "createNativeDecisionService()",
+      "kind": "function",
+      "signature": "createNativeDecisionService(configuration={}, {appRoot=process.cwd()}={})",
+      "entrypoints": ["arcane-os/core/decisions"],
+      "primaryImport": "arcane-os/core/decisions",
+      "group": "Native typed decisions",
+      "summary": "Renderer-independent native Laya service reusing the registered local-AI and model-assets owners.",
+      "availability": "Node Core with selected native ONNX and model files",
+      "protocol": "arcane/1 decisions.status/load/evaluate/unload and decisions.state",
+      "normalization": "Registration starts no model or tokenizer. Explicit load obtains dependency-ready same-process owners and reacquires getONNXRuntime after recovery. Native load/evaluate/classify/current/subscribe/unload/dispose preserve complete results; RPC uses the existing tensor codec. Unload has accepted service lifetime; host shutdown cancels request-lifetime load/evaluation."
+    },
+    {
+      "id": "core-decisions:default",
+      "name": "default",
+      "displayName": "createNativeDecisionService default export",
+      "kind": "function",
+      "signature": "default as createNativeDecisionService",
+      "entrypoints": ["arcane-os/core/decisions"],
+      "primaryImport": "arcane-os/core/decisions",
+      "group": "Native typed decisions",
+      "summary": "Default binding for the same native decision Core service factory.",
+      "availability": "Node Core runtime",
+      "protocol": "arcane/1 service definition",
+      "normalization": "Binding identity equals the named createNativeDecisionService export"
+    },
     {
       "id": "local-ai-whisper:createWhisperRuntime",
       "name": "createWhisperRuntime",
@@ -227,14 +269,14 @@
       "name": "createCoreImageRuntime",
       "displayName": "createCoreImageRuntime()",
       "kind": "function",
-      "signature": "createCoreImageRuntime({client=getInstalledCoreClient(),signal,onEvent}={})",
+      "signature": "createCoreImageRuntime({client,signal,onEvent}={})",
       "entrypoints": ["arcane-os/ai/core-image"],
       "primaryImport": "arcane-os/ai/core-image",
       "group": "Core local images",
       "summary": "Uses an available Core image service for generation and original-PNG editing with synchronous Thinking acknowledgement, lifecycle replay and complete PNG Blobs.",
       "availability": "Browser/native WebView with an available Core image service; construction opens no connection or model",
       "protocol": "arcane/1 image.status/load/generate/edit/unload and image.state/progress",
-      "normalization": "Returns load/generate/edit/unload/inspect/current/subscribe/close; edit preserves the complete original PNG Blob/File through transport with explicit strength; timeoutMs is zero, close cancels only this accessor and explicit unload owns the shared model"
+      "normalization": "Returns load/generate/edit/unload/inspect/current/subscribe/close; omitted client follows installation/replacement/retirement, explicit client including null remains fixed. Retirement cancels owned work and clears readiness; late old-client output is suppressed. Edit preserves the complete original PNG Blob/File through transport with explicit strength; timeoutMs is zero, close cancels only this accessor and explicit unload owns the shared model"
     },
     {
       "id": "core-image-service:createLocalImageService",
@@ -290,7 +332,7 @@
       "summary": "Owns selected native working-file projections and engine retain handles while original stored model files remain unchanged.",
       "availability": "Node Core with an application-selected working directory",
       "protocol": "arcane/1 modelAssets.open/write/complete/release/status and modelAssets.state",
-      "normalization": "Returns current/retain/dispose and Core service lifecycle; final native release joins writes and closes before deleting only its working projection"
+      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress}) streams complete upstream members through the existing file owner and reports file/phase progress. release(id) relinquishes preparation ownership; cancellation and cleanup join fetches/writes. Native retains survive until actual engine release before deleting only the owned working projection. Startup downloads nothing."
     },
     {
       "id": "core-model-assets-service:default",
@@ -318,21 +360,21 @@
       "summary": "Owns explicitly loaded ONNX graphs and complete named tensor inference in retained native workers.",
       "availability": "Node on Windows/Linux/macOS x64/arm64 with prepared onnxruntime-node; Android needs host adaptation",
       "protocol": "Per-session worker lifecycle with structured-clone tensors and replaying state",
-      "normalization": "Returns load/run/unload/current/subscribe/close; explicit model and session IDs; native calls may delay worker termination, and close observes actual exit"
+      "normalization": "Returns load/run/unload/current/subscribe/close; load accepts executionPreference gpu for advertised provider creation attempts then CPU, while explicit sessionOptions.executionProviders takes precedence. Complete execution diagnostics distinguish configured providers from physical acceleration. stopping revokes new runs while exited records actual Worker exit; recoverable run errors preserve the session. Cleanup joins exit and output delivery even when termination fails."
     },
     {
       "id": "core-onnx:createCoreONNXRuntime",
       "name": "createCoreONNXRuntime",
       "displayName": "createCoreONNXRuntime()",
       "kind": "function",
-      "signature": "createCoreONNXRuntime({client=getInstalledCoreClient()}={})",
+      "signature": "createCoreONNXRuntime({client}={})",
       "entrypoints": ["arcane-os/ai/core-onnx"],
       "primaryImport": "arcane-os/ai/core-onnx",
       "group": "Core local AI",
       "summary": "Accesses local system ONNX through an existing Core client with complete tensor transport.",
       "availability": "Browser with available Core ONNX service; construction installs no runtime or model",
       "protocol": "arcane/1 onnx.status/load/run/unload and localai.state",
-      "normalization": "Returns load/run/unload/inspect/current/subscribe/close; preserves typed and string tensors; accessor close cancels its requests without closing shared Core or implicitly unloading shared models"
+      "normalization": "Returns load/run/unload/inspect/current/subscribe/close; omitted client follows late installation/replacement/retirement and reads current status, while explicit client including null stays fixed. Retirement clears readiness and cancels owned work; late old-client results are suppressed. Preserves typed and string tensors; close removes subscriptions and cancels requests without closing shared Core or implicitly unloading shared models"
     },
     {
       "id": "root:createGitTextSnapshot",
@@ -409,14 +451,14 @@
       "name": "createCoreLocalAIProvider",
       "displayName": "createCoreLocalAIProvider()",
       "kind": "function",
-      "signature": "createCoreLocalAIProvider({client=getInstalledCoreClient(),id='llama.cpp'}={})",
+      "signature": "createCoreLocalAIProvider({client,id='llama.cpp'}={})",
       "entrypoints": ["arcane-os/ai/core-local"],
       "primaryImport": "arcane-os/ai/core-local",
       "group": "Core local AI",
       "summary": "Browser llama.cpp provider through an explicitly connected Core, with application-owned model selection and complete response streaming.",
       "availability": "Browser with an available Core local AI service; construction installs no runtime or model",
       "protocol": "arcane-ai-provider/2 LLM lifecycle over arcane/1",
-      "normalization": "Preserves complete payloads and original parsed chunks; waits for the exact requested model and cancels on observed readiness loss"
+      "normalization": "Preserves complete payloads and original parsed chunks; waits for the exact requested model and cancels on observed readiness loss. Omitted client follows installation/replacement/retirement; explicit client including null stays fixed. Inspect reports load capability separately from loaded readiness; disposal releases only an actually retained selection through its captured client. Provider/2 role state reconciles at existing operation boundaries, not through an idle state subscription."
     },
     {
       "id": "core-local-ai:createLocalAIService",
@@ -430,7 +472,7 @@
       "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
       "availability": "Node with selected upstream runtime distributions or available configured system services",
       "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE, Ollama native HTTP/NDJSON and ONNX tensor transport",
-      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup; independent services, complete responses and exact owned-process cleanup"
+      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup. getONNXRuntime() returns the actual prepared ONNX owner for native composition after context.getService('local-ai'); callers reacquire after recovery and retain the acquired handle for cleanup. llama.status/models observe without starting or restarting an engine. Independent services, complete responses and exact owned-process cleanup remain unchanged."
     },
     {
       "id": "core-local-ai:default",
@@ -4276,7 +4318,7 @@
       "summary": "Creates an app-neutral Core dispatcher with explicit services, request lifetimes, events and graceful drain.",
       "availability": "Node on Windows, Linux and macOS native hosts; Android requires its host adaptation",
       "protocol": "arcane/1 dispatcher and service lifecycle",
-      "normalization": "Starts services independently, preserves complete results/errors, cancels only request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order"
+      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order"
     },
     {
       "id": "core-stdio:encodeCoreFrame",

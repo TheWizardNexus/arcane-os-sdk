@@ -54,6 +54,7 @@ alone does not make bare module names resolve in a browser.
 | Connect a browser to one Core transport | [Core browser client](core-client.md) |
 | Cancel one Core speech synthesis request without changing its payload | [Speech request lifetime](core-client.md#events-and-request-lifetime) and [Core facade](sdk-api.md#createcorefacade) |
 | Compose native Core dispatch, service lifecycle, and stdio hosting | [Native Core runtime](core-runtime.md) |
+| Reuse dependency-ready native services without a renderer | [Core service composition](core-runtime.md#native-service-composition) and [existing ONNX owner](local-ai.md#native-service-owners) |
 | Compose application Core services during source development, independently of local AI | [Development Core services](core-development.md) |
 | Own an explicitly selected native Codex App Server session | [Codex App Server](codex-app-server.md) |
 | Expose application-owned tools and static resources through Node STDIO | [MCP STDIO server](mcp-stdio.md) |
@@ -66,12 +67,14 @@ alone does not make bare module names resolve in a browser.
 | Select the optional Intel NPU encoder with independent CUDA or CPU decoding | [Intel NPU Whisper](../guides/native-whisper-openvino.md) |
 | Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
 | Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
+| Prepare selected upstream model members in native services | [Native preparation and retained lifetime](model-assets.md#native-ownership) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
 | Own a native working checkout under per-user ArcaneData/Repos | [Native repository workspaces](core-repositories.md) |
 | Read Git identity defaults or select child-only author and credential hints | [Git identity configuration](core-repositories.md#git-identity-configuration) |
 | Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
+| Observe existing checkout configuration and capture an explicit remote/ref | [Repository configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
@@ -79,6 +82,7 @@ alone does not make bare module names resolve in a browser.
 | Subscribe to native events | [Arcane event reference](core/arcane-events.md) |
 | Use provider-neutral AI lifecycle, chat, speech, persistence, or document context | [Normalized AI](#normalized-ai) |
 | Choose a normalized typed browser decision surface | [Browser typed decisions](ai/browser-decisions.md) |
+| Score complete typed options with native Laya FP32 | [Native typed decisions](native-decisions.md) |
 | Run a caller-selected local LLM in the browser | [Browser-WASM local AI](ai/browser-wasm.md) |
 | Run caller-selected Whisper/Kokoro, native browser recognition/voices or cloud TTS | [Browser speech providers](ai/browser-speech.md) |
 | Send TWiN chat, System One state/questions or image requests | [TWiN Cloud guide](ai/twin-cloud.md) |
@@ -239,6 +243,7 @@ Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:
 | Run application-selected native llama.cpp/Ollama chat | [`arcane-os/ai/core-local`, `arcane-os/core/local-ai`](local-ai.md) | Explicit Core connection and selected native runtimes; installation, availability and loaded-model readiness remain distinct. |
 | Transcribe complete recordings with a retained native Whisper model | [`arcane-os/local-ai/whisper`](local-whisper.md) and [Core speech](native-speech.md) | Matching native helper, Whisper libraries, decoder and selected model; Windows defaults and explicit other-platform distributions have distinct preparation requirements. |
 | Run a local ONNX graph with named tensors | [`arcane-os/local-ai/onnx`, `arcane-os/ai/core-onnx`](local-ai.md#native-onnx-sessions) | Retained native workers; browser access requires an available Core ONNX service. |
+| Score typed options without a renderer | [`arcane-os/local-ai/decisions`, `arcane-os/core/decisions`](native-decisions.md) | Explicit native Laya FP32 activation using the existing ONNX owner; complete scores and outputs, joined Worker cleanup. |
 | Generate local images from complete prompts and selected model resources | [`arcane-os/local-ai/image`, `arcane-os/ai/core-image`](local-image-generation.md) | Prepared native image runtime; browser access requires its Core service. CPU Windows/Linux and Mac Metal/CPU paths have distinct actual host requirements. |
 | Supply complete stored model members to a native engine | [`arcane-os/ai/core-model-assets`, `arcane-os/core/model-assets`](model-assets.md) | Available Core service; DBOPFS originals stay authoritative while native owners retain working files. |
 | Run caller-selected Whisper/Kokoro locally | [`arcane-os/ai/browser-speech`](ai/browser-speech.md) | Browser with DBOPFS, Web Locks, Workers and selected upstream sources; automatic WebNN NPU, WebGPU, then WASM loading, or an explicit backend. |

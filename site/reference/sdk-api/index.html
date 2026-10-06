@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.66.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.67.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
 <code>arcane-os/event-manager</code>, <code>arcane-os/logging</code>, <code>arcane-os/mail</code>,
 <code>arcane-os/preference-store</code>, <code>arcane-os/speech-playback</code>, <code>arcane-os/websocket-client</code>,
@@ -175,6 +175,14 @@ runtime layouts.</p>
 <tr>
 <td><code>arcane-os/local-ai/onnx</code></td>
 <td>Retained native ONNX worker sessions with explicit graph loading and complete tensor inference.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/decisions</code></td>
+<td>Explicit native Laya FP32 decisions using the existing ONNX owner and a tokenizer Worker.</td>
+</tr>
+<tr>
+<td><code>arcane-os/core/decisions</code></td>
+<td>Renderer-independent typed-decision service composed with existing local-AI and model-assets owners.</td>
 </tr>
 <tr>
 <td><code>arcane-os/ai/core-onnx</code></td>
@@ -424,6 +432,27 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.</p
 <td><code>arcane-os/ai/browser-decisions</code></td>
 <td>Browser typed decisions</td>
 <td>Browser module Workers and the caller-selected inference backend</td>
+</tr>
+<tr>
+<td><code>createNativeDecisionModel()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/decisions</code></td>
+<td>Native typed decisions</td>
+<td>Node with an existing native ONNX owner and selected Laya FP32 files</td>
+</tr>
+<tr>
+<td><code>createNativeDecisionService()</code></td>
+<td>function</td>
+<td><code>arcane-os/core/decisions</code></td>
+<td>Native typed decisions</td>
+<td>Node Core with existing local-AI and model-assets services</td>
+</tr>
+<tr>
+<td><code>createNativeDecisionService default export</code></td>
+<td>function</td>
+<td><code>arcane-os/core/decisions</code></td>
+<td>Native typed decisions</td>
+<td>Same native decision service factory</td>
 </tr>
 <tr>
 <td><code>fetchRequest()</code></td>
@@ -4495,9 +4524,16 @@ async function useinspectWorkspaceProfile(...arguments_) {
 <h4 id="overview-102">Overview</h4>
 <p>Runs one fast-forward-only pull after proving the selected repository worktree is clean.</p>
 <h4 id="signature-and-result-68">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async repositoryPull({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async repositoryPull({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})
 </code></pre></div>
 <p>Import it from <code>arcane-os</code>. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.</p>
+<p>Optional <code>target:{remote,ref}</code> captures exact nonempty native-representable
+strings before any wait and selects <code>git pull --ff-only -- &lt;remote&gt; &lt;ref&gt;:</code>.
+The current clean branch receives a fast-forward-only integration; the SDK
+never switches branches, resets or changes configuration. Without a target,
+the existing configured pull and result remain unchanged. Targeted results
+add <code>target</code>, complete <code>stdout</code> and <code>stderr</code> to the existing pull result.
+See <a href="../core-repositories/#existing-checkout-configuration-and-selected-targets">checkout configuration and selected targets</a>.</p>
 <h4 id="availability-and-normalization-102">Availability and normalization</h4>
 <p><strong>Node; network-assisted Git.</strong> SDK-normalized inputs, errors, events, and documented result. Deep protocol: <a href="../protocols/">Node ESM</a>.</p>
 <h4 id="example-102">Example</h4>
@@ -4511,7 +4547,7 @@ async function userepositoryPull(...arguments_) {
 <h4 id="overview-103">Overview</h4>
 <p>Pushes the selected attached branch through the repository&#39;s configured remote and credentials.</p>
 <h4 id="signature-parameters-and-result-1">Signature, parameters, and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async repositoryPush({ workspaceRoot=process.cwd(), signal, onEvent, run=runProcess }={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async repositoryPush({ workspaceRoot=process.cwd(), target, signal, onEvent, run=runProcess }={})
 </code></pre></div>
 <p>Import it from <code>arcane-os</code>. <code>workspaceRoot</code> selects the Git worktree. <code>signal</code>
 cancels the owned Git process tree. The awaited <code>onEvent</code> callback receives the
@@ -4520,16 +4556,25 @@ injectable process runner intended for deterministic tests; ordinary callers
 should keep the default.</p>
 <p>Before pushing, the SDK runs <code>git rev-parse --show-toplevel</code>,
 <code>git branch --show-current</code>, and <code>git status --short --branch</code> in order. It rejects a
-detached HEAD, then runs plain <code>git push</code>; the repository&#39;s current branch,
+detached HEAD, then, without <code>target</code>, runs plain <code>git push</code>; the repository&#39;s current branch,
 configured upstream/remote, Git credentials, hooks, and server policy remain
 authoritative. Unlike <code>repositoryPull()</code>, this function does <strong>not</strong> require a
-clean worktree. It does not create a commit or select a remote/refspec for you.</p>
+clean worktree. It does not create a commit or choose an application destination.
+Optional <code>target:{remote,ref}</code> captures the original nonempty
+native-representable strings before any wait and runs
+<code>git push --no-follow-tags -- &lt;remote&gt; HEAD:&lt;ref&gt;</code>. This publishes current HEAD
+to the caller-selected ref without force or implicit configured tag following.
+It changes no branch or Git configuration; credentials, URL interpretation,
+hooks and remote rejection remain Git-owned.</p>
 <p>The promise resolves to
 <code>{action:&#39;push&#39;, repositoryRoot, branch, output}</code>. <code>output</code> is trimmed stdout,
 or trimmed stderr when stdout is empty. A missing Git executable, failed status
 probe, rejected/nonzero push, cancellation, or event-callback failure rejects
 with the normalized process error. Cancellation stops the local process tree;
-it cannot prove that a remote accepted no objects before the interruption.</p>
+it cannot prove that a remote accepted no objects before the interruption.
+Targeted results also contain the captured <code>target</code> and complete
+<code>stdout</code>/<code>stderr</code>; omitting the target preserves the existing result shape.
+See <a href="../core-repositories/#existing-checkout-configuration-and-selected-targets">checkout configuration and selected targets</a>.</p>
 <h4 id="availability-and-normalization-103">Availability and normalization</h4>
 <p><strong>Node; network-assisted Git.</strong> SDK-normalized inputs, errors, events, and documented result. Deep protocol: <a href="../protocols/">Node ESM</a>.</p>
 <h4 id="example-103">Example</h4>
@@ -6929,8 +6974,16 @@ privileges and persistence remain with those owners.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createCoreRuntime({application, version, services=[]}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/core/runtime</code>. The runtime exposes <code>current()</code>,
-<code>subscribe()</code>, <code>onFrame()</code>, <code>emit()</code>, <code>registerService()</code>, <code>start()</code>, <code>handle()</code>
+<code>subscribe()</code>, <code>onFrame()</code>, <code>emit()</code>, <code>registerService()</code>, <code>getService()</code>, <code>start()</code>, <code>handle()</code>
 and idempotent <code>close()</code>.</p>
+<p><code>await runtime.getService(name)</code> and service <code>context.getService(name)</code> return
+the actual registered service after its shared startup. They wait for that
+dependency alone, may start it before <code>runtime.start()</code>, and add no renderer or
+all-service barrier. Unknown services reject with <code>CORE_SERVICE_UNAVAILABLE</code>;
+new lookups during shutdown reject with <code>CORE_CLOSING</code>. Startup failures retain
+their original error. This is readiness, not a lifetime lease: retain acquired
+native handles for their actual cleanup rather than looking them up during
+disposal. See <a href="../core-runtime/#native-service-composition">native service composition</a>.</p>
 <p>Services start independently. Request-lifetime work receives cooperative
 cancellation; accepted <code>lifetime:&#39;service&#39;</code> work survives renderer cancellation.
 Shutdown stops admission, waits accepted responses, then runs each service&#39;s
@@ -7370,8 +7423,8 @@ explicit existing path. The application owns the remote, branch and Core API.</p
 <h4 id="signature-and-result-120">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})
 </code></pre></div>
-<p>Returns <code>{directory,open,status,pull,push,write,close,drain,dispose}</code>. Construction does
-no I/O. Operations accept <code>{signal}</code>; a missing or empty destination clones once,
+<p>Returns <code>{directory,open,status,configuration,pull,push,write,close,drain,dispose}</code>. Construction does
+no I/O. Preparing operations accept <code>{signal}</code>; a missing or empty destination clones once,
 while existing checkout files, branches, remotes and local changes remain intact.
 Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
@@ -7382,7 +7435,23 @@ settings for child Git operations without writing global/local configuration.
 Selected author fields override inherited child author/committer fields;
 omitted fields remain inherited. Username remains a credential hint, with
 authentication owned by ordinary Git and its configured helper.</p>
-<p><code>write({files:[{path,content}],message,signal})</code> snapshots the exact selected
+<p><code>configuration({signal})</code> observes an existing working root without clone,
+initialization or fetch. It returns <code>{repositoryRoot,headRef,origin,upstream}</code>:
+full symbolic HEAD (including unborn, null when detached), origin URL/pushURL
+arrays and current branch remote/merge/URL/pushURL arrays. Unset, empty and
+repeated configuration values remain distinct. These are ordinary configured
+values, not authentication or endpoint proof, and are not atomic with later
+operations. Raw stdout is decoded without replacement; unrepresentable text
+reports <code>ARCANE_GIT_CONFIGURATION_NOT_TEXT</code> with full diagnostics.</p>
+<p><code>pull({target,signal})</code>, <code>push({target,signal})</code> and
+<code>write({files:[{path,content}],message,target,signal})</code> accept optional
+<code>target:{remote,ref}</code>, captured as original strings at acceptance. The target
+selects a fast-forward-only pull into the current branch or a non-force push
+of current HEAD to the selected ref, without switching branches or changing
+configuration. It is independent of initial-clone <code>remote</code>/<code>branch</code>; omission
+preserves ordinary configured behavior. See the <a href="../core-repositories/#existing-checkout-configuration-and-selected-targets">complete configuration and
+target contract</a>.</p>
+<p><code>write</code> snapshots the exact selected
 strings, writes those repository-relative files, commits only their literal
 paths and performs an ordinary non-force push. It retains unrelated staged
 paths and existing Git filters/hooks. Results and causal failures distinguish
@@ -7434,7 +7503,7 @@ per-process selection example</a>.</p>
 <p>Creates a browser-safe llama.cpp LLM provider through an existing Core client.
 Construction selects no model and installs no runtime or transport.</p>
 <h4 id="signature-and-result-122">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createCoreLocalAIProvider({client=getInstalledCoreClient(),id=&#39;llama.cpp&#39;}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createCoreLocalAIProvider({client,id=&#39;llama.cpp&#39;}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/ai/core-local</code>. The provider implements
 <code>arcane-ai-provider/2</code> and exposes <code>catalog</code>, <code>status</code>, <code>inspect</code>, <code>load</code>,
@@ -7444,6 +7513,15 @@ Requests wait for the requested model&#39;s actual readiness, preserve complete
 payloads and parsed streaming chunks, and cancel on observed readiness loss.
 Missing Core reports unavailability; it does not choose a browser or cloud route.
 Dispose/unregister at the caller&#39;s owning lifecycle boundary.</p>
+<p>Omitted <code>client</code> follows late installation, replacement and retirement through
+the shared Core installation subscription. An explicit client, including
+<code>null</code>, remains fixed. Replacement revokes readiness and cancels owned work;
+late results cannot restore it. <code>inspect()</code> distinguishes explicit load
+capability from loaded readiness, while <code>status()</code> remains observational.
+Disposal releases only an actually retained selection through its captured
+client, so never-loaded and already-unloaded providers send no native unload.
+The provider/2 runtime reconciles status at its operation boundaries; this
+does not add an idle role-state subscription.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createCoreLocalAIProvider} from &#39;arcane-os/ai/core-local&#39;;
 import {getAIProviderRuntime} from &#39;arcane-os/ai-provider-runtime&#39;;
 
@@ -7466,6 +7544,12 @@ resolved installed runtime records. It returns a Core service definition with
 <code>current()</code> and independent selected-engine startup. Compose it through the
 existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
 an already running external service remains under its external owner.</p>
+<p>After <code>await context.getService(&#39;local-ai&#39;)</code>, <code>service.getONNXRuntime()</code> returns
+that service&#39;s actual prepared ONNX owner. It creates no engine and rejects
+unavailable or closing access. Reacquire on each explicit load after recovery;
+retain the returned handle for cleanup. Core shutdown cancels request-lifetime
+work, and independent services dispose concurrently. See
+<a href="../local-ai/#native-service-owners">native service owners</a>.</p>
 <p>Optional <code>prepare({signal,onEvent})</code> supplies resolved runtime records during
 this service&#39;s startup. Only operations depending on that service wait for its
 preparation; the development listener and independently composed image/model
@@ -7474,7 +7558,10 @@ requirements to this factory; <code>createLocalImageService()</code> owns select
 requirements. The managed development and native entrypoints separate them.</p>
 <p>The service provides <code>localai.status</code>, explicit <code>localai.services.recover</code>,
 <code>llama.status/models/load/unload/chat</code>, <code>onnx.status/load/run/unload</code>, and the documented native Ollama methods.
-<code>localai.state</code> reports runtime/model changes. <code>llama.chunk</code> and <code>ollama.chunk</code>
+<code>localai.state</code> reports runtime/model changes. <code>llama.status</code> and <code>llama.models</code>
+observe current state without starting, restarting or waiting for an engine.
+Explicit load retains startup and exact catalog-membership checks.
+<code>llama.chunk</code> and <code>ollama.chunk</code>
 carry original parsed chunks with <code>streamId</code>; terminal responses remain complete.
 There is no background health polling or implicit model choice.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createLocalAIService} from &#39;arcane-os/core/local-ai&#39;;
@@ -7485,7 +7572,7 @@ const service = createLocalAIService(application.native.localAI, {appRoot, runti
 and <a href="../local-ai/#native-bundling">native bundling</a>.</p>
 <h3 id="createonnxruntime">createONNXRuntime()</h3>
 <p><code>createONNXRuntime({modulePath,signal?,onEvent?})</code> from <code>arcane-os/local-ai/onnx</code>
-owns retained native ONNX sessions in workers. It exposes <code>load({id,model, sessionOptions?,signal?})</code>, <code>run({id,feeds,fetches?,runOptions?,signal?})</code>,
+owns retained native ONNX sessions in workers. It exposes <code>load({id,model, sessionOptions?,executionPreference?,signal?})</code>, <code>run({id,feeds,fetches?,runOptions?,signal?})</code>,
 <code>unload({id,signal?})</code>, <code>current()</code>, replaying <code>subscribe(listener)</code> and <code>close()</code>.
 The direct model path is absolute. Complete typed tensor records use
 <code>{type,dims,data}</code>; callers own the actual graph&#39;s inputs and preprocessing.</p>
@@ -7494,9 +7581,19 @@ before replacement. Independent sessions run concurrently; same-session work
 waits at that session&#39;s loading/execution boundary. Queued cancellation removes
 that request; active cancellation retires the affected worker and suppresses
 its response. Native code can delay termination; cleanup waits for actual exit.
+<code>current().sessions[].stopping</code> revokes new-run availability at terminal
+shutdown; <code>exited</code> records actual Worker exit. A recoverable run error leaves
+the loaded session usable. Unload joins exit and output delivery even when a
+termination request fails, preserving the complete cleanup error.</p>
+<p>The generic load defaults to CPU. <code>executionPreference:&#39;gpu&#39;</code> tries advertised
+CUDA, TensorRT, DirectML, CoreML and WebGPU session creation before CPU.
+Explicit <code>sessionOptions.executionProviders</code> takes precedence unchanged.
+The complete <code>execution</code> record reports discovery, provider attempts and
+fallback; successful creation establishes configuration, not physical GPU
+execution. Inference is never replayed on a different provider after failure.
 See <a href="../local-ai/#native-onnx-sessions">complete signatures, readiness, cancellation and usage</a>.</p>
 <h3 id="createcoreonnxruntime">createCoreONNXRuntime()</h3>
-<p><code>createCoreONNXRuntime({client=getInstalledCoreClient()}={})</code> from
+<p><code>createCoreONNXRuntime({client}={})</code> from
 <code>arcane-os/ai/core-onnx</code> accesses an available Core ONNX service. Its <code>load</code>,
 <code>run</code>, and <code>unload</code> mirror the native session selection and accept <code>signal</code> and
 <code>timeoutMs</code> (default <code>0</code>). Relative model paths resolve at Core&#39;s <code>appRoot</code>.
@@ -7504,7 +7601,11 @@ The accessor owns complete tensor transport encoding/decoding, <code>inspect()</
 <code>current()</code>, replaying <code>subscribe(listener)</code> and <code>close()</code>. Closing cancels this
 accessor&#39;s requests and subscriptions; unloading shared models is explicit.
 Construction installs no runtime and opens no transport. Existing browser
-ONNX/Wllama remain independent. See <a href="../local-ai/#onnx-through-core-and-the-browser">Core and browser usage</a>.</p>
+ONNX/Wllama remain independent. Omitted <code>client</code> follows late installation and
+reads each installed connection&#39;s current status; explicit clients, including
+<code>null</code>, remain fixed. Retirement or replacement clears readiness and cancels
+owned work, with late old-client results suppressed. Close also removes the
+installation subscription. See <a href="../local-ai/#onnx-through-core-and-the-browser">Core and browser usage</a>.</p>
 <h3 id="createimageruntime">createImageRuntime()</h3>
 <p><code>createImageRuntime({libraryPath,bindingModulePath,variants=[],models=[],backend=&#39;auto&#39;,signal?,onEvent?})</code>
 from <code>arcane-os/local-ai/image</code> retains the native image owner for the selected
@@ -7535,11 +7636,16 @@ can be retired. The final reference closes the worker. This differs from the
 browser accessor&#39;s detach-only ownership below. See the
 <a href="../local-image-generation/">image lifecycle, backend and error contract</a>.</p>
 <h3 id="createcoreimageruntime">createCoreImageRuntime()</h3>
-<p><code>createCoreImageRuntime({client=getInstalledCoreClient(),signal?,onEvent?})</code>
+<p><code>createCoreImageRuntime({client,signal?,onEvent?})</code>
 from <code>arcane-os/ai/core-image</code> returns immediately with <code>load</code>, <code>generate</code>, <code>edit</code>,
 <code>unload</code>, <code>inspect</code>, <code>current</code>, <code>subscribe</code> and <code>close</code>. It subscribes before
 requesting an initial status snapshot so newer lifecycle events win. It opens
 no connection and installs or selects no model.</p>
+<p>Omitted <code>client</code> follows late Core installation, replacement and retirement;
+an explicit client, including <code>null</code>, remains fixed. Each installed client is
+observed before its status request. Retirement cancels owned work and removes
+old readiness; late results cannot restore it. Close removes both service and
+installation subscriptions without closing the shared client or model.</p>
 <p><code>load({model,context?,assetProjectionId?,resourcePaths?,signal?})</code> and
 <code>generate({model,prompt,parameters?,assetProjectionId?,resourcePaths?,signal?, onProgress?})</code> use the selected Core service. Generation acknowledges with
 transient <code>Thinking</code> synchronously and returns complete
@@ -7803,6 +7909,14 @@ directories remain caller-selected. Each projection has its own child
 directory and complete member files.</p>
 <p><code>current()</code> returns <code>{closing,projections}</code>. <code>retain(id)</code> accepts a completed
 projection and returns <code>{id,directory,members,release}</code> for a native owner.
+Native <code>prepare({id,workingDirectory,members,signal,onProgress})</code> accepts
+ordered <code>{path,url}</code> members and returns their ready projection. Explicit calls
+stream complete upstream responses through the same file owner; startup
+downloads nothing. Independent members transfer concurrently and progress
+reports phases and completed files. <code>release(id)</code> relinquishes preparation
+ownership; cancellation, release and disposal join fetches and writes before
+cleanup. Native retain handles keep completed files alive until actual engine
+release. See <a href="../model-assets/#native-ownership">native preparation</a>.
 <code>dispose()</code> releases preparation ownership and joins file writes, closes and
 all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model
@@ -8305,15 +8419,90 @@ mountPwaInstallPrompt({appName: &#39;Example Library&#39;}).catch(
 <p>See the <a href="../pwa/#mountpwainstallprompt">mounting contract</a> and
 <a href="../runtime-components/#pwa-installhtml">component reference</a>. The browser owns
 native installation eligibility and URL-bar promotion.</p>
-<h3 id="createbrowserdecisionmodel">createBrowserDecisionModel()</h3>
+<h3 id="createnativedecisionmodel">createNativeDecisionModel()</h3>
 <h4 id="overview-220">Overview</h4>
+<p>Runs explicitly selected Laya FP32 option scoring through an existing native
+ONNX owner, with tokenization in a Node Worker. It creates no second inference
+engine and starts no model download at construction.</p>
+<h4 id="signature-and-result-132">Signature and result</h4>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model=&#39;onnx-community/laya-typed-decisions-ONNX&#39;,revision=&#39;main&#39;,dtype=&#39;fp32&#39;,sessionOptions,executionPreference=&#39;gpu&#39;,signal}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/local-ai/decisions</code>. Supply the existing <code>onnx</code> owner and
+either <code>modelAssets</code> plus <code>workingDirectory</code>, or native <code>paths</code> for the model,
+tokenizer and tokenizer configuration. The selected graph requires FP32. The
+handle exposes <code>load</code>, <code>evaluate</code>, <code>classify</code>, <code>current</code>, <code>status</code>, <code>subscribe</code>,
+<code>unload</code> and terminal <code>dispose</code>; <code>classify</code> aliases <code>evaluate</code> and <code>status</code>
+aliases <code>current</code>.</p>
+<p><code>evaluate(rows,{signal,runOptions})</code> preserves each complete <code>state</code>, <code>question</code>,
+<code>options</code> and optional <code>type</code> separately. It returns <code>{decisions,outputs}</code> with
+original rows, typed values, raw logits, unrounded probabilities and every
+named tensor output. It requires a loading or loaded activation. Cancellation
+retires the shared activation and joins its actual ONNX/tokenizer lifetime;
+working files remain retained until both Workers exit. Ordinary invalid rows
+leave a healthy session and sibling evaluations intact.</p>
+<h4 id="availability-and-normalization-200">Availability and normalization</h4>
+<p><strong>Node on Windows, Linux and macOS with the selected ONNX Runtime; Android needs
+host adaptation.</strong> GPU preference attempts actual advertised providers before
+CPU fallback; accepted configuration does not prove GPU node execution. Model
+selection, unchanged payloads, scoring interpretation and persistence remain
+application-owned. Complete lifecycle, errors and paths are documented in
+<a href="../native-decisions/">native typed decisions</a>.</p>
+<h4 id="example-208">Example</h4>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createNativeDecisionModel} from &#39;arcane-os/local-ai/decisions&#39;;
+
+function createMoonChefDecisions({onnx, paths}) {
+    return createNativeDecisionModel({onnx, paths});
+}
+</code></pre></div>
+<p>The caller explicitly loads the returned model before evaluation and unloads
+or disposes it at its owning boundary; defining this function downloads nothing.</p>
+<h3 id="createnativedecisionservice">createNativeDecisionService()</h3>
+<h4 id="overview-221">Overview</h4>
+<p>Composes the same native decision model into an existing Core runtime without
+a renderer. The factory starts no inference, tokenizer or model preparation.</p>
+<h4 id="signature-and-result-133">Signature and result</h4>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createNativeDecisionService(configuration={}, {appRoot=process.cwd()}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/core/decisions</code>. Configuration selects the model options
+above and an optional service <code>name</code> (default <code>decisions</code>); relative supplied
+<code>paths</code> resolve from <code>appRoot</code>. Explicit load obtains the registered local-AI
+and, when needed, model-assets owners through <code>context.getService</code>, then
+reacquires <code>getONNXRuntime()</code> after any recovery. Native members are <code>load</code>,
+<code>evaluate</code>, <code>classify</code>, <code>current</code>, <code>subscribe</code>, <code>unload</code>, <code>dispose</code> and Core
+<code>start(context)</code>.</p>
+<p>RPC exposes <code>decisions.status</code>, <code>decisions.load</code>, <code>decisions.evaluate</code> and
+<code>decisions.unload</code>. Evaluation accepts <code>{rows,runOptions?}</code> and returns complete
+<code>{decisions,outputs}</code> using the existing tensor codec at the JSON boundary.
+<code>decisions.state</code> and replaying <code>subscribe(listener,{emitCurrent:true,signal})</code>
+report lifecycle. Unload is accepted service-lifetime cleanup; host shutdown
+still cancels request-lifetime load/evaluation.</p>
+<h4 id="availability-and-normalization-201">Availability and normalization</h4>
+<p><strong>Node Core with an existing local-AI ONNX service and selected model files.</strong>
+Registration does not wait for all services or open another host. Original
+inputs, complete outputs, failures and cleanup semantics match the native
+model. See <a href="../native-decisions/#compose-with-existing-core-services">composition and example</a>.</p>
+<h4 id="example-209">Example</h4>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createNativeDecisionService} from &#39;arcane-os/core/decisions&#39;;
+
+const decisions = createNativeDecisionService({
+    model: &#39;onnx-community/laya-typed-decisions-ONNX&#39;,
+    dtype: &#39;fp32&#39;,
+    workingDirectory: &#39;.models/laya&#39;
+});
+// Add decisions to the application&#39;s existing Core services; load explicitly.
+</code></pre></div>
+<h3 id="createnativedecisionservice-default-export">createNativeDecisionService default export</h3>
+<p>The default export from <code>arcane-os/core/decisions</code> is exactly the named
+<code>createNativeDecisionService</code> factory, with the same arguments and lifecycle.</p>
+<h3 id="createbrowserdecisionmodel">createBrowserDecisionModel()</h3>
+<h4 id="overview-222">Overview</h4>
 <p>Creates an explicitly loaded browser model for Laya typed decisions or
 Julia-1. Laya defaults to FP16 and Julia to FP32; callers may select <code>dtype</code>
 explicitly. The shared Worker owns Transformers.js loading, full-input
 encoding, batched inference, complete results, cancellation and resource lifetime.
 Applications own model selection, questions, option meanings and decision policy.
 Existing chat and speech providers are unchanged.</p>
-<h4 id="signature-and-result-132">Signature and result</h4>
+<h4 id="signature-and-result-134">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserDecisionModel({family,model,revision,device,dtype,runtime}={})
 </code></pre></div>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createBrowserDecisionModel} from &#39;arcane-os/ai/browser-decisions&#39;;
@@ -8334,7 +8523,7 @@ optional <code>type</code> (<code>choice</code>, <code>score</code>, or <code>no
 <code>{decisions, outputs}</code> with all graph outputs and raw, unrounded probabilities.
 See the <a href="../ai/browser-decisions/">complete browser decision contract</a> for
 precision, tokenization, output meanings, lifecycle and model limitations.</p>
-<h4 id="availability-and-normalization-200">Availability and normalization</h4>
+<h4 id="availability-and-normalization-202">Availability and normalization</h4>
 <p>Browser module Workers plus the selected Transformers.js backend are required
 on explicit use. Import and construction do not activate a model. The optional
 nonempty <code>dtype</code> string defaults to <code>fp16</code> for Laya and <code>fp32</code> for Julia. An
@@ -8343,7 +8532,7 @@ selections report its failure without precision fallback. For Laya FP32, pass
 <code>dtype: &#39;fp32&#39;</code>.
 Cancellation terminates that client&#39;s Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.</p>
-<h4 id="example-208">Example</h4>
+<h4 id="example-210">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">runButton.addEventListener(
     &#39;click&#39;,
     async function askTeaRobot() {
@@ -8361,12 +8550,12 @@ No decisions are inserted into chat history or durable storage.</p>
 );
 </code></pre></div>
 <h3 id="createbrowserwasmllmprovider">createBrowserWasmLlmProvider()</h3>
-<h4 id="overview-221">Overview</h4>
+<h4 id="overview-223">Overview</h4>
 <p>Creates the packaged Wllama provider from genuine source and store objects
 created by this module. Structural lookalikes are rejected. It serializes
 requests and exposes provider states <code>unloaded</code>, <code>loading</code>, <code>ready</code>,
 <code>unloading</code>, and <code>error</code>.</p>
-<h4 id="signature-and-result-133">Signature and result</h4>
+<h4 id="signature-and-result-135">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWasmLlmProvider({ sources, store, loadDefaults={}, security, logger=console }={})
 </code></pre></div>
 <p><code>sources</code> is a nonempty array of unique SDK-created sources. Its first entry is
@@ -8394,7 +8583,7 @@ JSON-string arguments containing that nonempty user-facing message. The SDK
 never invokes a handler or executes a tool; a matching executed, declined,
 cancelled, or not-executed <code>role:&#39;tool&#39;</code> result is required before another user
 turn.</p>
-<h4 id="availability-and-normalization-201">Availability and normalization</h4>
+<h4 id="availability-and-normalization-203">Availability and normalization</h4>
 <p><strong>Browser secure context with WebAssembly and OPFS/DBOPFS.</strong> The default GPU route
 also requires WebGPU; explicit <code>gpuLayers:0</code> CPU loading skips GPU requirements
 and adapter work. A load succeeds after Wllama confirms the complete model is
@@ -8412,7 +8601,7 @@ surface stable <code>ARCANE_AI_*</code> codes such as <code>ARCANE_AI_WEBGPU_REQ
 <code>ARCANE_AI_RUNTIME_BUSY</code>; inspection and status can report
 <code>ARCANE_AI_PROVIDER_UNAVAILABLE</code> or fallback <code>ARCANE_AI_RUNTIME_FAILED</code> without
 misrepresenting those observations as a successful load.</p>
-<h4 id="example-209">Example</h4>
+<h4 id="example-211">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const provider = createBrowserWasmLlmProvider({
     sources:[source],
     store,
@@ -8421,13 +8610,13 @@ misrepresenting those observations as a successful load.</p>
 console.log(provider.status().state); // unloaded
 </code></pre></div>
 <h3 id="createdbopfsmodelstore">createDbopfsModelStore()</h3>
-<h4 id="overview-222">Overview</h4>
+<h4 id="overview-224">Overview</h4>
 <p>Adapts an existing DBOPFS instance into a complete multi-model, ordered
 multi-file cache without renaming its public methods. Each completed whole
 member or Range part is committed independently. An interrupted set
 is not a cache hit, but its completed members remain available to the next
 install so only missing work is fetched.</p>
-<h4 id="signature-and-result-134">Signature and result</h4>
+<h4 id="signature-and-result-136">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsModelStore({ dbopfs, tableName=&#39;arcane_ai_browser_models&#39;, estimateStorage=null, downloadConcurrency=4 }={})
 </code></pre></div>
 <p><code>downloadConcurrency</code> must be a positive safe integer and defaults to four.
@@ -8456,7 +8645,7 @@ declared member <code>bytes</code> values
 makes split-model total and remaining progress available from the start;
 otherwise aggregate-dependent fields remain <code>null</code> until they are honestly
 known.</p>
-<h4 id="availability-and-normalization-202">Availability and normalization</h4>
+<h4 id="availability-and-normalization-204">Availability and normalization</h4>
 <p><strong>Browser with a ready DBOPFS instance and OPFS.</strong> Cache metadata is not a
 transferable capability or license proof. Provider unload/dispose keeps all
 cached files; <code>store.remove(source)</code> explicitly deletes that source&#39;s files and
@@ -8480,7 +8669,7 @@ frame is discarded and fetched again. A complete whole member supersedes its
 redundant current Range fragments. Cleanup failure is warned without
 hiding the usable model. Wllama requires every selected model Blob or File to
 be non-empty.</p>
-<h4 id="example-210">Example</h4>
+<h4 id="example-212">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const store = createDbopfsModelStore({dbopfs});
 async function openCachedModel() {
     await store.ready();
@@ -8489,7 +8678,7 @@ async function openCachedModel() {
 }
 </code></pre></div>
 <h3 id="adaptv1llmprovider">adaptV1LlmProvider()</h3>
-<h4 id="overview-223">Overview</h4>
+<h4 id="overview-225">Overview</h4>
 <p>Projects one compatible v1 browser-WASM provider into the provider-neutral
 LLM role consumed by <code>arcane-os/ai-provider-runtime</code>. The
 runtime checks protocol <code>arcane-ai-adapter/1</code>, required identity/methods, and local-only
@@ -8497,7 +8686,7 @@ capability; it does not establish ownership for an arbitrary compatible
 object. The adapter does not
 change the wrapped provider, download a model, create a fallback, or execute a
 tool.</p>
-<h4 id="signature-and-result-135">Signature and result</h4>
+<h4 id="signature-and-result-137">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">adaptV1LlmProvider(provider)
 </code></pre></div>
 <p>The mutable result is
@@ -8516,12 +8705,12 @@ making iterator return wait for provider cleanup. The terminal result retains
 provider settlement; any later cancellation or iterator-return failure is
 reported completely to the developer console.
 Re-adapting the same provider returns the same adapter object.</p>
-<h4 id="availability-and-normalization-203">Availability and normalization</h4>
+<h4 id="availability-and-normalization-205">Availability and normalization</h4>
 <p><strong>Browser; the wrapped provider retains its own secure-context, WebAssembly,
 OPFS/DBOPFS, selected CPU or WebGPU route, model, and lifecycle requirements.</strong>
 The adapter normalizes provider/2 selection and lifecycle without adding Node, native, cloud, network,
 or CPU fallback behavior.</p>
-<h4 id="example-211">Example</h4>
+<h4 id="example-213">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {adaptV1LlmProvider} from &#39;arcane-os/ai/browser-wasm&#39;;
 import {getAIProviderRuntime} from &#39;arcane-os/ai-provider-runtime&#39;;
 
@@ -8539,7 +8728,7 @@ implement <code>arcane-ai-provider/2</code>; the managed <code>arcane/AIProvider
 <code>arcane/AIRuntimeState</code> projection modules can normalize their independent
 role lifecycle and observation, but are not exports of this package subpath.</p>
 <h3 id="browserspeechartifactgraphprotocol">BROWSER<em>SPEECH</em>ARTIFACT<em>GRAPH</em>PROTOCOL</h3>
-<h4 id="overview-224">Overview</h4>
+<h4 id="overview-226">Overview</h4>
 <p>Stable protocol identifier for an SDK-created browser speech materialization
 graph. The current <code>authenticated</code> discriminator identifies one complete
 caller-owned runtime, model, and voice routing record but grants no provider,
@@ -8549,12 +8738,12 @@ model, runtime, voice, network, or license authority.</p>
 </code></pre></div>
 <p>Its exact value is <code>arcane-ai-browser-speech-artifact-graph/1</code>, and it is
 exported only by <code>arcane-os/ai/browser-speech</code>.</p>
-<h4 id="availability-and-normalization-204">Availability and normalization</h4>
+<h4 id="availability-and-normalization-206">Availability and normalization</h4>
 <p><strong>Browser metadata; the ESM binding is importable in Node.</strong> Reading the
 constant starts no fetch, cache, Worker, provider, or event operation. Actual
 artifact preparation and provider use require the selected browser storage and
 Worker capabilities.</p>
-<h4 id="example-212">Example</h4>
+<h4 id="example-214">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
     BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL
 } from &#39;arcane-os/ai/browser-speech&#39;;
@@ -8562,7 +8751,7 @@ Worker capabilities.</p>
 console.log(BROWSER_SPEECH_ARTIFACT_GRAPH_PROTOCOL);
 </code></pre></div>
 <h3 id="browserspeechartifactprotocol">BROWSER<em>SPEECH</em>ARTIFACT_PROTOCOL</h3>
-<h4 id="overview-225">Overview</h4>
+<h4 id="overview-227">Overview</h4>
 <p>Stable protocol identifier for the optional SDK-created browser speech artifact
 store. It identifies the store contract, not a model authority or capability
 grant.</p>
@@ -8571,11 +8760,11 @@ grant.</p>
 </code></pre></div>
 <p>Its exact value is <code>arcane-ai-browser-speech-artifacts/1</code>, and it is exported
 only by <code>arcane-os/ai/browser-speech</code>.</p>
-<h4 id="availability-and-normalization-205">Availability and normalization</h4>
+<h4 id="availability-and-normalization-207">Availability and normalization</h4>
 <p><strong>Browser metadata.</strong> Importing or reading the constant starts no Worker and
 downloads no model or runtime artifact. Store use additionally requires
 DBOPFS/OPFS, Web Locks, and the browser APIs described below.</p>
-<h4 id="example-213">Example</h4>
+<h4 id="example-215">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
     BROWSER_SPEECH_ARTIFACT_PROTOCOL
 } from &#39;arcane-os/ai/browser-speech&#39;;
@@ -8583,13 +8772,13 @@ DBOPFS/OPFS, Web Locks, and the browser APIs described below.</p>
 console.log(BROWSER_SPEECH_ARTIFACT_PROTOCOL);
 </code></pre></div>
 <h3 id="createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</h3>
-<h4 id="overview-226">Overview</h4>
+<h4 id="overview-228">Overview</h4>
 <p>Normalizes one complete caller-owned browser speech materialization graph. The
 caller declares runtime, model, and voice sources together with their paths,
 media types, routing aliases, and model/runtime identity,
 sample rate, and TTS default voice where applicable. The SDK selects none of
 those values.</p>
-<h4 id="signature-and-result-136">Signature and result</h4>
+<h4 id="signature-and-result-138">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserSpeechArtifactGraph({ kind=&#39;browser-speech-authenticated-artifact-graph&#39;, security, providerId=null, role, model, runtime, files }={})
 </code></pre></div>
 <p><code>role</code> is exactly <code>stt</code> or <code>tts</code>; its model and runtime adapter fields must match
@@ -8601,13 +8790,13 @@ never required or interpreted for runtime materialization.</p>
 containing <code>{protocol,kind,providerId,role,model,runtime,files,security?}</code>. The
 current <code>kind</code> and <code>runtime.moduleGraph</code> value is
 <code>browser-speech-authenticated-artifact-graph</code>.</p>
-<h4 id="availability-and-normalization-206">Availability and normalization</h4>
+<h4 id="availability-and-normalization-208">Availability and normalization</h4>
 <p><strong>Browser metadata; the ESM subpath is importable in Node.</strong> Construction is
 synchronous and starts no fetch, cache, Worker, provider, or event operation.
 The store and provider accept SDK-created graph records so they can retain the
 associated materialization metadata. Preparing and executing a graph requires
 the selected DBOPFS, Web Locks, Fetch, object URL, and Worker capabilities.</p>
-<h4 id="example-214">Example</h4>
+<h4 id="example-216">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
     createBrowserSpeechArtifactGraph
 } from &#39;arcane-os/ai/browser-speech&#39;;
@@ -8616,11 +8805,11 @@ const graph = createBrowserSpeechArtifactGraph(callerOwnedGraphDescriptor);
 console.log(graph.protocol, graph.kind);
 </code></pre></div>
 <h3 id="createbrowserspeechauthority">createBrowserSpeechAuthority()</h3>
-<h4 id="overview-227">Overview</h4>
+<h4 id="overview-229">Overview</h4>
 <p>Validates and returns one mutable caller-owned Whisper STT or Kokoro TTS model/runtime
 selection. The application owns every model, runtime, revision, URL, voice, and
 business-policy choice; the SDK supplies no artifact selection.</p>
-<h4 id="signature-and-result-137">Signature and result</h4>
+<h4 id="signature-and-result-139">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserSpeechAuthority({ providerId, role, model, runtime, security }={})
 </code></pre></div>
 <p><code>role</code> is exactly <code>stt</code> or <code>tts</code>. <code>model</code> supplies
@@ -8632,11 +8821,11 @@ The runtime entry names one JavaScript module in the selected runtime.</p>
 <p>The result is a mutable <code>arcane-ai-model-authority/1</code> record containing the
 provider/model/role identity, normalized runtime and model file declarations,
 and optional default voice. Construction validates the descriptor structure.</p>
-<h4 id="availability-and-normalization-207">Availability and normalization</h4>
+<h4 id="availability-and-normalization-209">Availability and normalization</h4>
 <p><strong>Browser descriptor construction; actual use requires the selected provider
 Web APIs.</strong> Credential-bearing URLs, duplicate identities, mismatched adapters,
 and malformed runtime descriptors reject.</p>
-<h4 id="example-215">Example</h4>
+<h4 id="example-217">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserSpeechAuthority} from &#39;arcane-os/ai/browser-speech&#39;;
 
 const authority = createBrowserSpeechAuthority({
@@ -8679,13 +8868,13 @@ DBOPFS artifacts. Missing storage and cache failures surface
 Cancellation stops subsequent deletions with <code>AbortError</code>; <code>error.removed</code>
 retains the complete list of deletions already completed.</p>
 <h3 id="createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</h3>
-<h4 id="overview-228">Overview</h4>
+<h4 id="overview-230">Overview</h4>
 <p>Adapts an existing DBOPFS instance into a complete caller-selected speech
 runtime/model store. It serializes each selected model with an exclusive Web
 Lock, removes partial state after failure, stores ordinary mutable selection
 metadata before content, and treats a changed file inventory or source mapping
 as a cache miss that is downloaded again.</p>
-<h4 id="signature-and-result-138">Signature and result</h4>
+<h4 id="signature-and-result-140">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDbopfsSpeechArtifactStore({ dbopfs, tableName=&#39;arcane_ai_browser_speech&#39;, fetchImpl=null, objectUrlFactory=null }={})
 </code></pre></div>
 <p>The mutable result is <code>{protocol,tableName,prepare,remove}</code>.
@@ -8700,12 +8889,12 @@ preparation and download records with <code>phase</code>, <code>stage</code>, <c
 current <code>file</code> when available. File operations report actual <code>completed</code> and
 <code>total</code> inventory counts with <code>unit:&#39;files&#39;</code>; module preparation uses
 <code>total:null</code>. Cancellation stops progress along with the owning operation.</p>
-<h4 id="availability-and-normalization-208">Availability and normalization</h4>
+<h4 id="availability-and-normalization-210">Availability and normalization</h4>
 <p><strong>Browser with a ready DBOPFS instance, OPFS, Web Locks, Fetch or an injected
 fetch function, File/Blob, and object URLs.</strong> An unavailable authority lock
 fails as <code>ARCANE_AI_STORAGE_BUSY</code>; download, malformed cache, graph, and storage
 failures remain observable <code>ARCANE_AI_*</code> errors.</p>
-<h4 id="example-216">Example</h4>
+<h4 id="example-218">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
     createDbopfsSpeechArtifactStore
 } from &#39;arcane-os/ai/browser-speech&#39;;
@@ -8722,11 +8911,11 @@ async function inspectCachedSpeechAfterUserChoice() {
 }
 </code></pre></div>
 <h3 id="createbrowserwhisperprovider">createBrowserWhisperProvider()</h3>
-<h4 id="overview-229">Overview</h4>
+<h4 id="overview-231">Overview</h4>
 <p>Creates a local-only Whisper speech-to-text provider for the provider-neutral
 AI runtime. It owns one independent STT load/use/unload/dispose lifecycle and
 never selects a cloud, native, or LLM fallback.</p>
-<h4 id="signature-and-result-139">Signature and result</h4>
+<h4 id="signature-and-result-141">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserWhisperProvider(options={})
 </code></pre></div>
 <p>The recognized options are
@@ -8769,7 +8958,7 @@ provider operation. Missing decode support fails
 <code>ARCANE_AI_AUDIO_DECODE_UNAVAILABLE</code>; invalid or failed decoding fails
 <code>ARCANE_AI_INVALID_REQUEST</code> or <code>ARCANE_AI_AUDIO_DECODE_FAILED</code>. Unknown fields
 and accessors are rejected before Worker use.</p>
-<h4 id="availability-and-normalization-209">Availability and normalization</h4>
+<h4 id="availability-and-normalization-211">Availability and normalization</h4>
 <p><strong>Browser with Workers, object URLs, and a caller-selected
 <code>transformers-whisper</code> runtime/model plus the required DBOPFS store and Web
 Locks.</strong> The subpath is
@@ -8778,7 +8967,7 @@ execution adapter is published. No Core speech call, model/runtime download
 authority, or automatic provider fallback is added. Provider objects are not event targets; register them with
 the managed AI provider runtime when normalized <code>AIRuntimeState</code> observation is
 needed.</p>
-<h4 id="example-217">Example</h4>
+<h4 id="example-219">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserWhisperProvider} from &#39;arcane-os/ai/browser-speech&#39;;
 
 const whisper = createBrowserWhisperProvider({model, runtime, store:speechStore});
@@ -8804,12 +8993,12 @@ async function transcribeAfterUserChoice(audioBlob) {
 }
 </code></pre></div>
 <h3 id="createbrowserspeechrecognitionprovider">createBrowserSpeechRecognitionProvider()</h3>
-<h4 id="overview-230">Overview</h4>
+<h4 id="overview-232">Overview</h4>
 <p>Creates an explicitly selected provider/2 STT adapter for the browser&#39;s native
 <code>SpeechRecognition</code> or <code>webkitSpeechRecognition</code> service. It declares
 <code>localOnly:false</code> because recognition may use a remote browser service. It does
 not change Whisper, TTS, typing, stored preferences, or any default selection.</p>
-<h4 id="signature-and-result-140">Signature and result</h4>
+<h4 id="signature-and-result-142">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserSpeechRecognitionProvider({id,model,language}={})
 </code></pre></div>
 <p>The application supplies its provider <code>id</code> and <code>model:{id}</code>; optional <code>language</code>
@@ -8830,13 +9019,13 @@ failure. Unload/dispose cancel owned capture.
 The shared runtime&#39;s <code>createTranscriptionCapture()</code> additionally owns STT busy
 state and lifecycle replacement. See the
 <a href="../ai/browser-speech/#native-browser-speech-recognition">complete native capture contract</a>.</p>
-<h4 id="availability-and-normalization-210">Availability and normalization</h4>
+<h4 id="availability-and-normalization-212">Availability and normalization</h4>
 <p>Conditional browser/native-WebView support on Windows, Linux, macOS and
 Android, determined by the actual browser API and permission/service outcome,
 not by operating-system name. Missing API, denied microphone permission and
 service errors remain honest STT failures without disabling TTS or typing.
 No Core, Whisper, or cloud-provider fallback is inferred.</p>
-<h4 id="example-218">Example</h4>
+<h4 id="example-220">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserSpeechRecognitionProvider} from &#39;arcane-os/ai/browser-speech&#39;;
 
 async function selectNativeRecognition(ai, signal) {
@@ -8847,12 +9036,12 @@ async function selectNativeRecognition(ai, signal) {
 }
 </code></pre></div>
 <h3 id="createbrowserspeechsynthesisprovider">createBrowserSpeechSynthesisProvider()</h3>
-<h4 id="overview-231">Overview</h4>
+<h4 id="overview-233">Overview</h4>
 <p>Creates a provider/2 TTS adapter for native <code>speechSynthesis</code>. Construction,
 voice discovery and preparation are silent. Applications choose when to play
 and retain ownership of voice preferences. Browser voices may use remote
 services, so the provider declares <code>localOnly:false</code>.</p>
-<h4 id="signature-and-result-141">Signature and result</h4>
+<h4 id="signature-and-result-143">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserSpeechSynthesisProvider({id,model,language}={})
 </code></pre></div>
 <p>Supply <code>id</code> and <code>model:{id,name?,defaultVoice?}</code>; optional <code>language</code> is a
@@ -8901,13 +9090,13 @@ async function selectNativeVoice(ai) {
 <p>See <a href="../ai/browser-speech/">native speech and voice selection</a> for live catalogs,
 explicit playback, cancellation and language handling.</p>
 <h3 id="createtwincloudttsprovider">createTwinCloudTTSProvider()</h3>
-<h4 id="overview-232">Overview</h4>
+<h4 id="overview-234">Overview</h4>
 <p>Creates a <code>localOnly:false</code> TWiN Cloud provider/2 TTS adapter for the caller-selected
 model. It submits independent synthesis jobs, polls their completion, and returns
 each complete downloaded audio <code>Blob</code>. The shared AI
 queue owns punctuation segmentation, bounded concurrent requests, and playback
 in input order; this is not provider-native live audio streaming.</p>
-<h4 id="signature-and-result-142">Signature and result</h4>
+<h4 id="signature-and-result-144">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createTwinCloudTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})
 </code></pre></div>
 <p><code>id</code> is the application-owned provider identifier. <code>model</code> contains the selected
@@ -8919,7 +9108,7 @@ whole-synthesis-job capacity used by the shared AI runtime. It is independent
 from <code>followUpQueue.maxConcurrentRequests</code>, which controls follow-up HTTP
 operations. <code>followUpQueue.intervalMs</code> controls the spacing between those
 dispatch starts. Optional <code>fetch</code> supplies the standard Fetch interface.</p>
-<h4 id="availability-and-normalization-211">Availability and normalization</h4>
+<h4 id="availability-and-normalization-213">Availability and normalization</h4>
 <p>The adapter needs Fetch, Blob, and AbortController; it needs no Worker or
 DBOPFS. Browser access depends on endpoint CORS support. Construction makes
 no network request. Its provider-local <code>js-queue</code> is created only when this
@@ -8953,7 +9142,7 @@ Request cancellation, unload, and disposal stop local polling/downloads and
 discard late results; they cannot promise cancellation of an already submitted
 remote job. HTTP, provider, and media failures remain observable. The adapter
 does not select a fallback or silently resubmit a paid synthesis POST.</p>
-<h4 id="example-219">Example</h4>
+<h4 id="example-221">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createTwinCloudTTSProvider} from &#39;arcane-os/ai/browser-speech&#39;;
 
 async function configureCloudVoice(ai, getApiKey) {
@@ -8971,21 +9160,21 @@ async function configureCloudVoice(ai, getApiKey) {
 For streaming text, cancellation, and independent STT configuration, see
 <a href="../ai/browser-speech/#twin-cloud-text-to-speech">TWiN Cloud speech</a>.</p>
 <h3 id="createdigitaloceanfalttsprovider">createDigitalOceanFalTTSProvider()</h3>
-<h4 id="overview-233">Overview</h4>
+<h4 id="overview-235">Overview</h4>
 <p>Compatibility export of <code>createTwinCloudTTSProvider</code>, using the same function
 and implementation. The canonical public name is TWiN Cloud; the underlying
 DigitalOcean FAL endpoint and job protocol remain unchanged.</p>
-<h4 id="signature-and-result-143">Signature and result</h4>
+<h4 id="signature-and-result-145">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createDigitalOceanFalTTSProvider({id,model,getApiKey,maxConcurrentRequests=4,followUpQueue:{maxConcurrentRequests=4,intervalMs=250}={},fetch=globalThis.fetch}={})
 </code></pre></div>
 <p>Accepts the same options and returns the same provider as
 <a href="#createtwincloudttsprovider"><code>createTwinCloudTTSProvider()</code></a>.</p>
-<h4 id="availability-and-normalization-212">Availability and normalization</h4>
+<h4 id="availability-and-normalization-214">Availability and normalization</h4>
 <p>The alias shares the canonical factory&#39;s Browser and Node requirements,
 whole-job and submission queues, queued follow-ups, cancellation and result contract.
 Existing caller imports, stored provider IDs, and credentials remain valid;
 renaming a caller&#39;s import requires no saved-data migration.</p>
-<h4 id="example-220">Example</h4>
+<h4 id="example-222">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {
   createTwinCloudTTSProvider,
   createDigitalOceanFalTTSProvider
@@ -8994,7 +9183,7 @@ renaming a caller&#39;s import requires no saved-data migration.</p>
 console.log(createDigitalOceanFalTTSProvider === createTwinCloudTTSProvider);
 </code></pre></div>
 <h3 id="createbrowserkokoroprovider">createBrowserKokoroProvider()</h3>
-<h4 id="overview-234">Overview</h4>
+<h4 id="overview-236">Overview</h4>
 <p>Creates a local-only Kokoro text-to-speech provider for the provider-neutral AI
 runtime. It owns one independent, bounded Worker/session pool and never selects
 a cloud, native, or LLM fallback.</p>
@@ -9003,7 +9192,7 @@ application&#39;s voice selector. <code>catalog()</code> retains each complete r
 loading or fetching a model. This metadata neither restricts synthesis voice
 values nor proves playback availability. Artifact-graph voice paths remain a
 separate asset-routing contract.</p>
-<h4 id="signature-and-result-144">Signature and result</h4>
+<h4 id="signature-and-result-146">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createBrowserKokoroProvider(options={})
 </code></pre></div>
 <p>The recognized options are
@@ -9059,7 +9248,7 @@ pool Workers and cancels all active ownership. Stable failures include
 <code>ARCANE_AI_PROVIDER_DISPOSED</code>, <code>ARCANE_AI_OPERATION_SUPERSEDED</code>,
 <code>ARCANE_AI_WORKER_CRASHED</code>, <code>ARCANE_AI_WORKER_MESSAGE_ERROR</code>, and
 <code>ARCANE_AI_ADAPTER_PROTOCOL_MISMATCH</code>.</p>
-<h4 id="availability-and-normalization-213">Availability and normalization</h4>
+<h4 id="availability-and-normalization-215">Availability and normalization</h4>
 <p><strong>Browser with Workers, object URLs, and a caller-selected <code>kokoro-js</code>
 runtime/model/voice selection plus the required DBOPFS store and Web Locks.</strong>
 The subpath is
@@ -9067,7 +9256,7 @@ importable in Node, but no Node storage, Worker, or speech execution adapter is
 published. No Core speech call, model/runtime/voice authority, or automatic provider fallback is
 added. Provider objects are not event targets; managed <code>AIProviderRuntime</code> and
 <code>AIRuntimeState</code> projections own normalized cross-role observation.</p>
-<h4 id="example-221">Example</h4>
+<h4 id="example-223">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createBrowserKokoroProvider} from &#39;arcane-os/ai/browser-speech&#39;;
 
 // applicationProviderOptions is your application-owned model/runtime/store
@@ -9106,184 +9295,184 @@ async function synthesizeAfterUserChoice() {
 Node credentials, Resend commands, and the loopback gateway remain toolchain
 and CLI responsibilities rather than browser-package exports.</p>
 <h3 id="mailoutboxidempotencywindowms">MAIL<em>OUTBOX</em>IDEMPOTENCY<em>WINDOW</em>MS</h3>
-<h4 id="overview-235">Overview</h4>
+<h4 id="overview-237">Overview</h4>
 <p>Duration for same-key retry before ambiguous delivery requires reconciliation.</p>
 <h4 id="value-and-import-51">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS
 </code></pre></div>
-<h4 id="availability-and-normalization-214">Availability and normalization</h4>
+<h4 id="availability-and-normalization-216">Availability and normalization</h4>
 <p>Node and browser metadata. The immutable value is 86400000 milliseconds.</p>
-<h4 id="example-222">Example</h4>
+<h4 id="example-224">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MAIL_OUTBOX_IDEMPOTENCY_WINDOW_MS} from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="mailoutboxprotocol">MAIL<em>OUTBOX</em>PROTOCOL</h3>
-<h4 id="overview-236">Overview</h4>
+<h4 id="overview-238">Overview</h4>
 <p>Stable protocol identifier written to durable Mail outbox records.</p>
 <h4 id="value-and-import-52">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const MAIL_OUTBOX_PROTOCOL
 </code></pre></div>
-<h4 id="availability-and-normalization-215">Availability and normalization</h4>
+<h4 id="availability-and-normalization-217">Availability and normalization</h4>
 <p>Node and browser metadata. The immutable value is <code>arcane-mail-outbox/1</code>.</p>
-<h4 id="example-223">Example</h4>
+<h4 id="example-225">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MAIL_OUTBOX_PROTOCOL} from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="mailoutboxstates">MAIL<em>OUTBOX</em>STATES</h3>
-<h4 id="overview-237">Overview</h4>
+<h4 id="overview-239">Overview</h4>
 <p>Mutable ordered vocabulary for durable Mail outbox lifecycle states.</p>
 <h4 id="value-and-import-53">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const MAIL_OUTBOX_STATES
 </code></pre></div>
-<h4 id="availability-and-normalization-216">Availability and normalization</h4>
+<h4 id="availability-and-normalization-218">Availability and normalization</h4>
 <p>Node and browser metadata. States are queued, sending, retry<em>wait, accepted,
 failed, and reconciliation</em>required.</p>
-<h4 id="example-224">Example</h4>
+<h4 id="example-226">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MAIL_OUTBOX_STATES} from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="mailoutboxtable">MAIL<em>OUTBOX</em>TABLE</h3>
-<h4 id="overview-238">Overview</h4>
+<h4 id="overview-240">Overview</h4>
 <p>Default DBOPFS-compatible table name for durable Mail outbox records.</p>
 <h4 id="value-and-import-54">Value and import</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const MAIL_OUTBOX_TABLE
 </code></pre></div>
-<h4 id="availability-and-normalization-217">Availability and normalization</h4>
+<h4 id="availability-and-normalization-219">Availability and normalization</h4>
 <p>Node and browser metadata. The immutable value is <code>mail_outbox</code>.</p>
-<h4 id="example-225">Example</h4>
+<h4 id="example-227">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MAIL_OUTBOX_TABLE} from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="mail">Mail</h3>
-<h4 id="overview-239">Overview</h4>
+<h4 id="overview-241">Overview</h4>
 <p>Owns the application Mail singleton, durable lifecycle, report normalization,
 and explicit transport selection.</p>
-<h4 id="signature-and-result-145">Signature and result</h4>
+<h4 id="signature-and-result-147">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">new Mail(config=globalThis.arcane?.config?.mail||{}, options={})
 </code></pre></div>
-<h4 id="availability-and-normalization-218">Availability and normalization</h4>
+<h4 id="availability-and-normalization-220">Availability and normalization</h4>
 <p>Node with injected host adapters, or browser/native WebView with durable
 storage and Web Locks. Reports persist before delivery and results remain
 complete mutable records.</p>
-<h4 id="example-226">Example</h4>
+<h4 id="example-228">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {Mail} from &#39;arcane-os/mail&#39;;
 const mail = new Mail({}, options);
 </code></pre></div>
 <h3 id="mailoutbox">MailOutbox</h3>
-<h4 id="overview-240">Overview</h4>
+<h4 id="overview-242">Overview</h4>
 <p>Owns durable FIFO delivery, retry classification, and invalid-record
 maintenance.</p>
-<h4 id="signature-and-result-146">Signature and result</h4>
+<h4 id="signature-and-result-148">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">new MailOutbox(options={})
 </code></pre></div>
-<h4 id="availability-and-normalization-219">Availability and normalization</h4>
+<h4 id="availability-and-normalization-221">Availability and normalization</h4>
 <p>Node or browser with injected DBOPFS-compatible storage and a Web
 Locks-compatible lock manager. Records and summaries remain complete mutable
 values. An accepted result requires a valid <code>requestId</code>; <code>providerId</code> and
 <code>acceptanceAuthority</code> are optional transport metadata, and an acceptance
 authority is valid only on an accepted result.</p>
-<h4 id="example-227">Example</h4>
+<h4 id="example-229">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MailOutbox} from &#39;arcane-os/mail&#39;;
 const outbox = new MailOutbox(options);
 </code></pre></div>
 <h3 id="mailtransporterror">MailTransportError</h3>
-<h4 id="overview-241">Overview</h4>
+<h4 id="overview-243">Overview</h4>
 <p>Normalized Mail transport failure with stable retry and uncertainty metadata.</p>
-<h4 id="signature-and-result-147">Signature and result</h4>
+<h4 id="signature-and-result-149">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">new MailTransportError(message, options={})
 </code></pre></div>
-<h4 id="availability-and-normalization-220">Availability and normalization</h4>
+<h4 id="availability-and-normalization-222">Availability and normalization</h4>
 <p>Node and browser. It exposes code, retryable, retryAfterMs, statusCode,
 uncertain, and the complete remote detail subject only to HTTP framing.</p>
-<h4 id="example-228">Example</h4>
+<h4 id="example-230">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {MailTransportError} from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="createmailoutbox">createMailOutbox()</h3>
-<h4 id="overview-242">Overview</h4>
+<h4 id="overview-244">Overview</h4>
 <p>Creates a MailOutbox from caller-owned storage, locking, delivery, and
 lifecycle adapters.</p>
-<h4 id="signature-and-result-148">Signature and result</h4>
+<h4 id="signature-and-result-150">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createMailOutbox(options)
 </code></pre></div>
-<h4 id="availability-and-normalization-221">Availability and normalization</h4>
+<h4 id="availability-and-normalization-223">Availability and normalization</h4>
 <p>Node or browser with the required injected adapters. The result is the same
 validated contract as direct MailOutbox construction.</p>
-<h4 id="example-229">Example</h4>
+<h4 id="example-231">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createMailOutbox} from &#39;arcane-os/mail&#39;;
 const outbox = createMailOutbox(options);
 </code></pre></div>
 <h3 id="mail-default-export">Mail default export</h3>
-<h4 id="overview-243">Overview</h4>
+<h4 id="overview-245">Overview</h4>
 <p>Default package binding for the same Mail class exposed by the named export.</p>
-<h4 id="signature-and-result-149">Signature and result</h4>
+<h4 id="signature-and-result-151">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">default as Mail
 </code></pre></div>
-<h4 id="availability-and-normalization-222">Availability and normalization</h4>
+<h4 id="availability-and-normalization-224">Availability and normalization</h4>
 <p>Node with injected host adapters, or browser/native WebView with durable
 storage and Web Locks. Binding identity equals the named <code>Mail</code> export.</p>
-<h4 id="example-230">Example</h4>
+<h4 id="example-232">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import Mail from &#39;arcane-os/mail&#39;;
 </code></pre></div>
 <h3 id="normalizemailendpoint">normalizeMailEndpoint()</h3>
-<h4 id="overview-244">Overview</h4>
+<h4 id="overview-246">Overview</h4>
 <p>Resolves and validates one credential-free HTTPS or loopback-HTTP endpoint.</p>
-<h4 id="signature-and-result-150">Signature and result</h4>
+<h4 id="signature-and-result-152">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">normalizeMailEndpoint(endpoint, base=globalThis.location?.href)
 </code></pre></div>
-<h4 id="availability-and-normalization-223">Availability and normalization</h4>
+<h4 id="availability-and-normalization-225">Availability and normalization</h4>
 <p>Node and browser with URL support. Relative endpoints require a base;
 credentials, queries, fragments, and insecure non-loopback transport reject.</p>
-<h4 id="example-231">Example</h4>
+<h4 id="example-233">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {normalizeMailEndpoint} from &#39;arcane-os/mail&#39;;
 const endpoint = normalizeMailEndpoint(&#39;/v1/mail&#39;, location.href);
 </code></pre></div>
 <h3 id="resolvemailconfig">resolveMailConfig()</h3>
-<h4 id="overview-245">Overview</h4>
+<h4 id="overview-247">Overview</h4>
 <p>Resolves application identity, key, endpoint, and timeout without delivery.</p>
-<h4 id="signature-and-result-151">Signature and result</h4>
+<h4 id="signature-and-result-153">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">resolveMailConfig(config=globalThis.arcane?.config?.mail||{}, options={})
 </code></pre></div>
-<h4 id="availability-and-normalization-224">Availability and normalization</h4>
+<h4 id="availability-and-normalization-226">Availability and normalization</h4>
 <p>Node with explicit configuration, or browser/native WebView with optional
 document and location defaults. The returned configuration is a mutable plain
 record.</p>
-<h4 id="example-232">Example</h4>
+<h4 id="example-234">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {resolveMailConfig} from &#39;arcane-os/mail&#39;;
 const config = resolveMailConfig();
 </code></pre></div>
 <h3 id="sendmailreport">sendMailReport()</h3>
-<h4 id="overview-246">Overview</h4>
+<h4 id="overview-248">Overview</h4>
 <p>Sends one complete Mail report with an idempotency key through HTTP.</p>
-<h4 id="signature-and-result-152">Signature and result</h4>
+<h4 id="signature-and-result-154">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">sendMailReport({ appKey, appName, endpoint, fetchImpl=globalThis.fetch, report, reportKey, requestTimeout=null, serializedReport, signal })
 </code></pre></div>
-<h4 id="availability-and-normalization-225">Availability and normalization</h4>
+<h4 id="availability-and-normalization-227">Availability and normalization</h4>
 <p>Node and browser with Fetch and AbortController, or an explicit fetch
 implementation. The complete response is preserved subject only to unavoidable
 HTTP framing and normalized as acceptance or a <code>MailTransportError</code>.</p>
-<h4 id="example-233">Example</h4>
+<h4 id="example-235">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {sendMailReport} from &#39;arcane-os/mail&#39;;
 const result = await sendMailReport(options);
 </code></pre></div>
 <h3 id="serializemailreport">serializeMailReport()</h3>
-<h4 id="overview-247">Overview</h4>
+<h4 id="overview-249">Overview</h4>
 <p>Serializes one JSON-object Mail report for exact body comparison.</p>
-<h4 id="signature-and-result-153">Signature and result</h4>
+<h4 id="signature-and-result-155">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">serializeMailReport(report)
 </code></pre></div>
-<h4 id="availability-and-normalization-226">Availability and normalization</h4>
+<h4 id="availability-and-normalization-228">Availability and normalization</h4>
 <p>Node and browser. Returns compact JSON and rejects non-object or
 non-serializable reports.</p>
-<h4 id="example-234">Example</h4>
+<h4 id="example-236">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {serializeMailReport} from &#39;arcane-os/mail&#39;;
 const body = serializeMailReport(report);
 </code></pre></div>
 <h2 id="shared-logging">Shared logging</h2>
 <h3 id="arcanelogging">arcaneLogging</h3>
-<h4 id="overview-248">Overview</h4>
+<h4 id="overview-250">Overview</h4>
 <p>Shared console owner for Arcane runtime and application diagnostics. Available
 in SDK <code>0.5.14</code>, it reads the existing <code>user.developer</code> preference on every
 diagnostic emission after the shared user is ready. Enable developer mode in
 the application&#39;s profile settings. There is no separate verbosity setting.
 See <a href="../ai/browser-speech/#developer-diagnostics">speech developer diagnostics</a>
 for API calls, generation queue state, and playback events.</p>
-<h4 id="signature-and-result-154">Signature and result</h4>
+<h4 id="signature-and-result-156">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">const arcaneLogging
 arcaneLogging.enabled
 arcaneLogging.log(...args)
@@ -9299,7 +9488,7 @@ diagnostics appear at the console&#39;s normal Info level. <code>warn</code>, <c
 failure <code>trace</code> calls forward to their corresponding console methods in either
 mode. Each method returns <code>undefined</code>; a console failure does not change the
 operation being observed.</p>
-<h4 id="availability-and-normalization-227">Availability and normalization</h4>
+<h4 id="availability-and-normalization-229">Availability and normalization</h4>
 <p><strong>Node and browser.</strong> Imports reuse the same realm-local owner through
 <code>Symbol.for(&#39;arcane.logging&#39;)</code>, also exposed as <code>globalThis.arcaneLogging</code>.
 Arguments pass to the host console unchanged, including complete object
@@ -9307,37 +9496,37 @@ references. The logger does not serialize content, retain diagnostic history,
 write storage, or send network requests. Diagnostics remain disabled while
 the shared user is not ready. The logger does not select a language or change
 speech generation and playback behavior.</p>
-<h4 id="example-235">Example</h4>
+<h4 id="example-237">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {arcaneLogging} from &#39;arcane-os/logging&#39;;
 
 arcaneLogging.info(&#39;AI request&#39;, request);
 arcaneLogging.info(&#39;AI response&#39;, parsedResponse);
 </code></pre></div>
 <h3 id="readarcanedevelopermode">readArcaneDeveloperMode()</h3>
-<h4 id="overview-249">Overview</h4>
+<h4 id="overview-251">Overview</h4>
 <p>Reads the same developer-mode preference used by <code>arcaneLogging</code>, preserving
 the unloaded-user state without creating or changing a setting.</p>
-<h4 id="signature-and-result-155">Signature and result</h4>
+<h4 id="signature-and-result-157">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">readArcaneDeveloperMode(target=globalThis)
 </code></pre></div>
 <p><code>target</code> supplies the shared <code>user</code>. The result is <code>null</code> until
 <code>target.user.ready === true</code>, then <code>true</code> only when
 <code>target.user.developer === true</code>; other loaded preference values return
 <code>false</code>. If preference access throws, the reader returns <code>false</code>.</p>
-<h4 id="availability-and-normalization-228">Availability and normalization</h4>
+<h4 id="availability-and-normalization-230">Availability and normalization</h4>
 <p><strong>Node and browser.</strong> Reads the supplied target synchronously. It performs no
 subscription, write, or logging, and does not cache the preference.</p>
-<h4 id="example-236">Example</h4>
+<h4 id="example-238">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {readArcaneDeveloperMode} from &#39;arcane-os/logging&#39;;
 
 const developerMode=readArcaneDeveloperMode();
 </code></pre></div>
 <h3 id="fetchrequest">fetchRequest()</h3>
-<h4 id="overview-250">Overview</h4>
+<h4 id="overview-252">Overview</h4>
 <p>Makes one complete TWiN Cloud request with explicit caller-owned credentials
 and model selection. This named function is independent of the browser
 <code>AI</code> instance method with the same name.</p>
-<h4 id="signature-and-result-156">Signature and result</h4>
+<h4 id="signature-and-result-158">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async fetchRequest(options={})
 </code></pre></div>
 <p>Import the named function from <code>arcane-os/ai/twin-cloud</code>. Supply <code>twinKey</code>,
@@ -9361,7 +9550,7 @@ is <code>{operation:&#39;fetch&#39;,transport:&#39;http&#39;,destination:&#39;ht
 Both callbacks are awaited, and callback
 failures propagate. Credentials are supplied to transport rather than added to
 the message or response callback payload.</p>
-<h4 id="availability-and-normalization-229">Availability and normalization</h4>
+<h4 id="availability-and-normalization-231">Availability and normalization</h4>
 <p><strong>Node and Browser; Cloud transport.</strong> Uses standard Fetch and cancellation,
 without DOM, browser profiles, user singletons, or storage initialization.
 Import starts no request. HTTP <code>429</code> whose message contains <code>overload</code>
@@ -9375,7 +9564,7 @@ or callback settlement prevents successful return and uses
 model context is retained. The caller owns persistence and key configuration.
 See <a href="../ai/twin-cloud/">TWiN Cloud</a> for a complete Node JSON-schema example and
 the unchanged browser AI interface.</p>
-<h4 id="example-237">Example</h4>
+<h4 id="example-239">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import serverConfig from &#39;./server-config.json&#39; with {type: &#39;json&#39;};
 import {fetchRequest} from &#39;arcane-os/ai/twin-cloud&#39;;
 
@@ -9390,11 +9579,11 @@ console.log(response);
 <p><code>server-config.json</code> is an application-owned, ignored configuration file;
 never commit its key or print it in diagnostics. The SDK does not read it.</p>
 <h3 id="fetchsystemonerequest">fetchSystemOneRequest()</h3>
-<h4 id="overview-251">Overview</h4>
+<h4 id="overview-253">Overview</h4>
 <p>Sends one native TWiN System One request with caller-owned credentials, model,
 state, and questions. Question definitions, scales, model selection, and answer
 interpretation remain application responsibilities.</p>
-<h4 id="signature-and-result-157">Signature and result</h4>
+<h4 id="signature-and-result-159">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async fetchSystemOneRequest({twinKey,model,state,questions,signal=null,id=Date.now(),onRequest,onResponse,onRetry=null}={})
 </code></pre></div>
 <p>Import the named function from <code>arcane-os/ai/twin-cloud</code>. It posts
@@ -9407,14 +9596,14 @@ with <code>{operation:&#39;systemone&#39;,transport:&#39;http&#39;,destination:&
 as metadata. <code>onResponse(response,id,false)</code> receives the entire parsed result
 before return. Both callbacks are awaited and failures propagate. The key is
 used only for transport authentication, outside the diagnostic payloads.</p>
-<h4 id="availability-and-normalization-230">Availability and normalization</h4>
+<h4 id="availability-and-normalization-232">Availability and normalization</h4>
 <p><strong>Node and Browser; Cloud transport.</strong> Uses the existing <code>fetchJSONResponse</code>
 owner for complete errors, retries, <code>onRetry</code>, and <code>signal</code> cancellation, with
 no browser singleton, profile, storage, or retained history. A missing key uses
 <code>AI_PROVIDER_NOT_CONFIGURED</code>; a missing explicit model throws <code>TypeError</code>.
 Cancellation prevents successful return and uses <code>ARCANE_AI_REQUEST_ABORTED</code>,
 including checks after callback settlement. Import starts no request.</p>
-<h4 id="example-238">Example</h4>
+<h4 id="example-240">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {fetchSystemOneRequest} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 const response = await fetchSystemOneRequest({
@@ -9429,11 +9618,11 @@ application. The JEV identifier is an explicit caller choice, not a default.
 See <a href="../ai/twin-cloud/#evaluate-caller-owned-state-with-system-one">TWiN Cloud</a>
 for the complete transport and callback contract.</p>
 <h3 id="generateimages">generateImages()</h3>
-<h4 id="overview-252">Overview</h4>
+<h4 id="overview-254">Overview</h4>
 <p>Generates images through TWiN Cloud with a caller-selected model and complete
 prompt. Returns every image as a Blob in provider order. The application owns
 display, filenames, storage, credentials and model choice.</p>
-<h4 id="signature-and-result-158">Signature and result</h4>
+<h4 id="signature-and-result-160">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async generateImages({model,prompt,parameters={},twinKey,getApiKey,signal=null,id=Date.now(),onRequest,onResponse,onProgress}={})
 </code></pre></div>
 <p>Supported models are <code>fal-ai/flux/schnell</code> through async invocation and
@@ -9475,10 +9664,10 @@ async function drawLunarGarden(twinKey, signal) {
 and <a href="../runtime-modules/#markdownmediajs">MarkdownMedia</a> for application-owned
 image storage and document references.</p>
 <h3 id="fetchhttpresponse">fetchHTTPResponse()</h3>
-<h4 id="overview-253">Overview</h4>
+<h4 id="overview-255">Overview</h4>
 <p>Shared low-level HTTP owner used by browser AI and the focused TWiN API.
 Ordinary TWiN callers use <code>fetchRequest()</code> instead.</p>
-<h4 id="signature-and-result-159">Signature and result</h4>
+<h4 id="signature-and-result-161">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async fetchHTTPResponse(url,options)
 </code></pre></div>
 <p>Returns the successful Fetch <code>Response</code> without consuming its body. Both URL
@@ -9486,49 +9675,49 @@ and Fetch options are caller-supplied; this helper adds no key, model, or
 request envelope. Non-success responses are read completely as JSON when the
 content type contains <code>application/json</code>, otherwise as text. Only status 429
 with an overload message repeats after 3000 ms; other error bodies are thrown.</p>
-<h4 id="availability-and-normalization-231">Availability and normalization</h4>
+<h4 id="availability-and-normalization-233">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Exported from <code>arcane-os/ai/twin-cloud</code> for shared SDK
 integration. <code>options.signal</code> cancels Fetch and the overload wait and is checked
 after response/error-body reads. Cancellation uses
 <code>ARCANE_AI_REQUEST_ABORTED</code>. Overload warnings use the existing shared logger.</p>
-<h4 id="example-239">Example</h4>
+<h4 id="example-241">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {fetchHTTPResponse} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 // The integration supplies its selected endpoint and complete Fetch options.
 const response = await fetchHTTPResponse(endpoint, requestOptions);
 </code></pre></div>
 <h3 id="fetchjsonresponse">fetchJSONResponse()</h3>
-<h4 id="overview-254">Overview</h4>
+<h4 id="overview-256">Overview</h4>
 <p>Shared complete JSON-body reader built on <code>fetchHTTPResponse()</code>.</p>
-<h4 id="signature-and-result-160">Signature and result</h4>
+<h4 id="signature-and-result-162">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async fetchJSONResponse(url,options)
 </code></pre></div>
 <p>Returns the full parsed JSON value. A successful response whose content type
 does not contain <code>application/json</code> throws <code>TypeError</code>; JSON parser failures
 propagate. The helper does not select choices or validate a provider envelope.</p>
-<h4 id="availability-and-normalization-232">Availability and normalization</h4>
+<h4 id="availability-and-normalization-234">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Exported from <code>arcane-os/ai/twin-cloud</code> for shared SDK
 integration; it retains the HTTP owner&#39;s retry/cancellation behavior and checks
 cancellation again after parsing. Ordinary callers use <code>fetchRequest()</code>.</p>
-<h4 id="example-240">Example</h4>
+<h4 id="example-242">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {fetchJSONResponse} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 // The integration supplies its selected endpoint and complete Fetch options.
 const completion = await fetchJSONResponse(endpoint, requestOptions);
 </code></pre></div>
 <h3 id="structuredoutputformat">structuredOutputFormat()</h3>
-<h4 id="overview-255">Overview</h4>
+<h4 id="overview-257">Overview</h4>
 <p>Normalizes the existing AI structured-output option without rewriting a schema.</p>
-<h4 id="signature-and-result-161">Signature and result</h4>
+<h4 id="signature-and-result-163">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">structuredOutputFormat(value=false)
 </code></pre></div>
 <p>False, null, and undefined return null. True and <code>&#39;json&#39;</code> return <code>&#39;json&#39;</code>.
 A plain object with <code>Object.prototype</code> or a null prototype is returned
 unchanged. Other values throw <code>AI_STRUCTURED_OUTPUT_INVALID</code>.</p>
-<h4 id="availability-and-normalization-233">Availability and normalization</h4>
+<h4 id="availability-and-normalization-235">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Synchronous helper exported from
 <code>arcane-os/ai/twin-cloud</code>; performs no network or storage operation.</p>
-<h4 id="example-241">Example</h4>
+<h4 id="example-243">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {structuredOutputFormat} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 const format = structuredOutputFormat({
@@ -9537,37 +9726,37 @@ const format = structuredOutputFormat({
 });
 </code></pre></div>
 <h3 id="openairesponseformat">openAIResponseFormat()</h3>
-<h4 id="overview-256">Overview</h4>
+<h4 id="overview-258">Overview</h4>
 <p>Maps a normalized structured-output choice to chat-completion wire fields.</p>
-<h4 id="signature-and-result-162">Signature and result</h4>
+<h4 id="signature-and-result-164">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">openAIResponseFormat(format)
 </code></pre></div>
 <p><code>&#39;json&#39;</code> becomes <code>{type:&#39;json_object&#39;}</code>; a supplied schema becomes
 <code>{type:&#39;json_schema&#39;,json_schema:{name:&#39;structured_response&#39;,strict:true,schema:format}}</code>.
 A disabled format returns null. Use <code>structuredOutputFormat()</code> first to
 normalize the public option; this mapper does not validate schema contents.</p>
-<h4 id="availability-and-normalization-234">Availability and normalization</h4>
+<h4 id="availability-and-normalization-236">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Synchronous helper exported from
 <code>arcane-os/ai/twin-cloud</code>, shared with browser AI and performing no I/O.</p>
-<h4 id="example-242">Example</h4>
+<h4 id="example-244">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {structuredOutputFormat, openAIResponseFormat} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 const responseFormat = openAIResponseFormat(structuredOutputFormat(true));
 // {type: &#39;json_object&#39;}
 </code></pre></div>
 <h3 id="isairequestabort">isAIRequestAbort()</h3>
-<h4 id="overview-257">Overview</h4>
+<h4 id="overview-259">Overview</h4>
 <p>Recognizes the existing AI request cancellation forms.</p>
-<h4 id="signature-and-result-163">Signature and result</h4>
+<h4 id="signature-and-result-165">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">isAIRequestAbort(error,signal)
 </code></pre></div>
 <p>Returns a boolean: true when the signal is aborted, the error name is
 <code>AbortError</code>, or its code is <code>ARCANE_REQUEST_ABORTED</code>,
 <code>ARCANE_AI_REQUEST_ABORTED</code>, or <code>AI_REQUEST_ABORTED</code>.</p>
-<h4 id="availability-and-normalization-235">Availability and normalization</h4>
+<h4 id="availability-and-normalization-237">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Synchronous helper exported from
 <code>arcane-os/ai/twin-cloud</code>; it neither changes nor aborts the supplied operation.</p>
-<h4 id="example-243">Example</h4>
+<h4 id="example-245">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {isAIRequestAbort} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 const controller = new AbortController();
@@ -9575,19 +9764,19 @@ controller.abort();
 const cancelled = isAIRequestAbort(undefined, controller.signal);
 </code></pre></div>
 <h3 id="normalizeairequestabort">normalizeAIRequestAbort()</h3>
-<h4 id="overview-258">Overview</h4>
+<h4 id="overview-260">Overview</h4>
 <p>Keeps cancellation under the shared AI error code while preserving its cause.</p>
-<h4 id="signature-and-result-164">Signature and result</h4>
+<h4 id="signature-and-result-166">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">normalizeAIRequestAbort(error)
 </code></pre></div>
 <p>An existing <code>ARCANE_AI_REQUEST_ABORTED</code> error is returned unchanged. Otherwise
 the result is an Error named <code>AbortError</code>, with code
 <code>ARCANE_AI_REQUEST_ABORTED</code>, message <code>The AI request was cancelled.</code>, and the
 supplied value as its cause. The helper returns the error; it does not throw it.</p>
-<h4 id="availability-and-normalization-236">Availability and normalization</h4>
+<h4 id="availability-and-normalization-238">Availability and normalization</h4>
 <p><strong>Node and Browser.</strong> Synchronous helper exported from
 <code>arcane-os/ai/twin-cloud</code>; creates no request, storage, or user state.</p>
-<h4 id="example-244">Example</h4>
+<h4 id="example-246">Example</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {normalizeAIRequestAbort} from &#39;arcane-os/ai/twin-cloud&#39;;
 
 const cancelled = normalizeAIRequestAbort(new DOMException(&#39;Cancelled&#39;, &#39;AbortError&#39;));
@@ -9602,6 +9791,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.66.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.67.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -69,6 +69,8 @@ runtime layouts.
 | `arcane-os/core/local-ai` | Native llama.cpp, Ollama and ONNX Core service, model readiness, complete responses and owned lifecycle. See [local AI through Core](local-ai.md). |
 | `arcane-os/local-ai` | Official runtime installation and native artifact bundling for selected llama.cpp/Ollama/ONNX/image requirements and NeMo libraries. |
 | `arcane-os/local-ai/onnx` | Retained native ONNX worker sessions with explicit graph loading and complete tensor inference. |
+| `arcane-os/local-ai/decisions` | Explicit native Laya FP32 decisions using the existing ONNX owner and a tokenizer Worker. |
+| `arcane-os/core/decisions` | Renderer-independent typed-decision service composed with existing local-AI and model-assets owners. |
 | `arcane-os/ai/core-onnx` | Optional browser access to system ONNX through an existing Core connection. |
 | `arcane-os/local-ai/image` | Retained native stable-diffusion.cpp context, complete PNG generation and owned worker lifetime. |
 | `arcane-os/ai/core-image` | Browser image lifecycle and complete PNG Blobs through an available Core service. |
@@ -169,6 +171,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `acceptWebSocket()` | function | `arcane-os`, `arcane-os/websocket` | WebSocket protocol | Node; browser-native client interoperability |
 | `WS` | class | `arcane-os`, `arcane-os/websocket-client` | Shared WebSocket clients | Node and native-WebSocket browser hosts |
 | `createBrowserDecisionModel()` | function | `arcane-os/ai/browser-decisions` | Browser typed decisions | Browser module Workers and the caller-selected inference backend |
+| `createNativeDecisionModel()` | function | `arcane-os/local-ai/decisions` | Native typed decisions | Node with an existing native ONNX owner and selected Laya FP32 files |
+| `createNativeDecisionService()` | function | `arcane-os/core/decisions` | Native typed decisions | Node Core with existing local-AI and model-assets services |
+| `createNativeDecisionService default export` | function | `arcane-os/core/decisions` | Native typed decisions | Same native decision service factory |
 | `fetchRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud requests | Node and Browser; remote HTTPS provider |
 | `fetchSystemOneRequest()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud state-and-questions requests | Node and Browser; remote HTTPS provider |
 | `generateImages()` | function | `arcane-os/ai/twin-cloud` | TWiN Cloud image generation | Node and Browser with Fetch and Blob; remote HTTPS provider |
@@ -7297,8 +7302,17 @@ createCoreRuntime({application, version, services=[]}={})
 ```
 
 Import it from `arcane-os/core/runtime`. The runtime exposes `current()`,
-`subscribe()`, `onFrame()`, `emit()`, `registerService()`, `start()`, `handle()`
+`subscribe()`, `onFrame()`, `emit()`, `registerService()`, `getService()`, `start()`, `handle()`
 and idempotent `close()`.
+
+`await runtime.getService(name)` and service `context.getService(name)` return
+the actual registered service after its shared startup. They wait for that
+dependency alone, may start it before `runtime.start()`, and add no renderer or
+all-service barrier. Unknown services reject with `CORE_SERVICE_UNAVAILABLE`;
+new lookups during shutdown reject with `CORE_CLOSING`. Startup failures retain
+their original error. This is readiness, not a lifetime lease: retain acquired
+native handles for their actual cleanup rather than looking them up during
+disposal. See [native service composition](core-runtime.md#native-service-composition).
 
 Services start independently. Request-lifetime work receives cooperative
 cancellation; accepted `lifetime:'service'` work survives renderer cancellation.
@@ -8011,7 +8025,7 @@ Construction selects no model and installs no runtime or transport.
 ### Signature and result
 
 ```text
-createCoreLocalAIProvider({client=getInstalledCoreClient(),id='llama.cpp'}={})
+createCoreLocalAIProvider({client,id='llama.cpp'}={})
 ```
 
 Import it from `arcane-os/ai/core-local`. The provider implements
@@ -8022,6 +8036,16 @@ Requests wait for the requested model's actual readiness, preserve complete
 payloads and parsed streaming chunks, and cancel on observed readiness loss.
 Missing Core reports unavailability; it does not choose a browser or cloud route.
 Dispose/unregister at the caller's owning lifecycle boundary.
+
+Omitted `client` follows late installation, replacement and retirement through
+the shared Core installation subscription. An explicit client, including
+`null`, remains fixed. Replacement revokes readiness and cancels owned work;
+late results cannot restore it. `inspect()` distinguishes explicit load
+capability from loaded readiness, while `status()` remains observational.
+Disposal releases only an actually retained selection through its captured
+client, so never-loaded and already-unloaded providers send no native unload.
+The provider/2 runtime reconciles status at its operation boundaries; this
+does not add an idle role-state subscription.
 
 ```javascript
 import {createCoreLocalAIProvider} from 'arcane-os/ai/core-local';
@@ -8055,6 +8079,13 @@ resolved installed runtime records. It returns a Core service definition with
 existing Core lifecycle. Shutdown cancels owned work and joins owned processes;
 an already running external service remains under its external owner.
 
+After `await context.getService('local-ai')`, `service.getONNXRuntime()` returns
+that service's actual prepared ONNX owner. It creates no engine and rejects
+unavailable or closing access. Reacquire on each explicit load after recovery;
+retain the returned handle for cleanup. Core shutdown cancels request-lifetime
+work, and independent services dispose concurrently. See
+[native service owners](local-ai.md#native-service-owners).
+
 Optional `prepare({signal,onEvent})` supplies resolved runtime records during
 this service's startup. Only operations depending on that service wait for its
 preparation; the development listener and independently composed image/model
@@ -8064,7 +8095,10 @@ requirements. The managed development and native entrypoints separate them.
 
 The service provides `localai.status`, explicit `localai.services.recover`,
 `llama.status/models/load/unload/chat`, `onnx.status/load/run/unload`, and the documented native Ollama methods.
-`localai.state` reports runtime/model changes. `llama.chunk` and `ollama.chunk`
+`localai.state` reports runtime/model changes. `llama.status` and `llama.models`
+observe current state without starting, restarting or waiting for an engine.
+Explicit load retains startup and exact catalog-membership checks.
+`llama.chunk` and `ollama.chunk`
 carry original parsed chunks with `streamId`; terminal responses remain complete.
 There is no background health polling or implicit model choice.
 
@@ -8081,7 +8115,7 @@ and [native bundling](local-ai.md#native-bundling).
 
 `createONNXRuntime({modulePath,signal?,onEvent?})` from `arcane-os/local-ai/onnx`
 owns retained native ONNX sessions in workers. It exposes `load({id,model,
-sessionOptions?,signal?})`, `run({id,feeds,fetches?,runOptions?,signal?})`,
+sessionOptions?,executionPreference?,signal?})`, `run({id,feeds,fetches?,runOptions?,signal?})`,
 `unload({id,signal?})`, `current()`, replaying `subscribe(listener)` and `close()`.
 The direct model path is absolute. Complete typed tensor records use
 `{type,dims,data}`; callers own the actual graph's inputs and preprocessing.
@@ -8091,11 +8125,22 @@ before replacement. Independent sessions run concurrently; same-session work
 waits at that session's loading/execution boundary. Queued cancellation removes
 that request; active cancellation retires the affected worker and suppresses
 its response. Native code can delay termination; cleanup waits for actual exit.
+`current().sessions[].stopping` revokes new-run availability at terminal
+shutdown; `exited` records actual Worker exit. A recoverable run error leaves
+the loaded session usable. Unload joins exit and output delivery even when a
+termination request fails, preserving the complete cleanup error.
+
+The generic load defaults to CPU. `executionPreference:'gpu'` tries advertised
+CUDA, TensorRT, DirectML, CoreML and WebGPU session creation before CPU.
+Explicit `sessionOptions.executionProviders` takes precedence unchanged.
+The complete `execution` record reports discovery, provider attempts and
+fallback; successful creation establishes configuration, not physical GPU
+execution. Inference is never replayed on a different provider after failure.
 See [complete signatures, readiness, cancellation and usage](local-ai.md#native-onnx-sessions).
 
 ## createCoreONNXRuntime()
 
-`createCoreONNXRuntime({client=getInstalledCoreClient()}={})` from
+`createCoreONNXRuntime({client}={})` from
 `arcane-os/ai/core-onnx` accesses an available Core ONNX service. Its `load`,
 `run`, and `unload` mirror the native session selection and accept `signal` and
 `timeoutMs` (default `0`). Relative model paths resolve at Core's `appRoot`.
@@ -8103,7 +8148,11 @@ The accessor owns complete tensor transport encoding/decoding, `inspect()`,
 `current()`, replaying `subscribe(listener)` and `close()`. Closing cancels this
 accessor's requests and subscriptions; unloading shared models is explicit.
 Construction installs no runtime and opens no transport. Existing browser
-ONNX/Wllama remain independent. See [Core and browser usage](local-ai.md#onnx-through-core-and-the-browser).
+ONNX/Wllama remain independent. Omitted `client` follows late installation and
+reads each installed connection's current status; explicit clients, including
+`null`, remain fixed. Retirement or replacement clears readiness and cancels
+owned work, with late old-client results suppressed. Close also removes the
+installation subscription. See [Core and browser usage](local-ai.md#onnx-through-core-and-the-browser).
 
 ## createImageRuntime()
 
@@ -8143,11 +8192,17 @@ browser accessor's detach-only ownership below. See the
 
 ## createCoreImageRuntime()
 
-`createCoreImageRuntime({client=getInstalledCoreClient(),signal?,onEvent?})`
+`createCoreImageRuntime({client,signal?,onEvent?})`
 from `arcane-os/ai/core-image` returns immediately with `load`, `generate`, `edit`,
 `unload`, `inspect`, `current`, `subscribe` and `close`. It subscribes before
 requesting an initial status snapshot so newer lifecycle events win. It opens
 no connection and installs or selects no model.
+
+Omitted `client` follows late Core installation, replacement and retirement;
+an explicit client, including `null`, remains fixed. Each installed client is
+observed before its status request. Retirement cancels owned work and removes
+old readiness; late results cannot restore it. Close removes both service and
+installation subscriptions without closing the shared client or model.
 
 `load({model,context?,assetProjectionId?,resourcePaths?,signal?})` and
 `generate({model,prompt,parameters?,assetProjectionId?,resourcePaths?,signal?,
@@ -8445,6 +8500,14 @@ directory and complete member files.
 
 `current()` returns `{closing,projections}`. `retain(id)` accepts a completed
 projection and returns `{id,directory,members,release}` for a native owner.
+Native `prepare({id,workingDirectory,members,signal,onProgress})` accepts
+ordered `{path,url}` members and returns their ready projection. Explicit calls
+stream complete upstream responses through the same file owner; startup
+downloads nothing. Independent members transfer concurrently and progress
+reports phases and completed files. `release(id)` relinquishes preparation
+ownership; cancellation, release and disposal join fetches and writes before
+cleanup. Native retain handles keep completed files alive until actual engine
+release. See [native preparation](model-assets.md#native-ownership).
 `dispose()` releases preparation ownership and joins file writes, closes and
 all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model
@@ -9105,6 +9168,110 @@ mountPwaInstallPrompt({appName: 'Example Library'}).catch(
 See the [mounting contract](pwa.md#mountpwainstallprompt) and
 [component reference](runtime-components.md#pwa-installhtml). The browser owns
 native installation eligibility and URL-bar promotion.
+
+## createNativeDecisionModel()
+
+### Overview
+
+Runs explicitly selected Laya FP32 option scoring through an existing native
+ONNX owner, with tokenization in a Node Worker. It creates no second inference
+engine and starts no model download at construction.
+
+### Signature and result
+
+```text
+createNativeDecisionModel({onnx,modelAssets,workingDirectory,paths,model='onnx-community/laya-typed-decisions-ONNX',revision='main',dtype='fp32',sessionOptions,executionPreference='gpu',signal}={})
+```
+
+Import from `arcane-os/local-ai/decisions`. Supply the existing `onnx` owner and
+either `modelAssets` plus `workingDirectory`, or native `paths` for the model,
+tokenizer and tokenizer configuration. The selected graph requires FP32. The
+handle exposes `load`, `evaluate`, `classify`, `current`, `status`, `subscribe`,
+`unload` and terminal `dispose`; `classify` aliases `evaluate` and `status`
+aliases `current`.
+
+`evaluate(rows,{signal,runOptions})` preserves each complete `state`, `question`,
+`options` and optional `type` separately. It returns `{decisions,outputs}` with
+original rows, typed values, raw logits, unrounded probabilities and every
+named tensor output. It requires a loading or loaded activation. Cancellation
+retires the shared activation and joins its actual ONNX/tokenizer lifetime;
+working files remain retained until both Workers exit. Ordinary invalid rows
+leave a healthy session and sibling evaluations intact.
+
+### Availability and normalization
+
+**Node on Windows, Linux and macOS with the selected ONNX Runtime; Android needs
+host adaptation.** GPU preference attempts actual advertised providers before
+CPU fallback; accepted configuration does not prove GPU node execution. Model
+selection, unchanged payloads, scoring interpretation and persistence remain
+application-owned. Complete lifecycle, errors and paths are documented in
+[native typed decisions](native-decisions.md).
+
+### Example
+
+```javascript
+import {createNativeDecisionModel} from 'arcane-os/local-ai/decisions';
+
+function createMoonChefDecisions({onnx, paths}) {
+    return createNativeDecisionModel({onnx, paths});
+}
+```
+
+The caller explicitly loads the returned model before evaluation and unloads
+or disposes it at its owning boundary; defining this function downloads nothing.
+
+## createNativeDecisionService()
+
+### Overview
+
+Composes the same native decision model into an existing Core runtime without
+a renderer. The factory starts no inference, tokenizer or model preparation.
+
+### Signature and result
+
+```text
+createNativeDecisionService(configuration={}, {appRoot=process.cwd()}={})
+```
+
+Import from `arcane-os/core/decisions`. Configuration selects the model options
+above and an optional service `name` (default `decisions`); relative supplied
+`paths` resolve from `appRoot`. Explicit load obtains the registered local-AI
+and, when needed, model-assets owners through `context.getService`, then
+reacquires `getONNXRuntime()` after any recovery. Native members are `load`,
+`evaluate`, `classify`, `current`, `subscribe`, `unload`, `dispose` and Core
+`start(context)`.
+
+RPC exposes `decisions.status`, `decisions.load`, `decisions.evaluate` and
+`decisions.unload`. Evaluation accepts `{rows,runOptions?}` and returns complete
+`{decisions,outputs}` using the existing tensor codec at the JSON boundary.
+`decisions.state` and replaying `subscribe(listener,{emitCurrent:true,signal})`
+report lifecycle. Unload is accepted service-lifetime cleanup; host shutdown
+still cancels request-lifetime load/evaluation.
+
+### Availability and normalization
+
+**Node Core with an existing local-AI ONNX service and selected model files.**
+Registration does not wait for all services or open another host. Original
+inputs, complete outputs, failures and cleanup semantics match the native
+model. See [composition and example](native-decisions.md#compose-with-existing-core-services).
+
+### Example
+
+```javascript
+import {createNativeDecisionService} from 'arcane-os/core/decisions';
+
+const decisions = createNativeDecisionService({
+    model: 'onnx-community/laya-typed-decisions-ONNX',
+    dtype: 'fp32',
+    workingDirectory: '.models/laya'
+});
+// Add decisions to the application's existing Core services; load explicitly.
+```
+
+## createNativeDecisionService default export
+
+The default export from `arcane-os/core/decisions` is exactly the named
+`createNativeDecisionService` factory, with the same arguments and lifecycle.
 
 ## createBrowserDecisionModel()
 

@@ -569,6 +569,7 @@ const navigationGroups=[
             ['Codex App Server','docs/reference/codex-app-server.md','',true],
             ['MCP STDIO server','docs/reference/mcp-stdio.md','',true],
             ['Local AI through Core','docs/reference/local-ai.md'],
+            ['Native typed decisions','docs/reference/native-decisions.md','',true],
             ['FLUX.2 Klein 4B','docs/reference/local-image-flux.md'],
             ['SDXL Base 1.0','docs/reference/local-image-sdxl.md'],
             ['Native speech service','docs/reference/native-speech.md'],
