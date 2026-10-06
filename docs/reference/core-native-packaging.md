@@ -212,10 +212,14 @@ details and [the client contract](core-client.md) for native bridge integration.
 
 The generated Core entry accepts `--arcane-launch-config <path>`. The public
 `readCoreLaunchContext({argv=process.argv.slice(2)}={})` function in
-`arcane-os/core/host` reads that explicitly selected JSON object. Without the
-flag it returns `{}`. Missing files, missing flag values and malformed JSON
-report their actual errors; the reader does not search for configuration,
-rewrite it or change the process environment.
+`arcane-os/core/host` reads that explicitly selected JSON object. A native host
+can separately supply `--arcane-host-state-root <directory>` for the reader's
+`stateRoot` default. Every field in the explicit JSON object takes precedence
+unchanged, including an explicitly present `stateRoot` with a relative, null or
+other application-owned value. With neither argument the reader returns `{}`.
+Missing files, missing argument values and malformed JSON report their actual
+errors; the reader does not search for configuration, resolve or validate the
+state directory, rewrite the file or change the process environment.
 
 The generated entry supplies an artifact-derived `appRoot` and then applies the
 complete explicit launch context. Every service factory receives that same
@@ -224,7 +228,10 @@ launcher can supply the user's selected `workspaceRoot` and writable
 `stateRoot` at launch instead of embedding this machine's paths in an app
 package. The host owns those selections; the SDK does not choose a product's
 workspace, namespace, saved preferences or models. JSON values and additional
-application-owned fields remain unchanged.
+application-owned fields remain unchanged, including an app-selected
+`preferencesFile`. The state directory supplies no preference filename and
+triggers no stored-data discovery or migration. Linux and other composing hosts
+may pass the same separate argument; the reader chooses no platform directory.
 
 ## Selected local-AI runtimes
 
@@ -305,8 +312,11 @@ Arcane.exe --arcane-launch-config path/to/launch.json
 The complete JSON object reaches the service factories as their second
 argument. A supplied `stateRoot` also owns the WebView2 profile and diagnostic
 directory. Otherwise the launcher uses the current user's local application
-data under `Arcane/<app-id>`. The launcher does not invent an application
-workspace. Relative launch-file paths resolve from the invocation's working
+data under `Arcane/<app-id>`. It forwards that actual host selection through
+`--arcane-host-state-root`, so ordinary double-click startup supplies `stateRoot`
+to every Core service factory. The complete explicit launch context still takes
+precedence without rewriting its fields. The launcher does not invent an
+application workspace. Relative launch-file paths resolve from the invocation's working
 directory. `--close-on-stdin-eof` is an explicit process-owner option used by the
 SDK runner; an ordinary double-clicked window closes through its own UI.
 
@@ -414,7 +424,9 @@ owner and published `node-http-server`, not a second HTTP implementation.
 `context.stateRoot` takes precedence over the launcher's separate
 `--arcane-host-state-root` argument. The launcher defaults to
 `~/Library/Application Support/Arcane/<app-id>`; an explicitly supplied launch
-file remains unchanged and is forwarded to Core. The first successful listener
+file remains unchanged and is forwarded to Core. The shared launch reader also
+supplies that host default to every application service factory, with explicit
+launch fields taking precedence. The first successful listener
 stores its selected port in `packaged-web-origin.json`. Later launches reuse it;
 a port conflict or unreadable saved record is reported without changing origins
 or discarding stored state.

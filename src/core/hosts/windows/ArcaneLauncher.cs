@@ -69,7 +69,10 @@ namespace Arcane.Core.Hosts.Windows
                     Title = name,
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
                     CoreExecutable = Path.Combine(directory, "runtime", "ArcaneCore.exe"),
-                    CoreArguments = launchFilename == null ? String.Empty : "--arcane-launch-config " + QuoteArgument(launchFilename),
+                    // Forward the actual host selection separately; Core keeps
+                    // every explicit launch-record field unchanged.
+                    CoreArguments = "--arcane-host-state-root " + QuoteArgument(profileParent)
+                        + (launchFilename == null ? String.Empty : " --arcane-launch-config " + QuoteArgument(launchFilename)),
                     // Relative explicit launch filenames retain their caller's
                     // meaning; the SEA locates its loader beside its executable.
                     CoreWorkingDirectory = Environment.CurrentDirectory

@@ -6,13 +6,22 @@ import {startCoreStdio} from './stdio.mjs';
 const is = new Is(false);
 
 /**
- * Read only the explicitly supplied --arcane-launch-config filename.
- * Return the complete JSON object for the service factories' second argument;
- * field meanings belong to the launch owner and individual services.
+ * The host's separate state-root argument supplies a launch-context default.
+ * Every field in an explicitly selected launch JSON object takes precedence
+ * unchanged; field meanings belong to the launch owner and individual services.
  */
 export async function readCoreLaunchContext({argv = process.argv.slice(2)} = {}) {
+    const stateFlag = argv.indexOf('--arcane-host-state-root');
+    const defaults = {};
+    if (stateFlag !== -1) {
+        const stateRoot = argv[stateFlag + 1];
+        if (stateRoot === undefined || stateRoot === '') {
+            throw new TypeError('--arcane-host-state-root requires a directory.');
+        }
+        defaults.stateRoot = stateRoot;
+    }
     const flag = argv.indexOf('--arcane-launch-config');
-    if (flag === -1) return {};
+    if (flag === -1) return defaults;
     const filename = argv[flag + 1];
     if (filename === undefined || filename === '') {
         throw new TypeError('--arcane-launch-config requires a filename.');
@@ -21,7 +30,7 @@ export async function readCoreLaunchContext({argv = process.argv.slice(2)} = {})
     if (context === null || !is.object(context) || is.array(context)) {
         throw new TypeError('Core launch configuration must be a JSON object.');
     }
-    return context;
+    return {...defaults, ...context};
 }
 
 /** Compose app services with the shared dispatcher and draining transport. */

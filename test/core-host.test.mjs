@@ -60,6 +60,38 @@ test('Core launch context reports missing filenames and preserves file and JSON 
     }
 });
 
+test('Core launch context supplies the host state default without changing explicit launch fields', async function hostStateLaunchContext(t) {
+    const root = await createLaunchFixture(t);
+    const filename = path.join(root, 'moon cheese launch.json');
+    const hostRoots = ['C:\\Moon cheese\\state 🧀\\', '/home/moon/State 🧀', '/Users/moon/Library/Application Support/Arcane/moon'];
+    for (const stateRoot of hostRoots) {
+        const argv = ['--arcane-host-state-root', stateRoot];
+        assert.deepEqual(await readCoreLaunchContext({argv}), {stateRoot});
+    }
+    const stateRoot = hostRoots[0];
+    const argv = ['--arcane-host-state-root', stateRoot, '--arcane-launch-config', filename];
+    const content = '{\r\n\t"preferencesFile": "  Existing preferences 🧀.json  ",\r\n\t"workspaceRoot": "../moon work",\r\n\t"unknownOwner": {"instructions": "  Café é 🦑\\r\\nFinal line.  ", "values": [null, false, 0, "", {"moon": "月"}]},\r\n\t"__proto__": {"content": "An ordinary authored JSON field."}\r\n}\r\n';
+    await writeFile(filename, content);
+    assert.deepEqual(await readCoreLaunchContext({argv}), {stateRoot, ...JSON.parse(content)});
+    assert.equal(await readFile(filename, 'utf8'), content);
+
+    for (const explicitState of ['../selected state 🧀', null, '', false, 0, {owner: 'application'}]) {
+        const explicit = {...JSON.parse(content), stateRoot: explicitState};
+        const selected = JSON.stringify(explicit, null, 4) + '\r\n';
+        await writeFile(filename, selected);
+        assert.deepEqual(await readCoreLaunchContext({argv}), explicit);
+        assert.equal(await readFile(filename, 'utf8'), selected);
+    }
+});
+
+test('Core launch context reports a missing host state argument', async function missingHostStateArgument() {
+    for (const argv of [['--arcane-host-state-root'], ['--arcane-host-state-root', '']]) {
+        await assert.rejects(readCoreLaunchContext({argv}), {
+            name: 'TypeError', message: '--arcane-host-state-root requires a directory.'
+        });
+    }
+});
+
 function deferred() {
     let resolve;
     const promise = new Promise(function retainSettlement(resolvePromise) { resolve = resolvePromise; });
