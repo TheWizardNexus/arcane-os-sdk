@@ -32,6 +32,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         return {
             providerId: 'whisper.cpp', modelId: selected, state,
             loaded: state === 'ready', busy: active !== null,
+            requestId: active?.requestId ?? null,
             requestedBackend: helper?.variant.backend ?? runtime?.backend ?? 'auto',
             observedBackend: helper?.metadata?.observedBackend ?? null,
             backendEvidence: helper?.metadata?.backendEvidence ?? null,
@@ -152,8 +153,9 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             readiness.reject(failure);
             session.pending?.response.reject(failure);
             if (helper === session && state === 'ready' && !session.stopping) {
-                error = failure;
-                state = 'error';
+                const recovering = cpuRecoveryVariant(session, failure);
+                error = recovering ? null : failure;
+                state = recovering ? 'recovering' : 'error';
                 publish();
             }
             throw failure;
@@ -255,14 +257,23 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         return loading;
     }
 
-    function transcribe(request, {signal, onProgress} = {}) {
+    function cpuRecoveryVariant(session, failure) {
+        if (!active?.canRecover || active.session !== session || active.signal.aborted || unloading || closing
+            || session.variant.backend === 'cpu' || session.controller.signal.aborted
+            || session.observerFailure || failure.code === 'WHISPER_PROTOCOL_INCOMPLETE'
+            || (runtime.backend && runtime.backend !== 'auto')) return null;
+        if (failure.code !== 'WHISPER_INFERENCE_FAILED' && !session.failed) return null;
+        return runtime.variants.find(function preparedCPU(variant) { return variant.backend === 'cpu'; }) ?? null;
+    }
+
+    function transcribe(request, {signal, onProgress, requestId} = {}) {
         signal?.throwIfAborted();
         if (closing || disposed || unloading) return Promise.reject(whisperError('WHISPER_CLOSING', 'Whisper is closing.'));
         if (active) return Promise.reject(whisperError('WHISPER_BUSY', 'The selected Whisper model is transcribing another recording.'));
         if (!is.string(request?.audioBase64)) throw new TypeError('Transcription requires the complete audioBase64 recording.');
         const controller = new AbortController();
         const operationSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-        const operation = {controller, task: null};
+        const operation = {controller, signal: operationSignal, requestId, session: null, canRecover: false, task: null};
         active = operation;
         operation.task = Promise.resolve().then(async function transcribeRecording() {
             operationSignal.throwIfAborted();
@@ -274,6 +285,8 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                 throw whisperError('WHISPER_MODEL_MISMATCH', `The loaded model is ${selected}; the request selected ${request.model}.`);
             }
             const initialSession = helper;
+            operation.session = initialSession;
+            operation.canRecover = true;
             await mkdir(temporaryDirectory, {recursive: true});
             const directory = await mkdtemp(path.join(temporaryDirectory, 'recording-'));
             try {
@@ -287,18 +300,17 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                 operationSignal.throwIfAborted();
                 if (initialSession !== helper) throw whisperError('WHISPER_MODEL_CHANGED', 'The selected transcription model changed.');
                 try {
-                    return await infer(initialSession, pcm, request, operationSignal, onProgress, 1);
+                    const result = await infer(initialSession, pcm, request, operationSignal, onProgress, 1);
+                    operation.canRecover = false;
+                    return result;
                 } catch (failure) {
                     operationSignal.throwIfAborted();
-                    const cpu = runtime.backend === 'auto' || !runtime.backend
-                        ? runtime.variants.find(function cpuFallback(variant) { return variant.backend === 'cpu'; }) : null;
-                    const nativeFailure = failure.code === 'WHISPER_INFERENCE_FAILED'
-                        || (initialSession.failed && !initialSession.controller.signal.aborted && !initialSession.observerFailure
-                            && failure.code !== 'WHISPER_PROTOCOL_INCOMPLETE');
-                    if (!cpu || initialSession.variant.backend === 'cpu' || !nativeFailure) throw failure;
+                    const cpu = cpuRecoveryVariant(initialSession, failure);
+                    operation.canRecover = false;
+                    if (!cpu) throw failure;
                     // A failed GPU context is fully drained before CPU owns the
                     // same complete decoded recording and exact selected model.
-                    state = 'loading';
+                    state = 'recovering';
                     error = null;
                     publish();
                     try { await stopHelper(initialSession); }
@@ -309,6 +321,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                     operationSignal.throwIfAborted();
                     const replacement = startHelper(cpu, initialSession.model);
                     helper = replacement;
+                    operation.session = replacement;
                     publish();
                     function cancelFallbackLoad() { replacement.controller.abort(operationSignal.reason); }
                     operationSignal.addEventListener('abort', cancelFallbackLoad, {once: true});
@@ -338,12 +351,13 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
                     }
                 }
             } finally {
+                operation.canRecover = false;
                 // Decoder completion and the helper's joined terminal record both
                 // precede removal of this operation's complete recording files.
                 await rm(directory, {recursive: true, force: true});
             }
         }).catch(function transcriptionFailed(failure) {
-            if (state === 'loading' && (!helper || helper.stopping || helper.exited)) {
+            if (state === 'recovering' && (!helper || helper.stopping || helper.exited)) {
                 helper = null;
                 state = unloading || closing ? 'unloading' : operationSignal.aborted ? 'unloaded' : 'error';
                 error = operationSignal.aborted ? null : failure;
@@ -396,8 +410,6 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         if (disposed) return Promise.resolve(current());
         state = 'unloading';
         unloading = Promise.resolve().then(async function unloadModel() {
-            loadController?.abort();
-            active?.controller.abort();
             await Promise.allSettled([loading, active?.task].filter(Boolean));
             const session = helper;
             try { await stopHelper(session); }
@@ -410,6 +422,8 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             error = failure;
             throw failure;
         }).finally(function unloadSettled() { unloading = null; publish(); });
+        loadController?.abort();
+        active?.controller.abort();
         publish();
         return unloading;
     }

@@ -51,6 +51,13 @@ complete decoded recording once on CPU with the same model. Cancellation,
 input errors and observer errors do not trigger this retry. Explicit `cuda`,
 `metal` or `cpu` selections retain that chosen backend.
 
+During that accepted request's internal recovery, the engine reports
+`state: "recovering"`, `loaded: false`, and `busy: true`, with the same selected
+provider and model. It accepts no new transcription while the old context
+drains and the CPU context loads. Only actual CPU readiness restores `ready`.
+An explicitly unloaded, replaced, or closed model remains a cancellation
+boundary; internal recovery preserves the original request and its signal.
+
 `requestedBackend` identifies a preference. `observedBackend` and
 `backendEvidence` report native initialization evidence when available; they
 do not claim that every computation runs on the GPU. No driver or compiler is
@@ -123,10 +130,10 @@ prepared descriptor returned by `ensureLocalAIRuntimes`; alternatively,
 
 | Member | Contract |
 | --- | --- |
-| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, requested/observed backend, evidence and any error. |
+| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, active `requestId` or null, requested/observed backend, evidence and any error. |
 | `subscribe(listener, {replay = true, signal} = {})` | Immediately replays current state by default and returns an unsubscribe function. |
 | `load({modelId, signal} = {})` | Prepares the runtime if necessary, then waits for actual native model readiness. With no selected model it remains unloaded. |
-| `transcribe(request, {signal, onProgress} = {})` | Consumes the complete `audioBase64` recording. Optional `language` defaults to native automatic detection; `translate: true` selects Whisper's translation operation. `model` must match the loaded model. |
+| `transcribe(request, {signal, onProgress, requestId} = {})` | Consumes the complete `audioBase64` recording. Optional `language` defaults to native automatic detection; `translate: true` selects Whisper's translation operation. `model` must match the loaded model. Optional `requestId` carries the caller's existing operation identity through lifecycle snapshots as separate control information; it does not alter the recording or request payload. |
 | `unload()` | Cancels and joins active load/transcription, releases the native context, and permits a later explicit load. |
 | `close()` | Joins shutdown and disposes this engine permanently. Repeated calls share the same shutdown. |
 
