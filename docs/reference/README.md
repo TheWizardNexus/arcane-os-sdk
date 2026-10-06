@@ -82,7 +82,7 @@ alone does not make bare module names resolve in a browser.
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
-| Own a native working checkout under per-user ArcaneData/Repos | [Native repository workspaces](core-repositories.md) |
+| Own a native working checkout under per-user ArcaneData/Repos, with optional Windows long paths for new clones | [Native repository workspaces](core-repositories.md) and [Windows clone configuration](core-repositories.md#windows-long-paths-for-a-new-checkout) |
 | Read Git identity defaults or select child-only author and credential hints | [Git identity configuration](core-repositories.md#git-identity-configuration) |
 | Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
 | Observe existing checkout configuration and capture an explicit remote/ref | [Repository configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets) |

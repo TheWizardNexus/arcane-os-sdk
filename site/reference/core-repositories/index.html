@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.73.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.74.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="./" aria-current="page">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core-repositories.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#existing-checkout-configuration-and-selected-targets">Existing checkout configuration and selected targets</a><a href="#git-identity-configuration">Git identity configuration</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></details><p><code>arcane-os/core/repositories</code> owns a persistent native location for connected
@@ -78,7 +78,7 @@ const opened = await repository.open({signal});
 const status = await repository.status({signal});
 await repository.close();
 </code></pre></div>
-<p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run}={})</code>
+<p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run}={})</code>
 returns <code>{directory,open,status,configuration,pull,push,write,close,drain,dispose}</code>. The <code>directory</code>
 property is the absolute selected working path.</p>
 <ul>
@@ -94,6 +94,11 @@ the process working directory. The path is not relocated or rewritten.</li>
 <code>branch</code>, when supplied, is passed unchanged to Git&#39;s <code>clone --branch</code> option;
 otherwise Git selects the remote&#39;s default branch. Existing checkouts keep
 their own branch, remote, tracked files, untracked files and local changes.</li>
+<li>Optional <code>longPaths</code> is a boolean for newly cloned Windows checkouts. Explicit
+<code>true</code> or <code>false</code> supplies <code>clone --config core.longpaths=&lt;value&gt;</code>, so Git
+writes that choice to the new repository before its first checkout. Omission
+leaves Git&#39;s configuration unchanged. The option does not rewrite an existing
+checkout, change a global setting, or alter non-Windows clone commands.</li>
 <li><code>onEvent</code> and optional <code>run</code> use the existing SDK process owner. The default
 adapter is <code>runProcess</code>; Git must be available on PATH. Credentials and
 authentication remain with Git and the native host. The SDK adds no download,
@@ -146,6 +151,31 @@ untouched and reports its Git error or <code>ARCANE_REPOSITORY_DIRECTORY_INVALID
 A failed or cancelled clone reports the actual failure; any remaining directory
 is retained for application-owned inspection. There is no automatic deletion or
 destructive retry. Filesystem failures and complete Git diagnostics propagate.</p>
+<h3 id="windows-long-paths-for-a-new-checkout">Windows long paths for a new checkout</h3>
+<p>Select the option in the application&#39;s native repository connection:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const repository = createRepositoryWorkspace({
+    name: &#39;moon-cheese-dispatches&#39;,
+    remote: applicationConnection.remote,
+    longPaths: true
+});
+await repository.open({signal});
+</code></pre></div>
+<p>This remains one ordinary Git clone, including its branch/tag selection,
+progress, hooks, cancellation and empty-remote behavior. It does not clone
+without checkout and run a second initialization sequence. The boolean is
+captured when the owner is constructed; later edits to the options object
+cannot change an accepted connection.</p>
+<p>An explicit value intentionally selects the new repository&#39;s local
+<code>core.longpaths</code> setting. Git&#39;s ordinary configuration precedence still applies,
+including higher-priority command-scope settings supplied by the native host.
+Omit the option to retain inherited or template configuration without an SDK
+override. Existing repositories retain their settings even if this option is
+supplied; there is no configuration migration or repair pass.</p>
+<p><a href="https://git-scm.com/docs/git-clone#OPTIONS" target="_blank" rel="noreferrer">Git documents clone-local configuration before the initial checkout</a>.
+<a href="https://gitforwindows.org/git-cannot-create-a-file-or-directory-with-a-long-path.html" target="_blank" rel="noreferrer">Git for Windows describes long-path support</a>
+for its native commands; unrelated editors, scripts and host tools may have
+their own path limitations. This option changes no filenames or payloads and
+does not change the SDK&#39;s persistent directory selection.</p>
 <h2 id="existing-checkout-configuration-and-selected-targets">Existing checkout configuration and selected targets</h2>
 <p><code>configuration({signal}={})</code> observes an existing checkout without invoking
 <code>open</code>, creating directories, cloning, initializing, fetching or changing Git
@@ -470,6 +500,6 @@ continue to operate where they already are.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#existing-checkout-configuration-and-selected-targets">Existing checkout configuration and selected targets</a><a href="#git-identity-configuration">Git identity configuration</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.73.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.74.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

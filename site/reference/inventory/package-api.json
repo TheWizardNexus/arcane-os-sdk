@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.73.0",
+  "sdkVersion": "0.74.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -199,14 +199,14 @@
       "name": "createRepositoryWorkspace",
       "displayName": "createRepositoryWorkspace()",
       "kind": "function",
-      "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,branch,gitIdentity,onEvent,run=runProcess}={})",
+      "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run=runProcess}={})",
       "entrypoints": ["arcane-os/core/repositories"],
       "primaryImport": "arcane-os/core/repositories",
       "group": "Native repository workspaces",
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
       "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
       "protocol": "Git working repository and SDK process adapter",
-      "normalization": "Returns directory, open, status, configuration, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are preserved. configuration observes the existing root, symbolic HEAD, origin URL/pushURL arrays and branch remote/merge/upstream URL arrays without clone/init/fetch, preserving unset, empty and repeated values. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. pull/push/write accept a captured target {remote,ref} for current-branch fast-forward pull or non-force current-HEAD selected-ref push; omission retains ordinary configured behavior. write snapshots exact text and paths, stages/commits only literal owned paths and preserves unrelated staged files and Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes plus the supplied target. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and no config file is written."
+      "normalization": "Returns directory, open, status, configuration, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are preserved. Optional longPaths captures a boolean: explicit Windows true/false supplies clone-local core.longpaths before the first checkout, persisting only in the new repository under ordinary Git configuration precedence. Omission preserves configuration; existing repositories and non-Windows clone commands remain unchanged. No global setting or migration. configuration observes the existing root, symbolic HEAD, origin URL/pushURL arrays and branch remote/merge/upstream URL arrays without clone/init/fetch, preserving unset, empty and repeated values. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. pull/push/write accept a captured target {remote,ref} for current-branch fast-forward pull or non-force current-HEAD selected-ref push; omission retains ordinary configured behavior. write snapshots exact text and paths, stages/commits only literal owned paths and preserves unrelated staged files and Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes plus the supplied target. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and identity selection writes no config file."
     },
     {
       "id": "core-repositories:readGitIdentity",
