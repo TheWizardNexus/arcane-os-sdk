@@ -388,6 +388,10 @@ test(
                         this.rendered = 'rendered:' + text;
                     }
                 }
+                function renderTranscriptMarkdown(target, text) {
+                    target.raw = text;
+                    target.innerHTML = new MD(text).rendered;
+                }
                 function scrollTranscriptToBottom() {}
                 function reportTTSError(error) {
                     errors.push(error);

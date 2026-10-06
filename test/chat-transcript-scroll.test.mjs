@@ -32,6 +32,7 @@ const initializeHistory = Function('host', `'use strict';
     function normalizeVisibleToolCalls(calls) {return calls ?? [];}
     function setPendingStructuralToolCalls() {}
     function scrollTranscriptToBottom() {}
+    function releaseTranscriptMessageMedia() {}
     function createTranscriptMessage(role, content, name, options) {
         return {role, content, name, ...options};
     }
@@ -140,6 +141,9 @@ const initializeScrolling = Function(
     };
     const chatArea = {dataset: {}};
     function setSessionStatus() {}
+    const transcriptMedia = new Map();
+    function releaseTranscriptMarkdown() {}
+    function releaseTranscriptMessageMedia() {}
     function finishRecognitionDraft() {}
     function setAIAvailability() {}
     function nextChatOperationId(kind) {

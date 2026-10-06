@@ -5261,7 +5261,7 @@ test(
             {
                 start:'function setTranscriptMessageContent(',
                 end:'\n\n    function setTranscriptMessageTimestamp',
-                mutation:'markdown.innerHTML=new MD(content).rendered;',
+                mutation:'renderTranscriptMarkdown(markdown,content);',
                 scrolls:1
             },
             {
@@ -5291,13 +5291,13 @@ test(
             {
                 start:"async function streamMessage(text='', id='', isThinking)",
                 end:'\n\n    textArea.addEventListener',
-                mutation:'target.innerHTML=new MD(target.raw).rendered;',
+                mutation:'renderTranscriptMarkdown(target,target.raw?target.raw+text:text);',
                 scrolls:2
             },
             {
                 start:'function renderSessionMessageFailure(',
                 end:'\n\n    function internalStructuralToolFailure',
-                mutation:'markdown.innerHTML=new MD(text).rendered;',
+                mutation:'renderTranscriptMarkdown(markdown,text);',
                 scrolls:1
             },
             {
@@ -5662,6 +5662,13 @@ test(
                     });
                 }
                 ${source.slice(completeChatStart,completeChatEnd)}
+                // This structural/session fixture owns explicit rendering doubles;
+                // the shared media lifecycle has its focused Chat print fixture.
+                renderTranscriptMarkdown=function renderFixtureMarkdown(target,content){
+                    target.raw=content;
+                    target.innerHTML=new MD(content).rendered;
+                };
+                releaseTranscriptMessageMedia=function releaseFixtureMedia(){};
                 ${source.slice(toolSettlementStart,toolSettlementEnd)}
                 const session={
                     ai:{id:'bound-ai'},

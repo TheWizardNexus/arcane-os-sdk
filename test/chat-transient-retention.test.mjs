@@ -25,7 +25,8 @@ const initializeSession = Function(
         setTranscriptMessageContent, setTranscriptMessageTimestamp,
         normalizeVisibleToolCalls, sameStructuralToolCall,
         sameStructuralToolCalls, appendVisibleToolCall,
-        dispatchChatEvent, visibleErrorMessage, publicErrorFields
+        dispatchChatEvent, visibleErrorMessage, publicErrorFields,
+        renderTranscriptMarkdown, removeTranscriptMessage
     } = ui;
     const chatErrorCodes = {sessionBindingRejected: 'BINDING', sessionMessageRejected: 'MESSAGE'};
     const chatReasons = {sessionMessageCompleted: 'completed', sessionMessageRejected: 'rejected'};
@@ -101,6 +102,11 @@ function createFixture(session) {
         applyAIAvailability() {},
         setSessionStatus(state, message) { ui.status = {state, message}; },
         setTranscriptMessageContent(card, content) { card.markdown.raw = content; },
+        renderTranscriptMarkdown(target, content) {
+            target.raw = content;
+            target.innerHTML = new ui.MD(content).rendered;
+        },
+        removeTranscriptMessage(card) { card?.remove(); },
         setTranscriptMessageTimestamp(card, timestamp) { card.timestamp = timestamp; },
         normalizeVisibleToolCalls(calls = []) { return calls; },
         sameStructuralToolCall(left, right) { return JSON.stringify(left) === JSON.stringify(right); },

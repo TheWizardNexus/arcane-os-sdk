@@ -372,6 +372,26 @@ reach developer diagnostics and a concise recovery status stays outside the
 transcript. Destruction cancels pending preparation, while an already requested
 print retains its snapshot through `afterprint`.
 
+Markdown images with local `arcane-media:` references saved through
+[`MarkdownMedia`](runtime-modules.md#markdownmediajs) display automatically in
+new messages, live response chunks, final responses, and restored history.
+Chat resolves references through the existing application-scoped DBOPFS owner
+while preserving the complete original Markdown, model payloads, saved history,
+image descriptions, and ordinary image URLs. Text appears immediately; local
+image reads and decoding proceed independently without delaying streaming or
+session readiness. Failed images retain complete developer diagnostics and show
+a concise message beside that card; successful sibling images remain visible.
+
+Each rendered card owns its display URLs. Re-rendering, history replacement,
+transient-message removal, and destruction cancel obsolete display work and
+release those URLs without deleting stored images. Back/Forward Cache retains
+the existing component lifecycle. Explicit `print()` awaits the current images;
+native Print reports images that are still loading or failed instead of claiming
+they are ready. A requested print snapshot retains its image URLs across later
+message changes or component destruction until `afterprint` releases them.
+Applications continue to own image-record names, associations, and cleanup;
+Chat introduces no renderer callback or additional storage API.
+
 Before any session binding begins, callback-mode `sessionStatus` follows the
 selected sticky LLM role and the existing application-owned `modelName` label
 (or the selected model ID). Assigning `modelName` refreshes that status even

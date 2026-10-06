@@ -886,6 +886,7 @@
     const aiActivationButton=shadowRoot.querySelector('#ai_activation_button');
     const [
         {default:MD},
+        {hydrateMarkdownMedia},
         {default:FileEntity},
         {ConversationSubmissionBarrier,requireConversationTimeboxDelivery},
         {requestAIRuntimeIntent,subscribeAIRuntimeState},
@@ -893,6 +894,7 @@
         {getBrowserDeviceClass}
     ]=await Promise.all([
         import('../modules/MD.js'),
+        import('../modules/MarkdownMedia.js'),
         import('../entities/File.js'),
         import('../modules/ConversationTimebox.js'),
         import('../modules/AIRuntimeState.js'),
@@ -946,15 +948,19 @@
     let destroyed=false;
     let recognitionDraft=null;
     let writingRecognitionDraft=false;
+    const transcriptMedia=new Map();
+    let printMediaRetains=null;
     const printViewPromise=import('../modules/PrintView.js').then(
         function registerChatPrint({createPrintView}){
             if(destroyed) return null;
             return createPrintView({
                 host,
-                content:function chatPrintContent(){return chatOutput;},
+                content:renderedChatPrintContent,
                 title:function chatPrintTitle(){return host.printTitle||'Conversation';},
                 active:function chatPrintActive(){return !destroyed&&chatOutput.children.length>0;},
                 signal:aiRuntimeStateAbortController.signal,
+                retain:retainChatPrintMedia,
+                prepare:prepareChatPrintMedia,
                 onError:reportChatPrintFailure
             });
         }
@@ -1190,6 +1196,7 @@
             for(const item of record.removedNodes) {
                 if(item.localName === 'li' && item.parentElement !== chatOutput) {
                     transcriptResizeObserver?.unobserve(item);
+                    releaseTranscriptMessageMedia(item);
                 }
             }
             for(const item of record.addedNodes) {
@@ -1427,14 +1434,72 @@
         return entry;
     }
 
+    function renderTranscriptMarkdown(target,content){
+        if(destroyed) return null;
+        const template=target.ownerDocument.createElement('template');
+        template.innerHTML=new MD(content).rendered;
+        const pending=[...template.content.querySelectorAll('img')].some(
+            function localChatImage(image){
+                return image.getAttribute('src')?.startsWith('arcane-media:');
+            }
+        );
+        // Remove local-reference src values while detached; text renders now,
+        // and the shared media owner observes independent storage and decoding.
+        const handle=hydrateMarkdownMedia(template.content,{
+            signal:aiRuntimeStateAbortController.signal
+        });
+        releaseTranscriptMarkdown(target);
+        const media={handle,pending,error:null,status:null,ready:null};
+        transcriptMedia.set(target,media);
+        if(printMediaRetains){
+            printMediaRetains.add(handle.retain());
+        }
+        target.raw=content;
+        target.replaceChildren(template.content);
+        media.ready=handle.ready.then(function transcriptImagesReady(){
+            media.pending=false;
+        },function transcriptImagesFailed(error){
+            media.pending=false;
+            media.error=error;
+            if(destroyed||transcriptMedia.get(target)!==media) return;
+            arcaneLogging.error('Unable to display saved Chat images.',error);
+            const status=target.ownerDocument.createElement('p');
+            status.className='message_media_status';
+            status.setAttribute('role','status');
+            status.textContent='Some saved images could not be displayed.';
+            media.status=status;
+            target.after(status);
+            scrollTranscriptToBottom();
+        });
+        return media;
+    }
+
+    function releaseTranscriptMarkdown(target){
+        const media=transcriptMedia.get(target);
+        if(!media) return;
+        transcriptMedia.delete(target);
+        media.status?.remove();
+        media.handle.destroy();
+    }
+
+    function releaseTranscriptMessageMedia(item){
+        const markdown=item?.querySelector('.markdown');
+        if(markdown) releaseTranscriptMarkdown(markdown);
+    }
+
+    function removeTranscriptMessage(item){
+        if(!item) return;
+        releaseTranscriptMessageMedia(item);
+        item.remove();
+    }
+
     function setTranscriptMessageContent(item,content,timestamp){
         if(!is.string(content)){
             throw new TypeError('Chat session message content must be a string.');
         }
         item.querySelector('.thinking')?.remove();
         const markdown=item.querySelector('.markdown');
-        markdown.raw=content;
-        markdown.innerHTML=new MD(content).rendered;
+        renderTranscriptMarkdown(markdown,content);
         if(timestamp!==undefined){
             item.querySelector('.message_timestamp')?.replaceWith(
                 transcriptTime(timestamp)
@@ -1495,12 +1560,11 @@
         header.append(heading);
         const markdown=chatOutput.ownerDocument.createElement('div');
         markdown.className='markdown';
-        markdown.raw=content;
-        markdown.innerHTML=new MD(content).rendered;
         item.append(header,markdown,transcriptTime(timestamp));
         for(const call of normalizeVisibleToolCalls(toolCalls)){
             appendVisibleToolCall(item,call);
         }
+        renderTranscriptMarkdown(markdown,content);
         return item;
     }
 
@@ -1642,6 +1706,9 @@
         setPendingStructuralToolCalls(
             actionable?[...restoredPendingToolCalls.values()]:[]
         );
+        for(const item of chatOutput.children){
+            releaseTranscriptMessageMedia(item);
+        }
         chatOutput.replaceChildren(fragment);
         transcriptFollowing = true;
         transcriptScrollTop = chatOutput.scrollTop;
@@ -3034,9 +3101,7 @@
             thinkingHTML.remove();
         }
         
-        target.raw ? target.raw+=text : target.raw=text;
-
-        target.innerHTML=new MD(target.raw).rendered;
+        renderTranscriptMarkdown(target,target.raw?target.raw+text:text);
         
         scrollTranscriptToBottom();
     }
@@ -3393,8 +3458,7 @@
         message.querySelector('.thinking')?.remove();
         const markdown=message.querySelector('.markdown');
         const text=visibleErrorMessage(error,'The AI request failed.');
-        markdown.raw=text;
-        markdown.innerHTML=new MD(text).rendered;
+        renderTranscriptMarkdown(markdown,text);
         scrollTranscriptToBottom();
         return true;
     }
@@ -3421,8 +3485,8 @@
         const response=[...chatOutput.children].find(
             candidate=>candidate.id===`message-${messageId}`
         )||null;
-        response?.remove();
-        for(const request of requestMessages) request.remove();
+        removeTranscriptMessage(response);
+        for(const request of requestMessages) removeTranscriptMessage(request);
         const existing=textArea.value;
         if(existing!==text){
             textArea.value=existing
@@ -3500,7 +3564,7 @@
         function removeTransientSessionCards(){
             if(retainTurn||!transientCards.length) return;
             // The submitter supplies only nodes created for this submission.
-            for(const card of transientCards) card.remove();
+            for(const card of transientCards) removeTranscriptMessage(card);
             transientCards.length=0;
             scrollTranscriptToBottom();
         }
@@ -3675,9 +3739,9 @@
                     const response=[...chatOutput.children].find(
                         candidate=>candidate.id===`message-${messageId}`
                     )||null;
-                    response?.remove();
+                    removeTranscriptMessage(response);
                     for(const requestMessage of requestMessages){
-                        requestMessage.remove();
+                        removeTranscriptMessage(requestMessage);
                     }
                     scrollTranscriptToBottom();
                 }else if(retainTurn){
@@ -3692,7 +3756,7 @@
                 arcaneLogging.error('Arcane chat request failed.',error);
                 if(sessionRequestMessages.every(message=>message.role==='tool')){
                     for(const requestMessage of requestMessages){
-                        requestMessage.remove();
+                        removeTranscriptMessage(requestMessage);
                     }
                 }
                 if(retainTurn) renderSessionMessageFailure(messageId,error);
@@ -4136,11 +4200,64 @@
         return message;
     }
 
+    function renderedChatPrintContent(){
+        for(const media of transcriptMedia.values()){
+            if(media.pending){
+                const error=new Error('Saved images are still loading. Print again when they finish.');
+                error.code='ARCANE_MARKDOWN_MEDIA_PENDING';
+                throw error;
+            }
+            if(media.error) throw media.error;
+        }
+        return chatOutput;
+    }
+
+    function retainChatPrintMedia(){
+        renderedChatPrintContent();
+        const releases=new Set();
+        for(const media of transcriptMedia.values()){
+            releases.add(media.handle.retain());
+        }
+        printMediaRetains=releases;
+        return function releaseChatPrintMedia(){
+            if(printMediaRetains===releases){
+                printMediaRetains=null;
+            }
+            for(const release of releases) release();
+            releases.clear();
+        };
+    }
+
+    async function prepareChatPrintMedia(signal){
+        let cancel;
+        const cancelled=new Promise(function waitForChatPrintCancellation(resolve){cancel=resolve;});
+        signal?.addEventListener('abort',cancel,{once:true});
+        try{
+            while(!destroyed&&!signal?.aborted){
+                const selected=[...transcriptMedia];
+                await Promise.race([
+                    Promise.all(selected.map(function readyChatMedia([,media]){return media.ready;})),
+                    cancelled
+                ]);
+                if(destroyed||signal?.aborted) return false;
+                if(selected.length!==transcriptMedia.size||selected.some(
+                    function replacedChatMedia([target,media]){return transcriptMedia.get(target)!==media;}
+                )) continue;
+                renderedChatPrintContent();
+                return true;
+            }
+            return false;
+        }finally{
+            signal?.removeEventListener('abort',cancel);
+        }
+    }
+
     async function print(){
         if(destroyed) return false;
         try{
             const view=await printViewPromise;
-            return destroyed||!view?false:await view.print();
+            if(destroyed||!view||!await prepareChatPrintMedia()) return false;
+            return await view.print();
         }catch(error){
             reportChatPrintFailure(error);
             throw error;
@@ -4150,7 +4267,9 @@
     function reportChatPrintFailure(error){
         arcaneLogging.error('Unable to print the conversation.',error);
         if(!destroyed){
-            setSessionStatus('error','Unable to open print preview. Please try again.');
+            setSessionStatus('error',error?.code==='ARCANE_MARKDOWN_MEDIA_PENDING'
+                ?'Saved images are still loading. Print again when they finish.'
+                :'Unable to open print preview. Please try again.');
         }
     }
 
@@ -4235,6 +4354,9 @@
             ownership.abort(destroyReason);
         }
         aiRuntimeStateAbortController.abort(destroyReason);
+        for(const target of transcriptMedia.keys()){
+            releaseTranscriptMarkdown(target);
+        }
         aiActivationController.destroy();
         window.removeEventListener('pagehide',handlePageHide);
         window.removeEventListener('pageshow',handlePageShow);
