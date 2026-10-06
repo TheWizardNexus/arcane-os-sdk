@@ -207,6 +207,66 @@ The server path uses the existing portable Node serving owner, and browser
 retirement requires the browser's native service-worker support and an existing
 registration eligible for that update.
 
+### Retirement through an existing custom host
+
+An application that already serves its source through `node-http-server` can
+keep that server and delegate only its root worker route to the public SDK
+representation owner:
+
+```js
+import {Server} from 'node-http-server';
+import {resolvePwaRetirementResponse} from 'arcane-os';
+
+// This is the application's existing subclass and workspace root.
+class DragonMailServer extends Server {
+    async onRequest(request, response) {
+        const pathname = new URL(request.originalUrl || request.url, 'http://localhost').pathname;
+        if ((request.method === 'GET' || request.method === 'HEAD') && pathname === '/arcane-sw.js') {
+            const retirement = await resolvePwaRetirementResponse({
+                workspaceRoot: this.workspaceRoot,
+                appId: 'dragon-mail'
+            });
+            if (retirement) {
+                response.statusCode = retirement.statusCode;
+                for (const [name, value] of Object.entries(retirement.headers)) {
+                    response.setHeader(name, value);
+                }
+                await this.serve(request, response, retirement.body);
+                return true;
+            }
+        }
+        // Keep the application's other routes here before ordinary static serving.
+        return false;
+    }
+}
+```
+
+Use the application's actual root and ID. The SDK reads the current
+`arcane-packager.json` and, for standalone `appsRoot:"."`, the authored root
+`arcane-app.json`; only an absent authored descriptor selects
+`arcane-package.json`. Reads use the existing descriptor projection and package
+contract without rewriting either file or requiring a stale generated projection
+to equal a newly edited authored descriptor. `appId` is optional; when supplied,
+it must match that descriptor's ID.
+
+The result is `null` for multi-app workspaces, omitted or enabled PWA, an omitted
+`pwa.enabled` field (including `{pwa:{}}`), and any existing root `arcane-sw.js`
+entry. The author's explicit `pwa.enabled:false` choice and an `ENOENT`
+worker result produce `{statusCode, headers, body}`: status `200`, the shared
+JavaScript content type, `Cache-Control: no-cache`, and the complete existing
+retirement script. Malformed configuration and other filesystem failures reject
+instead of selecting another descriptor or treating a file as absent.
+
+The host applies those headers directly; it must not replace `no-cache` with
+its unrelated response defaults or treat a former enabled worker's validator as
+validation of this response. The existing `serve()` method owns response
+completion and HEAD body omission. Keep this exact worker route at the serving
+origin that owns the registration; application HTTPS redirects and other routes
+remain application-owned. This API starts no server, writes no file, performs
+no offline-inventory scan, and touches no browser data. It shares the same
+response policy and worker generator as the SDK source server. The native
+activation and existing-page lifetime limits above also apply here.
+
 ### Authored host root and app entry
 
 An authored `index.html` at the source host root keeps `/` separate from the

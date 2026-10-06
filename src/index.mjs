@@ -146,6 +146,7 @@ export {
 } from './workspace.mjs';
 export {materializeInstalledSdkRuntime} from './installed-sdk-runtime.mjs';
 export {startDevServer} from './dev-server.mjs';
+export {resolvePwaRetirementResponse} from './pwa-retirement.mjs';
 export {createDevelopmentCore} from './core/development.mjs';
 export {startSourceExampleServer} from './source-server.mjs';
 export {acceptWebSocket} from './websocket.mjs';

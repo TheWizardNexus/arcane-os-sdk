@@ -17,7 +17,7 @@ import {
     readWorkspaceAssetVersion,resolveAssetReference,rewriteAssetReferences,versionAssetUrl
 } from './import-map.mjs';
 import {createPwaArtifacts,selectPwaFiles} from './pwa.mjs';
-import {createPwaRetirementWorkerScript} from './pwa-worker.mjs';
+import {createPwaRetirementResponse} from './pwa-retirement.mjs';
 
 const is = new Is(false);
 
@@ -1074,6 +1074,7 @@ async function startOwnedDevServer({
         currentSourceRoutes = {
             ...routeSet,
             app: manifest,
+            pwaExplicitlyDisabled: (authored ? value.package?.pwa : value.pwa)?.enabled === false,
             rootDocument,
             startPath: applicationSourcePath(routeSet.config,routeSet.appId,manifest.entry),
             mappings: mappings.map(
@@ -1303,26 +1304,18 @@ async function startOwnedDevServer({
                 return;
             }
             if (mode === 'source' && selectedRoutes.config.appsRoot === '.'
-                && selectedRoutes.app?.pwa?.enabled === false && target.path === '/arcane-sw.js') {
-                let rootWorkerExists = true;
-                try {
-                    await lstat(path.join(selectedRoutes.workspaceRoot, 'arcane-sw.js'));
-                } catch (error) {
-                    if (error?.code !== 'ENOENT') throw error;
-                    rootWorkerExists = false;
-                }
-                if (!rootWorkerExists) {
-                    response.setHeader('Cache-Control', 'no-cache');
-                    await serveGeneratedRepresentation(
-                        fileServer,
-                        request,
-                        response,
-                        {
-                            // A former enabled worker's date cannot validate this retirement script.
-                            contentType: contentTypes.js,
-                            body: createPwaRetirementWorkerScript
-                        }
-                    );
+                && selectedRoutes.pwaExplicitlyDisabled && target.path === '/arcane-sw.js') {
+                const retirement = await createPwaRetirementResponse({
+                    workspaceRoot: selectedRoutes.workspaceRoot,
+                    pwa: selectedRoutes.app.pwa
+                });
+                if (retirement) {
+                    response.statusCode = retirement.statusCode;
+                    for (const [name, value] of Object.entries(retirement.headers)) {
+                        response.setHeader(name, value);
+                    }
+                    // A former enabled worker's date cannot validate this retirement script.
+                    await fileServer.serve(request, response, retirement.body);
                     return;
                 }
             }

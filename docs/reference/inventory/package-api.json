@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 297,
+  "memberCount": 298,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -2207,6 +2207,20 @@
       "availability": "Node; selected browser/native target or provider as documented",
       "protocol": "arcane-target-adapter/1, arcane-native-build-plan/1, or provider protocol",
       "normalization": "Normalized complete plan and result; target-specific artifact detail preserved"
+    },
+    {
+      "id": "root:resolvePwaRetirementResponse",
+      "name": "resolvePwaRetirementResponse",
+      "displayName": "resolvePwaRetirementResponse()",
+      "kind": "function",
+      "signature": "async resolvePwaRetirementResponse({workspaceRoot=process.cwd(), appId}={})",
+      "entrypoints": ["arcane-os"],
+      "primaryImport": "arcane-os",
+      "group": "Workspace, doctor, repository, and server",
+      "summary": "Resolves the shared disabled-PWA root worker response for an existing custom source host, preserving authored workers and browser saved data.",
+      "availability": "Node; browser service-worker lifecycle remains browser-owned",
+      "protocol": "Node ESM and native service-worker lifecycle",
+      "normalization": "Current standalone descriptor and absent-root-worker selection; complete status/headers/body or null"
     },
     {
       "id": "root:resolveWorkspace",

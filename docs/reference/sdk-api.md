@@ -4205,6 +4205,39 @@ There is no history scan, app loop, diagnostic payload store or automatic retry.
 The authored `test/websocket.test.mjs` fixtures cover this boundary; source
 inspection is distinct from executing them or verifying a browser deployment.
 
+## resolvePwaRetirementResponse()
+
+```text
+async resolvePwaRetirementResponse({workspaceRoot=process.cwd(), appId}={})
+```
+
+Import from `arcane-os`. This Node API supplies the shared disabled-PWA worker
+response to an application's existing server without starting or replacing it.
+It reads the current standalone workspace configuration and root authored
+descriptor, using the package descriptor only when the authored file is absent.
+The optional `appId` must match the selected descriptor. It uses the existing
+configuration contracts, performs no writes and rereads current configuration
+on each call; there is no retained cache, timer, subscription or dispose handle.
+
+It returns `null` for a non-standalone workspace, omitted or enabled PWA, an
+omitted `pwa.enabled` field, or an existing root `arcane-sw.js` entry. The author's
+explicit `pwa.enabled:false` choice plus an `ENOENT` root
+worker produces `{statusCode:200, headers, body}`, with the existing JavaScript
+content type, `Cache-Control: no-cache`, and the complete retirement script.
+Configuration/JSON errors and other filesystem failures reject. The result
+carries no prior worker `Last-Modified` validator.
+
+The caller owns its exact GET/HEAD `/arcane-sw.js` route and applies the supplied
+status, headers and body through its existing `node-http-server` public
+`serve()` path. A `null` result leaves normal routing intact. There is no request
+payload transformation, server listener, generated file, cache/storage cleanup,
+client enumeration or reload. The worker skips waiting on installation and
+unregisters its own registration on activation; existing-page controller timing
+remains browser-owned. The [custom-host PWA guide](pwa.md#retirement-through-an-existing-custom-host)
+shows the complete hook and preservation contract. The Node filesystem path is
+portable across Windows, Linux and macOS; Android needs its normal Node host
+adaptation, and browser retirement requires native service-worker support.
+
 ## startDevServer()
 
 ### Overview

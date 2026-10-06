@@ -9,6 +9,7 @@ import {developApplication, executeOperation} from '../src/toolchain.mjs';
 import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {ARCANE_PROTOCOL, SDK_VERSION} from '../src/constants.mjs';
 import {createPwaRetirementWorkerScript} from '../src/pwa-worker.mjs';
+import {resolvePwaRetirementResponse} from '../src/index.mjs';
 import {
     fetchSyntheticTls as fetch,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
@@ -828,6 +829,63 @@ test('ordinary source serving keeps stable URLs and does not add PWA routes', as
 
 for (const authored of [false, true]) {
     test(
+        `public retirement response reads current ${authored ? 'authored' : 'package'} descriptor without serving or rewriting files`,
+        async function resolveCustomHostRetirement(context) {
+            const {workspaceRoot} = await sourceFixture(
+                context,
+                {rootApp: true, http: true, enabled: false, authored, serve: false}
+            );
+            const options = {workspaceRoot, appId: 'fixture'};
+            assert.equal(await resolvePwaRetirementResponse(options), null);
+            const descriptorPath = path.join(workspaceRoot, authored ? 'arcane-app.json' : 'arcane-package.json');
+            const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+            const app = authored ? descriptor.package : descriptor;
+            for (const omittedChoice of [{}, {manifest: {short_name: 'Dragon Mail'}}]) {
+                app.pwa = omittedChoice;
+                await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
+                assert.equal(await resolvePwaRetirementResponse(options), null);
+            }
+            app.pwa = {enabled: false};
+            const completeSource = `${JSON.stringify(descriptor, null, 4)}\n`;
+            await writeFile(descriptorPath, completeSource);
+            const result = await resolvePwaRetirementResponse(options);
+            assert.equal(result.statusCode, 200);
+            assert.equal(result.headers['Cache-Control'], 'no-cache');
+            assert.ok(result.headers['Content-Type'].includes('javascript'));
+            assert.equal(Object.hasOwn(result.headers, 'Last-Modified'), false);
+            assert.equal(result.body, createPwaRetirementWorkerScript());
+            assert.equal(await readFile(descriptorPath, 'utf8'), completeSource);
+            await assert.rejects(lstat(path.join(workspaceRoot, 'arcane-sw.js')), {code: 'ENOENT'});
+            await assert.rejects(resolvePwaRetirementResponse({...options, appId: 'other'}));
+
+            app.pwa.enabled = true;
+            await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
+            assert.equal(await resolvePwaRetirementResponse(options), null);
+            app.pwa.enabled = false;
+            await writeFile(descriptorPath, completeSource);
+
+            const workerPath = path.join(workspaceRoot, 'arcane-sw.js');
+            const authoredSource = 'self.addEventListener("fetch", function keepDragonMail() {});\n';
+            await writeFile(workerPath, authoredSource);
+            assert.equal(await resolvePwaRetirementResponse(options), null);
+            assert.equal(await readFile(workerPath, 'utf8'), authoredSource);
+            await unlink(workerPath);
+            await mkdir(workerPath);
+            assert.equal(await resolvePwaRetirementResponse(options), null);
+            await writeFile(descriptorPath, '{');
+            await assert.rejects(resolvePwaRetirementResponse(options), SyntaxError);
+            assert.equal(await readFile(descriptorPath, 'utf8'), '{');
+        }
+    );
+}
+
+test('public retirement response leaves multi-app workspace routing to its owner', async function preserveMultiAppRetirement(context) {
+    const {workspaceRoot} = await sourceFixture(context, {http: true, serve: false});
+    assert.equal(await resolvePwaRetirementResponse({workspaceRoot, appId: 'fixture'}), null);
+});
+
+for (const authored of [false, true]) {
+    test(
         `standalone source retires an absent disabled worker for ${authored ? 'authored descriptors' : 'package descriptors'}`,
         async function retireDisabledSourceWorker(context) {
             const {workspaceRoot, instance, documentHtml} = await sourceFixture(
@@ -844,6 +902,13 @@ for (const authored of [false, true]) {
             const descriptorPath = path.join(workspaceRoot, authored ? 'arcane-app.json' : 'arcane-package.json');
             const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
             const app = authored ? descriptor.package : descriptor;
+            for (const omittedChoice of [{}, {manifest: {short_name: 'Dragon Mail'}}]) {
+                app.pwa = omittedChoice;
+                await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
+                const preserved = await globalThis.fetch(workerUrl);
+                assert.equal(preserved.status, 404);
+                await preserved.text();
+            }
             app.pwa.enabled = false;
             const disabledSource = `${JSON.stringify(descriptor, null, 4)}\n`;
             await writeFile(descriptorPath, disabledSource);
@@ -872,6 +937,11 @@ for (const authored of [false, true]) {
                 {code: 'ENOENT'}
             );
 
+            delete app.pwa.enabled;
+            await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
+            const noLongerDisabled = await globalThis.fetch(workerUrl);
+            assert.equal(noLongerDisabled.status, 404);
+            await noLongerDisabled.text();
             app.pwa.enabled = true;
             await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
             const reenabled = await globalThis.fetch(workerUrl);
