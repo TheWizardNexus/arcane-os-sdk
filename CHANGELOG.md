@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.83.1
+
+- Preserve complete failure-only native ONNX diagnostics in `error.onnxRun`,
+  including session and request identity, failure stage, graph metadata,
+  provider execution, run options and encoded feed/fetch tensors. Existing
+  rejected evaluations and retained decision error state carry the record.
+- Retain the device inventory already consumed by automatic physical selection
+  without another hardware query. Successful inference performs no diagnostic
+  tensor encoding; original errors and diagnostic-construction failures remain
+  observable without changing model inputs, device selection or cancellation.
+- These diagnostics expose evidence for a failed operation; they do not claim
+  to correct an application inference failure. No dependency changes.
+
 ## 0.83.0
 
 - Add optional `shadowPath` to native app-control inspection and actions. Follow

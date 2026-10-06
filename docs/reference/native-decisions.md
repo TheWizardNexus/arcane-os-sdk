@@ -342,7 +342,8 @@ An ONNX run failure reaches the rejected evaluation and retained `error` in
 the actual session, request, failure stage, model path, provider execution
 record, graph metadata and complete encoded feed tensors with their dimensions.
 The activation's `execution.execution.deviceInventory` retains the complete
-inventory consumed during its load, or `null` when that path did not gather one.
+inventory consumed by automatic physical selection during its load, or `null`
+when that selection path did not gather one.
 Neither observation starts another hardware query or changes model execution.
 Retain these complete records in the selected developer inspection surface;
 ordinary user status remains application-owned. A retained error identifies
