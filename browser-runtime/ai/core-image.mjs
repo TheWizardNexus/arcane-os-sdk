@@ -1,5 +1,5 @@
 import Is from '../dependencies/strong-type/index.js';
-import {getInstalledCoreClient} from '../core/client.mjs';
+import {subscribeCoreClient} from '../core/client.mjs';
 import {CoreError, serializeCoreError} from '../core/contracts.mjs';
 import {createArcaneEventSource} from '../event-manager.mjs';
 
@@ -50,7 +50,7 @@ async function encodeImage(image, signal) {
 
 /** Browser access to the selected native image service; no result persistence. */
 export function createCoreImageRuntime(
-    {client = getInstalledCoreClient(), signal, onEvent} = {}
+    {client: suppliedClient, signal, onEvent} = {}
 ) {
     const owner = {};
     const events = createArcaneEventSource(
@@ -60,26 +60,37 @@ export function createCoreImageRuntime(
     const lifetime = new AbortController();
     const lifetimeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
     const pending = new Set();
-    let state = {
-        id: 'stable-diffusion.cpp',
-        installed: false,
-        available: false,
-        selectedModel: null,
-        loaded: false,
-        state: client ? 'unknown' : 'unavailable',
-        backend: null,
-        devices: [],
-        resources: {},
-        progress: null,
-        error: null,
-        models: []
-    };
+    let client = null;
+    let connection = null;
+    let stopInstallation;
+    let state = emptyState();
     let revision = 0;
     let closed = false;
     let closing;
 
+    function emptyState(error = null) {
+        return {
+            id: 'stable-diffusion.cpp',
+            installed: false,
+            available: false,
+            selectedModel: null,
+            loaded: false,
+            state: client ? 'unknown' : 'unavailable',
+            backend: null,
+            devices: [],
+            resources: {},
+            progress: null,
+            error: error ? serializeCoreError(error) : null,
+            models: []
+        };
+    }
+
     function current() {
-        const requests = [...pending].map(
+        const requests = [...pending].filter(
+            function currentConnectionRequest(request) {
+                return request.connection === connection && !request.signal.aborted;
+            }
+        ).map(
             function requestState(request) {
                 return {
                     method: request.method,
@@ -97,7 +108,7 @@ export function createCoreImageRuntime(
                     return request.status === 'Thinking';
                 }
             ) ? 'Thinking' : null,
-            busy: pending.size > 0,
+            busy: requests.length > 0,
             closed
         };
     }
@@ -146,8 +157,38 @@ export function createCoreImageRuntime(
         publish();
     }
 
-    const unsubscribe = client?.events.on('image.state', accept)
-        ?? function noCoreSubscription() {};
+    function bindClient({client: nextClient, error = null}) {
+        if (closed || (connection && nextClient === client)) {
+            return;
+        }
+        const previous = connection;
+        client = nextClient;
+        const currentConnection = {client, controller: new AbortController(), unsubscribe: null};
+        connection = currentConnection;
+        revision += 1;
+        state = emptyState(error);
+        previous?.unsubscribe?.();
+        previous?.controller.abort();
+        if (client) {
+            currentConnection.unsubscribe = client.events.on(
+                'image.state',
+                function currentImageState(value) {
+                    if (connection === currentConnection) accept(value);
+                }
+            );
+        }
+        publish();
+        if (!closed && connection === currentConnection && client) {
+            // Observe only; installation never loads an engine or model.
+            inspect().catch(
+                function initialImageStateUnavailable(error) {
+                    if (!closed && connection === currentConnection && !currentConnection.controller.signal.aborted) {
+                        reportObserverFailure(error);
+                    }
+                }
+            );
+        }
+    }
 
     function invoke(method, parameters, {signal: requestSignal, onProgress} = {}) {
         if (closed) {
@@ -156,11 +197,15 @@ export function createCoreImageRuntime(
         if (!client) {
             throw unavailable('Local image generation requires an available Core connection.');
         }
-        const operationSignal = requestSignal
-            ? AbortSignal.any([requestSignal, lifetimeSignal]) : lifetimeSignal;
+        const currentConnection = connection;
+        const operationSignal = AbortSignal.any(
+            [lifetimeSignal, currentConnection.controller.signal, ...(requestSignal ? [requestSignal] : [])]
+        );
         operationSignal.throwIfAborted();
         const request = {
             method,
+            connection: currentConnection,
+            signal: operationSignal,
             revision,
             streamId: parameters.streamId,
             status: method === 'image.generate' || method === 'image.edit' ? 'Thinking' : null,
@@ -169,7 +214,7 @@ export function createCoreImageRuntime(
         };
         let stopProgress;
         if (request.streamId) {
-            stopProgress = client.events.on(
+            stopProgress = currentConnection.client.events.on(
                 'image.progress',
                 function imageProgress(value) {
                     if (closed || operationSignal.aborted || value.streamId !== request.streamId) {
@@ -202,7 +247,7 @@ export function createCoreImageRuntime(
                     {type: 'image.request', data: {method, parameters: requestParameters}}
                 );
                 operationSignal.throwIfAborted();
-                const result = await client.invoke(
+                const result = await currentConnection.client.invoke(
                     method,
                     requestParameters,
                     {signal: operationSignal, timeoutMs: 0}
@@ -238,7 +283,7 @@ export function createCoreImageRuntime(
             function releaseImageRequest() {
                 stopProgress?.();
                 pending.delete(request);
-                if (!closed) {
+                if (!closed && connection === currentConnection) {
                     publish();
                 }
             }
@@ -251,12 +296,14 @@ export function createCoreImageRuntime(
 
     async function inspect({signal: requestSignal} = {}) {
         const before = revision;
+        const currentConnection = connection;
         try {
             const result = await invoke(
                 'image.status',
                 {},
                 {signal: requestSignal}
             );
+            currentConnection.controller.signal.throwIfAborted();
             if (!closed && revision === before) {
                 accept(result);
             }
@@ -273,11 +320,13 @@ export function createCoreImageRuntime(
 
     async function load({model, context, assetProjectionId, resourcePaths, signal: requestSignal} = {}) {
         const before = revision;
+        const currentConnection = connection;
         const result = await invoke(
             'image.load',
             {model, context, assetProjectionId, resourcePaths},
             {signal: requestSignal}
         );
+        currentConnection.controller.signal.throwIfAborted();
         if (!closed && revision === before) {
             accept(result);
         }
@@ -308,11 +357,13 @@ export function createCoreImageRuntime(
 
     async function unload({signal: requestSignal} = {}) {
         const before = revision;
+        const currentConnection = connection;
         const result = await invoke(
             'image.unload',
             {},
             {signal: requestSignal}
         );
+        currentConnection.controller.signal.throwIfAborted();
         if (!closed && revision === before) {
             accept(result);
         }
@@ -365,8 +416,10 @@ export function createCoreImageRuntime(
         );
         lifetime.abort();
         lifetimeSignal.removeEventListener('abort', close);
-        unsubscribe();
-        state = {...state, available: false, state: 'closed'};
+        stopInstallation?.();
+        connection?.unsubscribe?.();
+        connection?.controller.abort();
+        state = {...state, available: false, loaded: false, state: 'closed'};
         publish();
         events.dispose();
         return closing;
@@ -379,13 +432,10 @@ export function createCoreImageRuntime(
     );
     if (lifetimeSignal.aborted) {
         close();
-    } else if (client) {
-        // Subscribe before the snapshot request so a later lifecycle event wins.
-        inspect().catch(
-            function initialImageStateUnavailable(error) {
-                globalThis.console?.error('Core image initial state unavailable.', error);
-            }
-        );
+    } else if (suppliedClient === undefined) {
+        stopInstallation = subscribeCoreClient(bindClient, {signal: lifetimeSignal});
+    } else {
+        bindClient({client: suppliedClient});
     }
 
     return {load, generate, edit, unload, inspect, current, subscribe, close};

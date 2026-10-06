@@ -199,14 +199,16 @@ ordered `Blob` or `File` members after its resumable download. Range support
 allows concurrent transfer within a member; those transfer parts remain the
 store's concern. Use `offline: true` to require an already complete stored model.
 The store does not select or run the image engine. In source development,
-load the development Core bootstrap described
-in [Local AI through Core](local-ai.md#development) before constructing the
-accessor. Native hosts install their Core client through the existing host path.
+use the development Core bootstrap described
+in [Local AI through Core](local-ai.md#development). The accessor can be
+constructed before that client is installed; perform model operations once
+the service is available. Native hosts install their Core client through the
+existing host path.
 An ordinary browser without Core reports local image generation as unavailable.
 
 | Member | Contract |
 |---|---|
-| `createCoreImageRuntime({client?, signal?, onEvent?})` | Uses the installed Core client by default, subscribes to lifecycle events and asynchronously reads one initial status snapshot. It returns immediately. |
+| `createCoreImageRuntime({client?, signal?, onEvent?})` | Follows Core installation and lifecycle events by default, asynchronously reading status for each client. An explicit `client`, including `null`, remains caller-owned. It returns immediately. |
 | `load({model, context?, assetProjectionId?, resourcePaths?, signal?})` | Loads the selected model and returns authoritative service state after native completion. `context` supplies native context options. |
 | `generate({model, prompt, parameters?, assetProjectionId?, resourcePaths?, signal?, onProgress?})` | Returns the complete result with `images: [{blob, mediaType, width, height}]`. Additional runtime result metadata remains present. |
 | `unload({signal?})` | Explicitly unloads the shared selected native context and returns its resulting state. |
@@ -228,6 +230,15 @@ Service metadata adds runtime `id`, installation/availability state and selected
 model definitions, including their resource metadata before engine preparation
 finishes. Installed files do not imply a loaded model. A late status
 response never overwrites a newer lifecycle event.
+
+With `client` omitted, the accessor consumes the shared
+[`subscribeCoreClient`](core-client.md) installation stream. A late installation
+attaches the service listener and reads current status; it never installs an
+engine or loads a model. Retirement or replacement synchronously clears
+readiness and transient `Thinking`, cancels owned requests and detaches the
+retired service listener. Old state, progress and results cannot update the
+replacement connection. `close()` also removes the installation subscription;
+it does not claim that the shared native model was unloaded.
 
 Prompts and parameters pass unchanged to the native runtime. Native option
 names, supported model operations and defaults belong to that runtime and the

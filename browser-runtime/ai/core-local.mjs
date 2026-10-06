@@ -1,5 +1,5 @@
 import Is from '../dependencies/strong-type/index.js';
-import {getInstalledCoreClient} from '../core/client.mjs';
+import {subscribeCoreClient} from '../core/client.mjs';
 
 const is = new Is(false);
 const PROVIDER_PROTOCOL = 'arcane-ai-provider/2';
@@ -22,19 +22,26 @@ function cancelled(reason) {
  * selects its model; Core owns the running engine and its loaded sessions.
  * Creating this provider neither connects a transport nor installs a runtime.
  */
-export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id = 'llama.cpp'} = {}) {
+export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.cpp'} = {}) {
     if (!is.string(id) || !id.trim()) throw new TypeError('The Core AI provider id must be a nonempty string.');
-    if (client !== null && (!is.function(client?.invoke) || !is.function(client?.events?.on))) {
+    if (suppliedClient !== undefined && suppliedClient !== null
+        && (!is.function(suppliedClient?.invoke) || !is.function(suppliedClient?.events?.on))) {
         throw new TypeError('The Core AI client must expose invoke and events.on.');
     }
 
     let runtime = null;
     let models = [];
     let selection = null;
+    let selectionConnection = null;
     let disposed = false;
     let loading = false;
+    let unloading = false;
     let sequence = 0;
     let lifecycleRevision = 0;
+    let client = null;
+    let connection = null;
+    let stopInstallation;
+    let disposing;
     const requests = new Set();
 
     function requireClient() {
@@ -58,7 +65,13 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
     }
 
     function modelReady() {
-        return runtime?.available === true && runtime.state === 'ready' && Boolean(loadedModel());
+        return !unloading && selectionConnection === connection && runtime?.available === true
+            && runtime.state === 'ready' && Boolean(loadedModel());
+    }
+
+    function assertCurrentConnection(value) {
+        if (disposed || connection !== value) throw cancelled();
+        value.controller.signal.throwIfAborted();
     }
 
     function status() {
@@ -67,7 +80,9 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
             state: disposed ? 'disposed' : loading ? 'loading' : loaded ? 'ready'
                 : runtime?.error ? 'error' : runtime?.available === true ? 'unloaded' : 'unavailable',
             loaded,
-            busy: loading || requests.size > 0,
+            busy: Boolean(loading || unloading) || [...requests].some(function currentRequest(request) {
+                return request.connection === connection && !request.controller.signal.aborted;
+            }),
             modelId: selection?.modelId ?? null,
             available: !disposed && runtime?.available === true,
             installed: runtime?.installed === true,
@@ -79,6 +94,7 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
         runtime = value ?? null;
         models = is.array(runtime?.models) ? runtime.models : [];
         for (const request of requests) {
+            if (request.connection !== connection || request.modelId === null) continue;
             const model = models.find(function requestModel(record) { return record.id === request.modelId; });
             if (model?.loaded === true) request.loaded = true;
             if (runtime?.available !== true || (request.loaded && (runtime.state !== 'ready' || model?.loaded !== true))) {
@@ -88,13 +104,62 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
         return status();
     }
 
-    const unsubscribe = client?.events.on('localai.state', function localRuntimeChanged(snapshot) {
-        if (disposed || !is.array(snapshot?.runtimes)) return;
+    function bindClient({client: nextClient, error = null}) {
+        if (disposed || (connection && nextClient === client)) return;
+        const previous = connection;
+        client = nextClient;
+        const currentConnection = {client, controller: new AbortController(), unsubscribe: null};
+        connection = currentConnection;
         lifecycleRevision += 1;
-        acceptRuntime(snapshot.runtimes.find(function llamaRuntime(value) {
-            return value.id === 'llama.cpp';
-        }));
-    }) ?? function noCoreSubscription() {};
+        loading = false;
+        unloading = false;
+        runtime = {installed: false, available: false, state: client ? 'unknown' : 'unavailable', error};
+        models = [];
+        previous?.unsubscribe?.();
+        previous?.controller.abort();
+        if (client) {
+            currentConnection.unsubscribe = client.events.on(
+                'localai.state',
+                function localRuntimeChanged(snapshot) {
+                    if (disposed || connection !== currentConnection || !is.array(snapshot?.runtimes)) return;
+                    lifecycleRevision += 1;
+                    acceptRuntime(snapshot.runtimes.find(function llamaRuntime(value) {
+                        return value.id === 'llama.cpp';
+                    }));
+                }
+            );
+        }
+        if (client && suppliedClient === undefined) {
+            const revision = lifecycleRevision;
+            invokeOwned(client, 'llama.status', {}).then(
+                function installedRuntimeObserved(value) {
+                    if (!disposed && connection === currentConnection && lifecycleRevision === revision) acceptRuntime(value);
+                },
+                function installedRuntimeFailed(error) {
+                    if (!disposed && connection === currentConnection && lifecycleRevision === revision) {
+                        acceptRuntime({...runtime, available: false, state: 'error', error});
+                    }
+                }
+            );
+        }
+    }
+
+    async function invokeOwned(core, method, parameters, signal) {
+        const request = ownRequest(signal, null, core);
+        request.result = Promise.resolve().then(
+            function invokeLocalOperation() {
+                request.controller.signal.throwIfAborted();
+                return core.invoke(method, parameters, {signal: request.controller.signal});
+            }
+        );
+        try {
+            const result = await request.result;
+            request.controller.signal.throwIfAborted();
+            return result;
+        } finally {
+            request.release();
+        }
+    }
 
     function authority(value) {
         return {protocol: AUTHORITY_PROTOCOL, providerId: id, modelId: value.modelId};
@@ -103,10 +168,12 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
     async function inspect(value, {signal} = {}) {
         requireSelection(value);
         if (signal?.aborted) throw cancelled(signal.reason);
+        const currentConnection = connection;
+        const statusRevision = lifecycleRevision;
         try {
             const core = requireClient();
-            const statusRevision = lifecycleRevision;
-            const current = await core.invoke('llama.status', {}, {signal});
+            const current = await invokeOwned(core, 'llama.status', {}, signal);
+            assertCurrentConnection(currentConnection);
             if (lifecycleRevision === statusRevision) acceptRuntime(current);
             if (runtime?.available !== true) {
                 return {
@@ -126,48 +193,63 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
             return {available: true, authority: authority(value)};
         } catch (error) {
             if (signal?.aborted || error?.name === 'AbortError') throw error;
-            acceptRuntime({...runtime, available: false, state: 'error', error});
+            if (!disposed && connection === currentConnection && lifecycleRevision === statusRevision) {
+                acceptRuntime({...runtime, available: false, state: 'error', error});
+            }
             return {available: false, code: error.code ?? 'ARCANE_AI_CORE_UNAVAILABLE', message: error.message, error};
         }
     }
 
     async function load({selection: value, signal, progress} = {}) {
         const core = requireClient();
+        const currentConnection = connection;
         requireSelection(value);
         if (signal?.aborted) throw cancelled(signal.reason);
         selection = value;
-        loading = true;
+        selectionConnection = currentConnection;
+        const operation = {};
+        loading = operation;
+        unloading = false;
+        lifecycleRevision += 1;
         try {
             progress?.({phase: 'loading', modelId: value.modelId});
             const revision = lifecycleRevision;
-            const current = await core.invoke('llama.load', {model: value.modelId}, {signal});
+            const current = await invokeOwned(core, 'llama.load', {model: value.modelId}, signal);
+            assertCurrentConnection(currentConnection);
+            if (loading !== operation || selection !== value) throw cancelled();
             if (lifecycleRevision === revision) acceptRuntime(current);
             if (!modelReady()) throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Core did not report the selected model loaded and ready.', current?.error);
             progress?.({phase: 'ready', modelId: value.modelId});
+            assertCurrentConnection(currentConnection);
+            if (loading !== operation || selection !== value) throw cancelled();
             return {authority: authority(value), status: {...status(), state: 'ready', busy: false}};
         } finally {
-            loading = false;
+            if (loading === operation) loading = false;
         }
     }
 
-    function ownRequest(signal, modelId) {
+    function ownRequest(signal, modelId, core = requireClient()) {
+        const currentConnection = connection;
+        if (core !== currentConnection?.client) throw cancelled();
         const controller = new AbortController();
-        function forwardAbort() { controller.abort(signal.reason); }
-        signal?.addEventListener('abort', forwardAbort, {once: true});
-        if (signal?.aborted) forwardAbort();
-        const request = {controller, result: null, modelId, loaded: models.some(function loadedTarget(model) {
+        const operationSignal = signal
+            ? AbortSignal.any([signal, currentConnection.controller.signal]) : currentConnection.controller.signal;
+        function forwardAbort() { controller.abort(operationSignal.reason); }
+        operationSignal.addEventListener('abort', forwardAbort, {once: true});
+        if (operationSignal.aborted) forwardAbort();
+        const request = {controller, connection: currentConnection, result: null, modelId, loaded: models.some(function loadedTarget(model) {
             return model.id === modelId && model.loaded === true;
         })};
         requests.add(request);
         request.release = function releaseRequest() {
-            signal?.removeEventListener('abort', forwardAbort);
+            operationSignal.removeEventListener('abort', forwardAbort);
             requests.delete(request);
         };
         return request;
     }
 
     function streamRequest(core, parameters, signal) {
-        const request = ownRequest(signal, parameters.model);
+        const request = ownRequest(signal, parameters.model, core);
         const chunks = [];
         const readers = [];
         let complete = false;
@@ -195,6 +277,7 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
         });
 
         request.result = Promise.resolve().then(function invokeStream() {
+            request.controller.signal.throwIfAborted();
             return core.invoke('llama.chat', {...parameters, stream: true, streamId}, {signal: request.controller.signal});
         }).then(function streamCompleted(result) {
             if (request.controller.signal.aborted) throw cancelled(request.controller.signal.reason);
@@ -237,15 +320,17 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
 
     async function request({selection: value, operation, payload, signal} = {}) {
         const core = requireClient();
+        const currentConnection = connection;
         requireSelection(value);
         if (signal?.aborted) throw cancelled(signal.reason);
-        if (loading || selection?.modelId !== value.modelId) {
+        if (loading || unloading || selectionConnection !== connection || selection?.modelId !== value.modelId) {
             throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Load the selected local model before requesting inference.');
         }
         const model = payload?.model ?? value.modelId;
         if (!models.some(function knownModel(record) { return record.id === model; })) {
             const revision = lifecycleRevision;
-            const current = await core.invoke('llama.status', {}, {signal});
+            const current = await invokeOwned(core, 'llama.status', {}, signal);
+            assertCurrentConnection(currentConnection);
             if (lifecycleRevision === revision) acceptRuntime(current);
         }
         if (!models.some(function knownModel(record) { return record.id === model; })) {
@@ -258,8 +343,9 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
         const parameters = {model, payload};
         if (operation === 'stream') return streamRequest(core, parameters, signal);
         if (operation !== 'chat') throw localAIError('ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE', 'The local llama.cpp provider supports chat and stream.');
-        const pending = ownRequest(signal, model);
+        const pending = ownRequest(signal, model, core);
         pending.result = Promise.resolve().then(function invokeChat() {
+            pending.controller.signal.throwIfAborted();
             return core.invoke('llama.chat', {...parameters, stream: false}, {signal: pending.controller.signal});
         }).then(function chatCompleted(result) {
             if (pending.controller.signal.aborted) throw cancelled(pending.controller.signal.reason);
@@ -270,24 +356,80 @@ export function createCoreLocalAIProvider({client = getInstalledCoreClient(), id
 
     async function unload({selection: value = selection, signal} = {}) {
         const core = requireClient();
+        const currentConnection = connection;
         if (signal?.aborted) throw cancelled(signal.reason);
+        if (value && value === selection && selectionConnection !== currentConnection) {
+            throw localAIError('ARCANE_AI_CORE_UNAVAILABLE', 'The selected model belongs to a retired Core connection.');
+        }
+        if (value) requireSelection(value);
+        const operation = {};
+        unloading = operation;
+        loading = false;
+        lifecycleRevision += 1;
         for (const request of requests) request.controller.abort();
-        await Promise.allSettled([...requests].map(function activeResult(request) { return request.result; }));
-        if (!value) return status();
-        requireSelection(value);
-        const revision = lifecycleRevision;
-        const current = await core.invoke('llama.unload', {model: value.modelId}, {signal});
-        if (lifecycleRevision === revision) acceptRuntime(current);
-        selection = null;
-        return status();
+        try {
+            await Promise.allSettled([...requests].map(function activeResult(request) { return request.result; }));
+            assertCurrentConnection(currentConnection);
+            if (unloading !== operation) throw cancelled();
+            if (value) {
+                const revision = lifecycleRevision;
+                const current = await invokeOwned(core, 'llama.unload', {model: value.modelId}, signal);
+                assertCurrentConnection(currentConnection);
+                if (unloading !== operation) throw cancelled();
+                if (lifecycleRevision === revision) acceptRuntime(current);
+            }
+            if (unloading !== operation) throw cancelled();
+            selection = null;
+            selectionConnection = null;
+            unloading = false;
+            return status();
+        } catch (error) {
+            if (!disposed && connection === currentConnection && unloading === operation) {
+                runtime = {...runtime, state: 'error', error};
+            }
+            throw error;
+        } finally {
+            if (unloading === operation) unloading = false;
+        }
     }
 
-    async function dispose(options = {}) {
-        if (disposed) return status();
-        if (selection || requests.size) await unload(options);
+    function dispose({selection: value = selection, signal} = {}) {
+        if (disposing) return disposing;
+        const core = value === selection ? selectionConnection?.client ?? client : client;
         disposed = true;
-        unsubscribe();
-        return status();
+        loading = false;
+        unloading = false;
+        lifecycleRevision += 1;
+        stopInstallation?.();
+        connection?.unsubscribe?.();
+        connection?.controller.abort();
+        disposing = Promise.resolve().then(
+            async function disposeLocalProvider() {
+                await Promise.allSettled([...requests].map(function activeResult(request) { return request.result; }));
+                if (value) {
+                    requireSelection(value);
+                    if (!core) throw localAIError('ARCANE_AI_CORE_UNAVAILABLE', 'The retired Core connection cannot unload the selected model.');
+                    // Disposal owns this final release on the captured client only.
+                    // Subscription cleanup above remains complete if it rejects.
+                    await core.invoke('llama.unload', {model: value.modelId}, {signal});
+                }
+                selection = null;
+                selectionConnection = null;
+                return status();
+            }
+        ).catch(
+            function nativeReleaseFailed(error) {
+                runtime = {...runtime, error};
+                throw error;
+            }
+        );
+        return disposing;
+    }
+
+    if (suppliedClient === undefined) {
+        stopInstallation = subscribeCoreClient(bindClient);
+    } else {
+        bindClient({client: suppliedClient});
     }
 
     return {

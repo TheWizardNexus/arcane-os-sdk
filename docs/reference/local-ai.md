@@ -289,6 +289,26 @@ does not install software or select a model. A missing Core connection reports
 unavailability, leaving browser Wllama/ONNX routes available for the application
 to select.
 
+Omit `client` to follow the installed Core client through
+[`subscribeCoreClient`](core-client.md): construction may precede installation.
+Each installation reads `llama.status` without selecting, downloading or loading
+a model. Retirement or replacement synchronously revokes this provider's
+`status().loaded`, cancels its owned operations and detaches the old lifecycle
+listener. Late results cannot restore the retired selection. Explicitly load
+the selection against the replacement client before inference. Passing a
+`client`, including `null`, keeps that caller-supplied connection fixed.
+
+`status()` is this provider's current state. The `arcane-ai-provider/2` contract
+does not provide a provider-state subscription, so this installation handling
+alone does not update an idle AI runtime's retained role state. The provider
+runtime still reconciles the provider at its existing operation boundaries.
+`dispose()` removes installation and service subscriptions and cancels owned
+operations synchronously, then attempts the selected model's release through
+its captured client. A failed release rejects with the actual error even though
+the provider is disposed; disposal does not establish successful native unload.
+It never unloads a retired selection through a replacement client or closes the
+shared Core client.
+
 If a router evicts the primary model while serving a request-specific model,
 reload the primary selection before its next request. The provider does not
 silently change the application's saved model choice. Release registration
@@ -382,6 +402,15 @@ transport codec. `current()` adds `busy` and `closed` to its latest Core state.
 Closing the accessor cancels its requests and subscriptions; model unloading
 is explicit because other accessors may share the Core session. It never
 closes the shared Core client.
+
+Omitting `client` follows Core installation events with current-client replay,
+including installation after construction. Each new connection reads
+`onnx.status`; it does not install a runtime or load a model. Retirement or
+replacement immediately clears retained session readiness and cancels this
+accessor's operations. Late old-client state and results are ignored. Passing
+an explicit `client`, including `null`, retains caller ownership and does not
+follow global installation changes. `close()` also removes the installation
+subscription.
 
 Construction neither opens a connection nor installs a runtime. A browser needs
 an already available native Core service or the explicit development bridge.
