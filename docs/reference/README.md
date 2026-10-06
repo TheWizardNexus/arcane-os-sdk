@@ -70,6 +70,7 @@ alone does not make bare module names resolve in a browser.
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
 | Own a native working checkout under per-user ArcaneData/Repos | [Native repository workspaces](core-repositories.md) |
+| Read Git identity defaults or select child-only author and credential hints | [Git identity configuration](core-repositories.md#git-identity-configuration) |
 | Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
 | Pass host-selected state defaults and unchanged explicit launch values to services | [Launch-time locations](core-native-packaging.md#launch-time-locations) |

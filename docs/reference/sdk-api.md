@@ -108,7 +108,7 @@ runtime layouts.
 | `arcane-os/pwa` | Nonblocking PWA registration, worker updates, native installation state and a dismissible installation component. |
 | `arcane-os/ai/browser-wasm` | Caller-selected browser-local Wllama inference, complete DBOPFS model storage, streaming, cancellation, and structural tool-call results. |
 | `arcane-os/ai/core-local` | Browser llama.cpp provider through an available Core connection; browser-local Wllama and ONNX remain independently available. |
-| `arcane-os/ai/browser-decisions` | Explicit-load Laya FP16 and Julia-1 FP32 typed decisions through the shared Transformers.js Worker owner. |
+| `arcane-os/ai/browser-decisions` | Explicit-load Laya and Julia-1 typed decisions with caller-selected precision through the shared Transformers.js Worker owner. |
 | `arcane-os/ai/tool-text-stream` | Shared selected tool-argument text observer for provider integration. |
 | `arcane-os/ai/twin-cloud` | Stateless chat, System One state/questions and image generation with explicit key/model, complete results and operation-specific retry/cancellation. |
 | `arcane-os/ai/browser-speech` | Caller-selected Whisper/Kokoro, native browser recognition/synthesis, cloud TTS, upstream assets, role lifecycle and cancellation. |
@@ -9110,13 +9110,18 @@ native installation eligibility and URL-bar promotion.
 
 ### Overview
 
-Creates an explicitly loaded browser model for Laya typed decisions in FP16 or
-Julia-1 in FP32. The shared Worker owns Transformers.js loading, full-input
+Creates an explicitly loaded browser model for Laya typed decisions or
+Julia-1. Laya defaults to FP16 and Julia to FP32; callers may select `dtype`
+explicitly. The shared Worker owns Transformers.js loading, full-input
 encoding, batched inference, complete results, cancellation and resource lifetime.
 Applications own model selection, questions, option meanings and decision policy.
 Existing chat and speech providers are unchanged.
 
 ### Signature and result
+
+```text
+createBrowserDecisionModel({family,model,revision,device,dtype,runtime}={})
+```
 
 ```js
 import {createBrowserDecisionModel} from 'arcane-os/ai/browser-decisions';
@@ -9142,8 +9147,11 @@ precision, tokenization, output meanings, lifecycle and model limitations.
 ### Availability and normalization
 
 Browser module Workers plus the selected Transformers.js backend are required
-on explicit use. Import and construction do not activate a model. Laya fixes
-`dtype: 'fp16'`; Julia fixes `dtype: 'fp32'`; there is no precision fallback.
+on explicit use. Import and construction do not activate a model. The optional
+nonempty `dtype` string defaults to `fp16` for Laya and `fp32` for Julia. An
+explicit value is forwarded unchanged to the upstream loader; unsupported
+selections report its failure without precision fallback. For Laya FP32, pass
+`dtype: 'fp32'`.
 Cancellation terminates that client's Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.
 
