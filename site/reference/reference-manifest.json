@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.81.0",
+    "sdk": "0.82.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 54,
+    "markdownPages": 55,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 151,
+    "htmlPages": 152,
     "inventories": 4
   },
   "pages": [
@@ -302,6 +302,12 @@
       "source": "docs/reference/model-assets.md",
       "output": "site/reference/model-assets/index.html",
       "route": "reference/model-assets/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/native-app-control.md",
+      "output": "site/reference/native-app-control/index.html",
+      "route": "reference/native-app-control/",
       "kind": "markdown"
     },
     {
