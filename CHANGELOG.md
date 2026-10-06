@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.84.0
+
+- Add `startCoreListener({runtime, endpoint, onError})` through
+  `arcane-os/core/host` so local clients can use an application's existing
+  window-owned Core without creating another runtime or changing its profile,
+  service instances or saved-data location. Native packages select it with
+  `native.launchContext.coreListener: {endpoint}`.
+- Keep response correlation, cancellation and current-state replay scoped to
+  each connection. Preserve complete application payloads, expose the original
+  handler `requestId` and actual internal `coreRequestId`, and prevent retired
+  request events from attaching to a later reuse of a client ID.
+- Closing a client or listener leaves accepted service-owned work with its
+  runtime. Window shutdown drains Core and then closes its listener. Existing
+  explicitly selected headless shared-host behavior remains available. This
+  capability does not claim to correct or verify model inference.
+
 ## 0.83.1
 
 - Preserve complete failure-only native ONNX diagnostics in `error.onnxRun`,
