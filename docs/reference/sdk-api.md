@@ -427,6 +427,7 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `arcaneNativeBuilderProvider` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `arcaneNativeBuilderProvider default export` | singleton | `arcane-os/native/portable-provider` | Portable native provider | Node; produces a portable payload rather than an executable host |
 | `startCoreHost()` | function | `arcane-os/core/host` | Native Core host composition | Node with readable input and writable output streams |
+| `startCoreListener()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC attached to an existing runtime |
 | `startSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC on Windows, Linux and macOS |
 | `connectSharedCoreHost()` | function | `arcane-os/core/host` | Shared Core host | Node local IPC and optional explicit headless startup |
 | `connectAppControl()` | function | `arcane-os/core/app-control` | Native application control | Node local IPC; current window adapter is Windows WebView2 |
@@ -7394,6 +7395,14 @@ Import it from `arcane-os/core/runtime`. The runtime exposes `current()`,
 `subscribe()`, `onFrame()`, `emit()`, `registerService()`, `getService()`, `start()`, `handle()`
 and idempotent `close()`.
 
+`runtime.handle(frame, {contextRequestId})` optionally preserves a transport's
+original client ID in handler `context.requestId`, while `context.coreRequestId`
+always exposes the actual internal `frame.id`. Active requests, cancellation,
+response IDs and request-event envelopes retain that internal ID. Ordinary
+`handle(frame)` exposes both context IDs equal to `frame.id`. This metadata
+does not change parameters or event data; transports own client-facing protocol
+correlation. See [the runtime contract](core-runtime.md#state-and-frames).
+
 `await runtime.getService(name)` and service `context.getService(name)` return
 the actual registered service after its shared startup. They wait for that
 dependency alone, may start it before `runtime.start()`, and add no renderer or
@@ -7550,6 +7559,13 @@ startCoreStdio({runtime, input=process.stdin, output=process.stdout, onError}={}
 Import it from `arcane-os/core/stdio`. The result is
 `{runtime, closed, close}`. EOF or input close starts graceful shutdown;
 `closed` settles only after accepted runtime work and queued output settle.
+
+Responses, request events, cancellation controls and current-state replay are
+connection-scoped even when an additional IPC listener shares the runtime.
+Stdio preserves original handler `requestId` values while routing fresh internal
+IDs; uncorrelated service events remain shared. EOF retains its existing
+runtime-wide shutdown ownership. Additional clients attach through
+[`startCoreListener()`](#startcorelistener).
 
 ### Availability and normalization
 
@@ -7994,6 +8010,14 @@ and explicit workspace values remain unchanged. Relative explicit paths retain
 the caller's working-directory meaning. `appId` and the selected state path
 must be nonempty strings; a selected `sharedHost` must be an object. Malformed
 inputs report `TypeError`; native endpoint failures belong to the IPC operation.
+
+`native.launchContext.coreListener:{endpoint}` instead attaches local IPC to
+the existing window/stdio runtime. Its endpoint remains explicit and receives
+no default. The generated entry rejects simultaneous `coreListener` and
+`sharedHost` selections. Client disconnect affects that connection; window
+shutdown still drains Core and closes the additional listener. See
+[`startCoreListener()`](#startcorelistener) and
+[native launch locations](core-native-packaging.md#launch-time-locations).
 
 ```javascript
 import {resolveNativeLaunchContext} from 'arcane-os/core/host';
@@ -8793,6 +8817,59 @@ async function bundleMoonCheeseRuntime(outputRoot){
 The ordinary provider invokes this owner only for an explicit native local-AI
 selection. See [selected local-AI runtimes](core-native-packaging.md#selected-local-ai-runtimes).
 
+## startCoreListener()
+
+### Overview and signature
+
+Attaches a local IPC listener to an existing Core runtime, without creating,
+starting or taking ownership of that runtime or its services.
+
+```text
+startCoreListener({runtime,endpoint,onError}={})
+```
+
+Import from `arcane-os/core/host`. Resolves `{endpoint,closed,close}` after the
+selected endpoint binds. `close()` is idempotent, cancels the listener's
+request-lifetime work, flushes queued output and closes its connections. It
+does not call `runtime.close()` or wait for accepted service-lifetime work;
+that work remains tracked by the existing runtime. Runtime shutdown rejects
+new listener requests, retains the endpoint through service drain/disposal,
+and closes the listener automatically. Observe both owners' `closed` promises.
+Bind errors reject startup without closing the supplied runtime. Transport
+errors reach `onError`, with complete console diagnostics by default; terminal
+listener errors reject `closed`. Attaching to a draining/closed runtime reports
+`CORE_CLOSING`.
+
+Node supports named pipes on Windows and Unix-domain sockets on Linux/macOS;
+Android requires its host adaptation. Supply a nonempty endpoint and an existing
+parent directory where required. Connect with `connectSharedCoreHost({endpoint})`
+and omit `start`. Its current-runtime replay does not replay requests. The
+borrowed listener implements no `core.host.shutdown` operation; use client
+`close()` for disconnection and the existing runtime's owner for host shutdown.
+
+Each connection owns response/event correlation and request cancellation.
+Handler `requestId` preserves the client ID; `coreRequestId` is the distinct
+internal dispatch ID. Parameters, results and event data, including
+`data.requestId`, remain unchanged. Runtime-state snapshots retain internal
+active IDs; no service event is invented or retained for later replay.
+
+```js
+import {startCoreListener} from 'arcane-os/core/host';
+
+const listener = await startCoreListener({runtime: host.runtime, endpoint: selectedEndpoint});
+try {
+    await host.closed;
+} finally {
+    await listener.close();
+}
+```
+
+`host` is the application's existing stdio host. Generated native entries
+select this attachment with `native.launchContext.coreListener:{endpoint}`,
+preserving their actual runtime, service set, profile, origin and state root.
+Omit `sharedHost`; the two options describe alternative lifetimes. Full
+contract: [existing-runtime listener](core-shared-host.md#attach-to-an-existing-window-owned-core).
+
 ## startSharedCoreHost()
 
 ### Overview
@@ -8870,6 +8947,12 @@ not kill a host another client may use. No startup timeout is imposed; supply
 `core.host.shutdown`, drains all shared services and returns `{state:'closed'}`
 before disconnecting. It affects every client; cancellation after acceptance
 does not reverse it. A drain failure returns the full Core error.
+
+The same connector can attach to `startCoreListener()` with `start` omitted.
+There, `close()` still disconnects only this client, and `shutdown()` has no
+listener-owned operation: absent an application method of that name, the
+ordinary dispatcher returns `METHOD_NOT_ALLOWED`. The existing window/runtime
+owner remains responsible for shutdown.
 
 ```js
 import {connectSharedCoreHost} from 'arcane-os/core/host';
@@ -8967,9 +9050,10 @@ stdio-owned Core lifetime. See [native shared-host launch](core-shared-host.md#n
 
 ## startCoreHost()
 
-For independent UI and MCP processes sharing one application runtime, use the
-[shared host functions](#startsharedcorehost) above. Ordinary `startCoreHost()`
-retains its existing stdio-owned lifetime.
+For an external client of the actual window-owned runtime, attach
+[`startCoreListener()`](#startcorelistener) to `host.runtime`. For an explicitly
+independent headless lifetime, use the [shared host functions](#startsharedcorehost).
+Ordinary `startCoreHost()` retains its existing stdio-owned lifetime.
 
 ### Overview
 

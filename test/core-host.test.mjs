@@ -6,7 +6,7 @@ import {PassThrough, Writable} from 'node:stream';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import test from '../src/testing.mjs';
-import {readCoreLaunchContext, resolveNativeLaunchContext, startCoreHost} from '../src/core/host.mjs';
+import {readCoreLaunchContext, resolveNativeLaunchContext, startCoreHost, startCoreListener} from '../src/core/host.mjs';
 import {createCoreFrameDecoder, encodeCoreFrame} from '../src/core/stdio.mjs';
 import {CORE_PROTOCOL} from '../browser-runtime/core/contracts.mjs';
 
@@ -35,6 +35,15 @@ test('Core launch context reads only an explicit file and preserves every object
     const context = await readCoreLaunchContext({argv: ['--unrelated', 'untouched', '--arcane-launch-config', filename]});
     assert.deepEqual(context, JSON.parse(content));
     assert.equal(await readFile(filename, 'utf8'), content);
+});
+
+test('native Core listener selection preserves its explicit endpoint without selecting a headless host', function nativeCoreListenerSelection() {
+    const coreListener = {endpoint: 'complete-selected-local-endpoint'};
+    const context = resolveNativeLaunchContext({appId: 'moon-listener', context: {coreListener}});
+    assert.equal(context.coreListener, coreListener);
+    assert.equal(context.coreListener.endpoint, coreListener.endpoint);
+    assert.equal(Object.hasOwn(context, 'sharedHost'), false);
+    assert.equal(typeof startCoreListener, 'function');
 });
 
 test('Core launch context reports missing filenames and preserves file and JSON errors', async function launchContextFailures(t) {

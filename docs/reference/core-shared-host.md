@@ -13,6 +13,69 @@ event history. Application methods and policy stay in the application services.
 Use the [MCP server](mcp-stdio.md) for external MCP framing; local Core continues
 to use the existing `arcane/1` protocol and Content-Length stream framing.
 
+## Attach to an existing window-owned Core
+
+`startCoreListener({runtime,endpoint,onError})` adds a local IPC listener to an
+existing Core runtime. It resolves `{endpoint,closed,close}` after binding the
+selected endpoint. It neither constructs nor starts a runtime or service. The
+existing host retains its application, services, origin, profile, state location
+and shutdown ownership.
+
+```js
+import {startCoreListener} from 'arcane-os/core/host';
+
+// host is the application's existing startCoreHost/startCoreStdio handle.
+const listener = await startCoreListener({runtime: host.runtime, endpoint: selectedEndpoint});
+try {
+    await host.closed;
+} finally {
+    await listener.close();
+}
+```
+
+An external client uses `connectSharedCoreHost({endpoint: selectedEndpoint})`
+with `start` omitted, invokes the application's existing methods through
+`connection.client.invoke(method, parameters)`, and calls `connection.close()`
+when finished. This connection uses the existing SDK framing, correlation and
+current-runtime replay; it does not launch another Core or replay requests.
+The listener does not implement or intercept `core.host.shutdown`.
+`connection.shutdown()` therefore has no listener-owned shutdown operation;
+without an application method of that name it returns the ordinary
+`METHOD_NOT_ALLOWED` error. The window's host remains the shutdown owner.
+
+Disconnect and `listener.close()` cancel only the affected connections'
+request-lifetime work. Explicit listener close drains queued output and releases
+the endpoint without closing the runtime or waiting for accepted service-lifetime
+work; that work remains tracked by its service/runtime owner. When the runtime
+itself begins shutdown, the listener rejects new requests and retains its endpoint
+through runtime drain/disposal, then closes its connections automatically.
+Observe both the host's `closed` and the listener's `closed` for their respective
+completion or failure. `close()` is idempotent. Transport errors reach `onError`
+(complete console diagnostics by default); terminal listener failures reject
+`closed`. Bind failures reject startup with their actual native error and leave
+the supplied runtime alive. A draining/closed runtime rejects attachment with
+`CORE_CLOSING`.
+
+Stdio and each IPC connection have independent request correlation and
+cancellation. Handlers reached through stdio or this listener receive the
+original client ID in `context.requestId`; `context.coreRequestId` exposes the
+fresh internal ID used by runtime dispatch and protocol routing. Responses and
+top-level event correlation return to their originating connection. The new listener leaves all event data,
+including any authored `data.requestId`, and all parameters/results unchanged.
+Its runtime-state snapshot retains the runtime's internal active IDs. Late events
+from a retired request never attach to a later reuse of that client's ID.
+Uncorrelated service events remain shared. See the
+[runtime metadata contract](core-runtime.md#state-and-frames).
+
+For a generated native entry, select
+`native.launchContext.coreListener:{endpoint}` and omit `sharedHost`. This adds
+the listener to the ordinary window/stdio runtime; closing the native window
+still drains Core. The endpoint is explicit, with no inferred headless startup
+or new default location. Its parent directory must already exist on platforms
+that require one. Selecting both `coreListener` and `sharedHost` reports
+`TypeError` because they select different runtime lifetimes. See
+[native launch locations](core-native-packaging.md#launch-time-locations).
+
 ## Host entry
 
 ```js
@@ -107,8 +170,8 @@ running. `closed` observes connection termination and rejects on a transport
 error. A subsequent connection uses the still-running owner. Reconnection is
 explicit; failed or uncertain requests are never resubmitted.
 
-`await connection.shutdown(invokeOptions)` explicitly invokes the host-owned
-`core.host.shutdown` operation. It drains the shared runtime, returns
+For an owning shared host, `await connection.shutdown(invokeOptions)` explicitly
+invokes the host-owned `core.host.shutdown` operation. It drains the shared runtime, returns
 `{state:'closed'}` after successful service cleanup, then closes the connection.
 A drain failure returns the full Core error. Shutdown affects **all** clients
 of that app endpoint and belongs to the application owner's explicit lifecycle,
@@ -118,8 +181,8 @@ after shutdown acceptance does not undo the shared shutdown.
 
 ## Correlation, events, and state
 
-Each connection has its own request-ID space. The transport substitutes an
-internal Core request ID and restores the originating ID on responses and
+Each connection has its own request-ID space. The owning shared-host adapter
+substitutes an internal Core request ID and restores the originating ID on responses and
 the optional top-level event `requestId`. Existing `data.requestId` values that
 carry that same Core correlation ID are restored too. `parameters`, returned results, schemas,
 documents, and content remain complete and unchanged. A handler's
@@ -137,10 +200,10 @@ connection's IDs; other connections' active requests retain Core-side IDs.
 requests. A disconnect performs the same scoped cancellation. The underlying
 runtime continues to preserve service-lifetime acceptance.
 
-`runtime.replay` sends only that connection the current `core.ready`,
-`core.state`, and `core.service.state` snapshot. Optional synchronous
-`getReplayEvents()` returns current `{event,data}` records from their actual
-service owners. It is for current domain state, not historical chunks or
+Both listener forms handle `runtime.replay` by sending only that connection the
+current `core.ready`, `core.state`, and `core.service.state` snapshot. Optional
+synchronous `getReplayEvents()` on the owning shared host returns current
+`{event,data}` records from their actual service owners. It is for current domain state, not historical chunks or
 retired requests. Subscribe before requesting a domain snapshot when its live
 events may change; applications own those domain methods and state.
 

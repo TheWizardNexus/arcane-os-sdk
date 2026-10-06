@@ -19,6 +19,63 @@ function cancel(requestId) {
     return {protocol: CORE_PROTOCOL, type: 'control', control: 'request.cancel', requestId};
 }
 
+test('transport context IDs preserve service data while internal IDs own frames and cancellation', async function transportContextIdentity(t) {
+    const entered = deferred();
+    const finished = deferred();
+    const frames = [];
+    const payload = {requestId: 'authored-payload-id', content: '  Complete octopus dispatch.\r\n🦑  '};
+    let context;
+    let received;
+    const runtime = createCoreRuntime(
+        {
+            services: [
+                {
+                    name: 'courier',
+                    methods: {
+                        'courier.wait': async function wait(parameters, operation) {
+                            received = parameters;
+                            context = operation;
+                            operation.emit('courier.progress', parameters);
+                            entered.resolve();
+                            await finished.promise;
+                            return parameters;
+                        }
+                    }
+                }
+            ]
+        }
+    );
+    t.after(
+        async function finishTransportContext() {
+            finished.resolve();
+            await runtime.close();
+        }
+    );
+    runtime.onFrame(function collectFrame(frame) { frames.push(frame); });
+    runtime.start();
+    const operation = runtime.handle(request('internal-operation', 'courier.wait', payload), {contextRequestId: 'client-operation'});
+    await entered.promise;
+    assert.equal(context.requestId, 'client-operation');
+    assert.equal(context.coreRequestId, 'internal-operation');
+    assert.equal(received, payload);
+    assert.equal(runtime.current().activeRequests[0].id, 'internal-operation');
+    const progress = frames.find(function progressFrame(frame) { return frame.event === 'courier.progress'; });
+    assert.equal(progress.requestId, 'internal-operation');
+    assert.deepEqual(progress.data, payload);
+    assert.equal(await runtime.handle(cancel('client-operation')), false);
+    assert.equal(context.signal.aborted, false);
+    assert.equal(await runtime.handle(cancel('internal-operation')), true);
+    finished.resolve();
+    const response = await operation;
+    assert.equal(response.id, 'internal-operation');
+    assert.equal(response.error.code, 'REQUEST_ABORTED');
+    assert.equal(payload.requestId, 'authored-payload-id');
+    assert.deepEqual((await runtime.handle(request('direct-operation', 'courier.wait', payload))).result, payload);
+    assert.equal(context.requestId, 'direct-operation');
+    assert.equal(context.coreRequestId, 'direct-operation');
+    await assert.rejects(runtime.handle(request('invalid', 'system.ping'), {contextRequestId: ''}), {code: 'INVALID_RPC_REQUEST'});
+});
+
 test('native service lookup shares startup and preserves independent service readiness', async function nativeDependencies(t) {
     const gate = deferred();
     const entered = deferred();

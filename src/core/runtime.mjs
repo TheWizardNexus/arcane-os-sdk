@@ -218,7 +218,7 @@ class CoreRuntime {
         return this.current();
     }
 
-    async handle(frame) {
+    async handle(frame, {contextRequestId} = {}) {
         if (frame?.protocol !== CORE_PROTOCOL) throw failure('INVALID_RPC_REQUEST', 'Unknown Core protocol.');
         if (frame.type === 'control') {
             if (frame.control === 'runtime.replay') {
@@ -235,7 +235,10 @@ class CoreRuntime {
         if (frame.type !== 'request' || !is.string(frame.id) || !frame.id || !is.string(frame.method)) {
             throw failure('INVALID_RPC_REQUEST', 'A Core request requires an id and method.');
         }
-        const task = this.#answer(frame);
+        if (contextRequestId !== undefined && (!is.string(contextRequestId) || !contextRequestId)) {
+            throw failure('INVALID_RPC_REQUEST', 'A transport context request id must be a nonempty string.');
+        }
+        const task = this.#answer(frame, contextRequestId);
         this.#responses.add(task);
         try {
             return await task;
@@ -244,7 +247,7 @@ class CoreRuntime {
         }
     }
 
-    async #answer(frame) {
+    async #answer(frame, contextRequestId) {
         let result;
         let error;
         let ok = true;
@@ -254,7 +257,7 @@ class CoreRuntime {
             if (frame.method === 'system.ping') result = {ok: true};
             else if (frame.method === 'version.current') result = this.#version;
             else if (frame.method === 'app.current') result = this.#application;
-            else result = await this.#request(frame);
+            else result = await this.#request(frame, contextRequestId);
         } catch (caught) {
             ok = false;
             error = caught;
@@ -270,7 +273,7 @@ class CoreRuntime {
         return response;
     }
 
-    #request(frame) {
+    #request(frame, contextRequestId) {
         const registration = this.#methods.get(frame.method);
         if (!registration) {
             const namespace = frame.method.split('.')[0];
@@ -300,7 +303,8 @@ class CoreRuntime {
                     const result = await handle.call(
                         service.definition,
                         frame.parameters,
-                        {...runtime.#serviceContext(service, frame.id), requestId: frame.id, signal: controller.signal}
+                        {...runtime.#serviceContext(service, frame.id),
+                            requestId: contextRequestId ?? frame.id, coreRequestId: frame.id, signal: controller.signal}
                     );
                     aborted(controller);
                     return result;

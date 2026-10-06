@@ -1,6 +1,7 @@
 import {finished} from 'node:stream';
 import Is from 'strong-type';
 import {CoreError, serializeCoreError} from '../../browser-runtime/core/contracts.mjs';
+import {createCoreRuntimeConnection} from './runtime-connection.mjs';
 
 const is = new Is(false);
 
@@ -116,10 +117,24 @@ export function startCoreStdio({runtime, input = process.stdin, output = process
         ).catch(failOutput);
     }
 
-    const unsubscribe = runtime.onFrame(queueFrame);
+    const connection = createCoreRuntimeConnection(
+        {
+            runtime,
+            send: queueFrame,
+            mapFrame(frame) {
+                if (frame.event !== 'core.state') return frame;
+                return {...frame, data: {...frame.data, activeRequests: frame.data.activeRequests.map(
+                    function requestState(request) {
+                        const owned = connection.request(request.id);
+                        return owned ? {...request, id: owned.id} : request;
+                    }
+                )}};
+            }
+        }
+    );
 
     function receiveFrame(frame) {
-        const task = runtime.handle(frame);
+        const task = connection.handle(frame);
         pending.add(task);
         task.then(
             function requestSettled() {
@@ -157,7 +172,7 @@ export function startCoreStdio({runtime, input = process.stdin, output = process
     }
 
     async function releaseTransportListeners() {
-        unsubscribe();
+        await connection.close();
         output.off('error', failOutput);
         // destroy(error) marks a stream destroyed before its scheduled error
         // and close events. The native completion owner observes their delivery;

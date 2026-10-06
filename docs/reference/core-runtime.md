@@ -67,7 +67,7 @@ complete diagnostic serialization; the startup promise retains its original
 rejection value.
 
 Each lifecycle hook receives `{application, service, emit, getService}`. Each request handler
-receives `(parameters, {application, service, emit, getService, requestId, signal})`, with
+receives `(parameters, {application, service, emit, getService, requestId, coreRequestId, signal})`, with
 `this` bound to its service definition. A hook or handler may publish a complete
 service-owned event through `emit(event, data)`.
 
@@ -131,6 +131,18 @@ The shared `arcane-os/core/contracts` module owns `CORE_PROTOCOL` (`arcane/1`),
 `{protocol, type:'response', id, ok:false, error, time}`. Framing and method
 availability errors remain observable; unavailable services are not replaced
 with browser behavior.
+
+A transport that assigns internal dispatch IDs may call
+`runtime.handle(frame, {contextRequestId})`. This optional nonempty string sets
+only the service handler's `context.requestId`. `context.coreRequestId` always
+exposes the actual `frame.id`; it distinguishes simultaneous requests whose
+clients selected equal IDs. The supplied `frame.id` still
+owns active-request state, cancellation lookup, response correlation and the
+request event's top-level envelope. Parameters and event data remain unchanged.
+Ordinary `handle(frame)` keeps its existing behavior: `context.requestId` equals
+`frame.id`, and `coreRequestId` equals that same ID. Stdio and
+the borrowed IPC listener use this metadata to preserve the original client ID
+in service-facing data while their transport owner routes unique dispatch IDs.
 
 A request with no registered handler retains code `METHOD_NOT_ALLOWED` and
 adds the exact `method`, its first dotted `namespace`, and a `reason`.
@@ -221,6 +233,21 @@ an already ended or destroyed input is handled when attached. Transport failures
 reach `onError` and reject `closed`. The transport detaches
 its listeners and pauses its input; it does not end caller-owned output streams
 or take ownership of the host process.
+
+Stdio routes responses and request-context events only for its own requests.
+`request.cancel`, `requests.cancelAll` and `runtime.replay` are connection-scoped;
+they do not cancel or replay another attached connection's work. The protocol
+owner gives every accepted request a fresh internal ID and restores its client
+ID on responses, event envelopes and stdio's own `core.state` entries. Handler
+`context.requestId` and complete application payloads keep their original values.
+Uncorrelated runtime/service events remain shared.
+
+`startCoreListener({runtime,endpoint,onError})` from `arcane-os/core/host` can
+attach additional local clients to this same runtime. Its explicit `close()`
+closes only that listener; stdio EOF still closes the runtime and drains all
+accepted service work, then the listener closes automatically. Observe the
+listener's `closed` as well as the stdio owner's `closed` to join both transport
+lifecycles. See [existing-runtime listeners](core-shared-host.md#attach-to-an-existing-window-owned-core).
 
 ## Platform and delivery boundary
 

@@ -135,6 +135,21 @@ test('portable assembly carries the optional native window configuration unchang
     assert.deepEqual(appDescriptor.native.window, {width: 1280, height: 800, resizable: true});
 });
 
+test('native Core listener opt-in attaches to the existing stdio runtime and joins closure', function nativeCoreListenerEntry() {
+    const launchContext = {coreListener: {endpoint: 'selected-local-endpoint'}, content: '  Keep launch context complete.\r\n🦑  '};
+    const entry = coreEntrySource({...application, native: {launchContext}}, '1.2.3', []);
+    assert.ok(entry.includes('host = startCoreHost({application, version, services});'));
+    assert.ok(entry.includes('if (context.coreListener !== undefined) {'));
+    assert.ok(entry.includes('listener = await startCoreListener({runtime: host.runtime, endpoint: context.coreListener?.endpoint});'));
+    assert.ok(entry.includes('await listener?.close();'));
+    assert.ok(entry.includes('await host.close();'));
+    assert.ok(entry.indexOf("process.on('SIGINT', closeCore);") < entry.indexOf('listener = await startCoreListener'));
+    assert.ok(entry.indexOf("process.on('SIGTERM', closeCore);") < entry.indexOf('listener = await startCoreListener'));
+    assert.ok(entry.includes('if (context.coreListener !== undefined && context.sharedHost !== undefined) {'));
+    assert.ok(entry.includes(JSON.stringify(JSON.stringify(launchContext))));
+    assert.ok(entry.indexOf('listener = await startCoreListener') < entry.indexOf("} else if (process.argv.includes('--arcane-core-headless'))"));
+});
+
 test('portable assembly preserves complete app and dependency files and authors service composition without executing it', async function completePayload(t) {
     const fixture = await createFixture(t);
     const dependencyRoot = path.join(fixture.root, 'selected-dependency');
@@ -207,7 +222,7 @@ test('portable assembly preserves complete app and dependency files and authors 
         assert.deepEqual(included, installed);
     }
     const entry = await readFile(path.join(output, 'runtime/arcane-core.mjs'), 'utf8');
-    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, startCoreListener, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
     assert.ok(entry.includes('import("../app/services/dispatch.mjs")'));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
     assert.ok(entry.includes('await host?.closed'));
@@ -240,7 +255,7 @@ test('portable Core entry shares explicit launch context without changing author
     ];
     const entry = coreEntrySource(launchApplication, '1.2.3', services);
     assert.ok(entry.includes("import {fileURLToPath} from 'node:url';"));
-    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
+    assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, startCoreListener, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
     assert.ok(entry.includes([
         'const context = {',
         "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",

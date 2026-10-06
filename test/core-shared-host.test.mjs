@@ -6,8 +6,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {PassThrough, Writable} from 'node:stream';
 import test from '../src/testing.mjs';
-import {connectSharedCoreHost, startSharedCoreHost, startSharedCoreBridge} from '../src/core/host.mjs';
-import {createCoreFrameDecoder, encodeCoreFrame} from '../src/core/stdio.mjs';
+import {connectSharedCoreHost, startCoreListener, startSharedCoreHost, startSharedCoreBridge} from '../src/core/host.mjs';
+import {createCoreRuntime} from '../src/core/runtime.mjs';
+import {createCoreFrameDecoder, encodeCoreFrame, startCoreStdio} from '../src/core/stdio.mjs';
 
 const fixtureRoot = fileURLToPath(new URL('../.arcane/shared-host-fixtures/', import.meta.url));
 const hostModule = new URL('../src/core/host.mjs', import.meta.url).href;
@@ -57,6 +58,190 @@ async function rawPeer(endpoint) {
         async close() { if (socket.closed) return; const closed = once(socket, 'close'); socket.end(); await closed; }
     };
 }
+
+test('borrowed listener reuses its runtime and preserves payload fields without owning shutdown', async function borrowedRuntime(t) {
+    const {endpoint, own} = await fixture(t);
+    const payload = {content: '  Every squid manifesto line.\r\n🦑  ', requestId: 'authored-id'};
+    let starts = 0;
+    let calls = 0;
+    let emitted;
+    const runtime = createCoreRuntime();
+    runtime.registerService(
+        {
+            name: 'echo',
+            start() { starts++; },
+            methods: {
+                'echo.read': function read(parameters, context) {
+                    calls++;
+                    emitted = {requestId: runtime.current().activeRequests[0].id, parameters};
+                    context.emit('echo.progress', emitted);
+                    return parameters;
+                }
+            }
+        }
+    );
+    own(function closeRuntime() { return runtime.close(); });
+    runtime.start();
+    const listener = await startCoreListener({runtime, endpoint});
+    own(function closeListener() { return listener.close(); });
+    await assert.rejects(startCoreListener({runtime, endpoint, onError() {}}), {code: 'EADDRINUSE'});
+    assert.equal(runtime.current().state, 'ready');
+    const connection = await connectSharedCoreHost({endpoint, onError() {}});
+    own(function closeConnection() { return connection.close(); });
+    const progress = deferred();
+    connection.client.events.on('echo.progress', progress.resolve);
+    assert.deepEqual(await connection.client.invoke('echo.read', payload), payload);
+    assert.deepEqual(await progress.promise, emitted);
+    assert.equal(starts, 1);
+    assert.equal(calls, 1);
+    await assert.rejects(connection.client.invoke('core.host.shutdown'), {code: 'METHOD_NOT_ALLOWED'});
+    await connection.close();
+    assert.equal(runtime.current().state, 'ready');
+    await listener.close();
+    assert.equal(runtime.current().state, 'ready');
+    assert.equal(listener.close(), listener.closed);
+    assert.deepEqual((await runtime.handle({protocol, type: 'request', id: 'still-live', method: 'system.ping'})).result, {ok: true});
+});
+
+test('stdio and listener peers own correlation, replay and cancellation independently', async function attachedConnections(t) {
+    const {endpoint, own} = await fixture(t);
+    const accepted = new Map(['first', 'second', 'window'].map(function acceptance(owner) { return [owner, deferred()]; }));
+    const gates = new Map(['first', 'second', 'window'].map(function completion(owner) { return [owner, deferred()]; }));
+    const contexts = new Map();
+    const windowAborted = deferred();
+    const firstAborted = deferred();
+    const windowAnswered = deferred();
+    const windowFrames = [];
+    const input = new PassThrough();
+    const decoder = createCoreFrameDecoder(
+        function collectWindowFrame(frame) {
+            windowFrames.push(frame);
+            if (frame.type === 'response') windowAnswered.resolve(frame);
+        }
+    );
+    const output = new Writable({write(chunk, encoding, callback) { decoder.push(chunk); callback(); }});
+    const runtime = createCoreRuntime(
+        {
+            services: [
+                {
+                    name: 'echo',
+                    methods: {
+                        'echo.wait': async function wait(parameters, context) {
+                            contexts.set(parameters.owner, context);
+                            if (parameters.owner === 'window') context.signal.addEventListener('abort', windowAborted.resolve, {once: true});
+                            if (parameters.owner === 'first') context.signal.addEventListener('abort', firstAborted.resolve, {once: true});
+                            accepted.get(parameters.owner).resolve();
+                            await gates.get(parameters.owner).promise;
+                            context.emit('echo.progress', parameters);
+                            return parameters;
+                        }
+                    }
+                }
+            ]
+        }
+    );
+    const host = startCoreStdio({runtime, input, output});
+    own(
+        async function closeAttachedFixture() {
+            for (const gate of gates.values()) gate.resolve();
+            await host.close();
+            input.destroy();
+            output.end();
+        }
+    );
+    const listener = await startCoreListener({runtime, endpoint});
+    own(async function closeAttachedListener() {
+        for (const gate of gates.values()) gate.resolve();
+        await listener.close();
+    });
+    const first = await rawPeer(endpoint);
+    const second = await rawPeer(endpoint);
+    own(function closeFirst() { return first.close(); });
+    own(function closeSecond() { return second.close(); });
+    first.send({type: 'request', id: 'same-id', method: 'echo.wait', parameters: {owner: 'first'}});
+    second.send({type: 'request', id: 'same-id', method: 'echo.wait', parameters: {owner: 'second', requestId: 'leave-this-field'}});
+    await Promise.all([accepted.get('first').promise, accepted.get('second').promise]);
+    const collision = runtime.current().activeRequests[0].id;
+    input.write(encodeCoreFrame({protocol, type: 'request', id: collision, method: 'echo.wait', parameters: {owner: 'window'}}));
+    await accepted.get('window').promise;
+    assert.equal(contexts.get('window').requestId, collision);
+    assert.equal(contexts.get('first').requestId, 'same-id');
+    assert.equal(contexts.get('second').requestId, 'same-id');
+    assert.notEqual(contexts.get('first').coreRequestId, contexts.get('second').coreRequestId);
+    assert.notEqual(contexts.get('window').coreRequestId, collision);
+    input.write(encodeCoreFrame({protocol, type: 'control', control: 'requests.cancelAll'}));
+    await windowAborted.promise;
+    assert.equal(contexts.get('first').signal.aborted, false);
+    assert.equal(contexts.get('second').signal.aborted, false);
+    await first.close();
+    await firstAborted.promise;
+    assert.equal(contexts.get('second').signal.aborted, false);
+    const beforeReplay = windowFrames.filter(function ready(frame) { return frame.event === 'core.ready'; }).length;
+    second.send({type: 'control', control: 'runtime.replay'});
+    await second.next(function ready(frame) { return frame.event === 'core.ready'; });
+    assert.equal(windowFrames.filter(function ready(frame) { return frame.event === 'core.ready'; }).length, beforeReplay);
+    for (const gate of gates.values()) gate.resolve();
+    const answer = await second.next(function responseFrame(frame) { return frame.type === 'response'; });
+    assert.equal(answer.id, 'same-id');
+    assert.deepEqual(answer.result, {owner: 'second', requestId: 'leave-this-field'});
+    assert.equal((await windowAnswered.promise).id, collision);
+    assert.equal(windowFrames.some(function foreignEvent(frame) { return frame.event === 'echo.progress' && frame.data.owner !== 'window'; }), false);
+    assert.equal(windowFrames.filter(function responseFrame(frame) { return frame.type === 'response'; }).length, 1);
+    input.end();
+    await Promise.all([host.closed, listener.closed]);
+});
+
+test('listener disconnect and explicit close retain accepted service work and window shutdown drains the endpoint', async function borrowedDrain(t) {
+    const {endpoint, own} = await fixture(t);
+    const accepted = deferred();
+    const saved = deferred();
+    const disposed = deferred();
+    let serviceSignal;
+    let completed = false;
+    const runtime = createCoreRuntime(
+        {
+            services: [
+                {
+                    name: 'ledger',
+                    methods: {
+                        'ledger.save': {
+                            lifetime: 'service',
+                            async handle(parameters, {signal}) {
+                                serviceSignal = signal;
+                                accepted.resolve();
+                                await saved.promise;
+                                completed = true;
+                                return parameters;
+                            }
+                        }
+                    },
+                    dispose() { disposed.resolve(); }
+                }
+            ]
+        }
+    );
+    own(async function finishSave() { saved.resolve(); await runtime.close(); });
+    runtime.start();
+    const listener = await startCoreListener({runtime, endpoint});
+    own(async function closeSaveListener() { saved.resolve(); await listener.close(); });
+    const peer = await rawPeer(endpoint);
+    own(function closePeer() { return peer.close(); });
+    peer.send({type: 'request', id: 'save', method: 'ledger.save', parameters: {content: 'Complete lunar ledger'}});
+    await accepted.promise;
+    await peer.close();
+    await listener.close();
+    assert.equal(serviceSignal.aborted, false);
+    assert.equal(completed, false);
+    assert.equal(runtime.current().state, 'ready');
+    const replacement = await startCoreListener({runtime, endpoint});
+    own(async function closeReplacement() { saved.resolve(); await replacement.close(); });
+    const closing = runtime.close();
+    await assert.rejects(startSharedCoreHost({endpoint}), {code: 'EADDRINUSE', coreHostPhase: 'listen'});
+    assert.equal(serviceSignal.aborted, false);
+    saved.resolve();
+    await Promise.all([closing, replacement.closed, disposed.promise]);
+    assert.equal(completed, true);
+});
 
 test('shared host claims before factories and replays current lifecycle without duplicating the owner', async function claimAndReplay(t) {
     const {endpoint, own} = await fixture(t);

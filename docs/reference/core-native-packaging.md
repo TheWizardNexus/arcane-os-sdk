@@ -234,6 +234,27 @@ Windows and macOS launchers use the same packaged defaults for native state
 selection, so an ordinary executable launch and external MCP can select the
 same app-owned Core.
 
+To expose the actual window-owned Core to an external local client while
+preserving that stdio lifetime, select
+`native.launchContext:{coreListener:{endpoint:"APPLICATION-SELECTED-LOCAL-ENDPOINT"}}`
+instead. The generated entry calls
+`startCoreListener({runtime:host.runtime,endpoint})` after creating its ordinary
+stdio host. It reuses that exact service set and launch context, including the
+existing origin, profile and state root; no headless runtime is created. The
+listener endpoint has no default and its parent directory must already exist
+where required by the operating system. `coreListener` and `sharedHost` are
+alternative selections; supplying both reports `TypeError`.
+
+Clients use `connectSharedCoreHost({endpoint})` with `start` omitted and close
+only their own connection. This listener provides no host-shutdown RPC. Closing
+the window still drains its Core, including accepted service-owned operations,
+and then closes the listener. Signal-driven host shutdown remains observed while
+the listener is binding; a bind failure drains the newly created stdio host and
+reports the failure. The generated entry joins listener closure without changing
+the existing shared-host/headless branches. See
+[the existing-runtime listener contract](core-shared-host.md#attach-to-an-existing-window-owned-core)
+for direct composition, correlation, cancellation and complete error behavior.
+
 `resolveNativeLaunchContext({appId,context={}})` from `arcane-os/core/host` is
 the public, synchronous location owner for native applications and external MCP.
 It returns a new complete context and fills only omitted fields:

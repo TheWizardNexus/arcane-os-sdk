@@ -15,6 +15,68 @@ function request(id, method, parameters = {}) {
     return {protocol: CORE_PROTOCOL, type: 'request', id, method, parameters};
 }
 
+test('stdio reused client IDs preserve progress data and never receive retired request events', async function retiredRequestCorrelation(t) {
+    const secondEntered = deferred();
+    const finishSecond = deferred();
+    const firstAnswered = deferred();
+    const secondAnswered = deferred();
+    const frames = [];
+    const contexts = [];
+    const input = new PassThrough();
+    const decoder = createCoreFrameDecoder(
+        function collectFrame(frame) {
+            frames.push(frame);
+            if (frame.type === 'response' && frame.result === 'first') firstAnswered.resolve();
+            if (frame.type === 'response' && frame.result === 'second') secondAnswered.resolve();
+        }
+    );
+    const output = new Writable(
+        {write(chunk, encoding, callback) { decoder.push(chunk); callback(); }}
+    );
+    const runtime = createCoreRuntime(
+        {
+            services: [
+                {
+                    name: 'echo',
+                    methods: {
+                        'echo.wait': async function wait(parameters, context) {
+                            contexts.push(context);
+                            if (parameters === 'second') {
+                                secondEntered.resolve();
+                                await finishSecond.promise;
+                            }
+                            context.emit('echo.progress', {requestId: context.requestId, content: parameters});
+                            return parameters;
+                        }
+                    }
+                }
+            ]
+        }
+    );
+    const host = startCoreStdio({runtime, input, output});
+    t.after(
+        async function closeRetiredFixture() {
+            finishSecond.resolve();
+            await host.close();
+            input.destroy();
+            output.end();
+        }
+    );
+    input.write(encodeCoreFrame(request('same-client-id', 'echo.wait', 'first')));
+    await firstAnswered.promise;
+    input.write(encodeCoreFrame(request('same-client-id', 'echo.wait', 'second')));
+    await secondEntered.promise;
+    contexts[0].emit('echo.retired', {content: 'An old squid must not interrupt this delivery.'});
+    finishSecond.resolve();
+    await secondAnswered.promise;
+    assert.deepEqual(contexts.map(function clientId(context) { return context.requestId; }), ['same-client-id', 'same-client-id']);
+    assert.equal(frames.some(function retired(frame) { return frame.event === 'echo.retired'; }), false);
+    assert.deepEqual(
+        frames.filter(function progress(frame) { return frame.event === 'echo.progress'; }).map(function content(frame) { return frame.data; }),
+        [{requestId: 'same-client-id', content: 'first'}, {requestId: 'same-client-id', content: 'second'}]
+    );
+});
+
 test('native framing preserves fragmented Unicode and consecutive complete frames', function fragmentedFrames() {
     const frames = [];
     const first = request('first', 'journal.save', {

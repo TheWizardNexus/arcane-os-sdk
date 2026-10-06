@@ -2,10 +2,14 @@ import {spawn} from 'node:child_process';
 import {open} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {randomUUID} from 'node:crypto';
+import Is from 'strong-type';
 import {CORE_PROTOCOL, CoreError, serializeCoreError} from '../../browser-runtime/core/contracts.mjs';
 import {createCoreRuntime} from './runtime.mjs';
 import {createCoreFrameDecoder, encodeCoreFrame} from './stdio.mjs';
 import {connectCoreSocket, createCoreSocketConnection, writeCoreSocket as write} from './socket-connection.mjs';
+import {createCoreRuntimeConnection} from './runtime-connection.mjs';
+
+const is = new Is(false);
 
 function failure(code, message) { return new CoreError({code, message}); }
 function reportError(error) { console.error('Shared Arcane Core failed:', error); }
@@ -23,6 +27,233 @@ function response(id, result, error) {
         time: new Date().toISOString()};
 }
 
+/** Add local IPC to an existing runtime without acquiring its lifetime. */
+export async function startCoreListener({runtime, endpoint, onError = reportError} = {}) {
+    if (!is.string(endpoint) || !endpoint) throw new TypeError('A Core listener endpoint must be a nonempty local pipe/socket path.');
+    if (!runtime || !is.function(runtime.handle) || !is.function(runtime.onFrame)
+        || !is.function(runtime.current) || !is.function(runtime.subscribe)) {
+        throw new TypeError('A Core listener requires an existing Core runtime.');
+    }
+    if (['draining', 'closed'].includes(runtime.current().state)) throw failure('CORE_CLOSING', 'Core is closing.');
+    const peers = new Set();
+    const prefix = `listener-${randomUUID()}:`;
+    let accepting = true;
+    let closing;
+    let terminalError;
+    let resolveClosed;
+    let rejectClosed;
+    let resolveRuntimeClosed;
+    const runtimeClosed = new Promise(
+        function observeRuntimeClosure(resolve) { resolveRuntimeClosed = resolve; }
+    );
+    const closed = new Promise(
+        function ownListener(resolve, reject) {
+            resolveClosed = resolve;
+            rejectClosed = reject;
+        }
+    );
+    closed.catch(function observeReportedListenerFailure() {});
+
+    function diagnostic(error) {
+        report(onError, error);
+    }
+
+    function disconnect(peer) {
+        if (peer.closed) return;
+        peer.closed = true;
+        peers.delete(peer);
+        peer.connection.close().catch(diagnostic);
+    }
+
+    function send(peer, frame) {
+        if (peer.closed) return;
+        let content;
+        try {
+            content = encodeCoreFrame(frame);
+        } catch (error) {
+            diagnostic(error);
+            peer.socket.destroy();
+            return;
+        }
+        peer.writes = peer.writes.then(
+            function writeNext() {
+                if (!peer.closed) return write(peer.socket, content);
+            }
+        ).catch(
+            function outputFailed(error) {
+                diagnostic(error);
+                peer.socket.destroy();
+            }
+        );
+    }
+
+    function accept(socket) {
+        const peer = {socket, closed: false, writes: Promise.resolve(), connection: null};
+        peers.add(peer);
+        peer.connection = createCoreRuntimeConnection(
+            {
+                runtime,
+                requestPrefix: prefix,
+                send(frame) { send(peer, frame); }
+            }
+        );
+        const decoder = createCoreFrameDecoder(
+            function receiveFrame(frame) {
+                if (peer.closed) return;
+                if (!accepting && frame?.type === 'request') {
+                    send(peer, response(frame.id, undefined, failure('CORE_CLOSING', 'The Core listener is closing.')));
+                    return;
+                }
+                // No owning-host shutdown command or application dispatcher.
+                peer.connection.handle(frame).catch(
+                    function requestFailed(error) {
+                        if (frame?.type === 'request') send(peer, response(frame.id, undefined, error));
+                        else send(peer, event('core.error', serializeCoreError(error)));
+                    }
+                );
+            }
+        );
+        socket.on(
+            'data',
+            function receiveData(chunk) {
+                try {
+                    decoder.push(chunk);
+                } catch (error) {
+                    diagnostic(error);
+                    socket.destroy();
+                }
+            }
+        );
+        socket.on('error', diagnostic);
+        socket.on(
+            'end',
+            function inputEnded() {
+                try {
+                    decoder.finish();
+                } catch (error) {
+                    diagnostic(error);
+                }
+                disconnect(peer);
+            }
+        );
+        socket.on('close', function connectionClosed() { disconnect(peer); });
+        socket.resume();
+    }
+
+    const server = createServer({pauseOnConnect: true}, accept);
+    const binding = new Promise(
+        function claimEndpoint(resolve, reject) {
+            function failed(error) {
+                server.off('listening', listening);
+                reject(error);
+            }
+            function listening() {
+                server.off('error', failed);
+                resolve();
+            }
+            server.once('error', failed);
+            server.once('listening', listening);
+            server.listen({path: endpoint});
+        }
+    );
+
+    function close() {
+        if (closing) return closed;
+        accepting = false;
+        closing = Promise.resolve().then(
+            async function closeListener() {
+                try {
+                    await binding;
+                } catch (error) {
+                    terminalError ??= error;
+                }
+                // Window/Core shutdown retains the endpoint through service
+                // drain. Closing this listener never initiates runtime.close().
+                if (runtime.current().state === 'draining') await runtimeClosed;
+                const stopped = new Promise(
+                    function stopListening(resolve, reject) {
+                        server.close(
+                            function listenerClosed(error) {
+                                if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') reject(error);
+                                else resolve();
+                            }
+                        );
+                    }
+                );
+                stopped.catch(function observeListenerStopFailure() {});
+                const connected = [...peers];
+                const cancellations = await Promise.allSettled(
+                    connected.map(
+                        function detachConnection(peer) {
+                            peer.socket.pause();
+                            return peer.connection.close();
+                        }
+                    )
+                );
+                for (const outcome of cancellations) {
+                    if (outcome.status === 'rejected') {
+                        terminalError = terminalError
+                            ? new AggregateError([terminalError, outcome.reason], 'Core listener closure failed.')
+                            : outcome.reason;
+                    }
+                }
+                await Promise.all(connected.map(function flushConnection(peer) { return peer.writes; }));
+                for (const peer of connected) {
+                    peer.socket.resume();
+                    peer.socket.end();
+                }
+                await stopped;
+                if (terminalError) throw terminalError;
+                return {state: 'closed', endpoint};
+            }
+        );
+        closing.then(
+            function listenerClosed(result) {
+                unsubscribe();
+                resolveClosed(result);
+            },
+            function listenerFailed(error) {
+                unsubscribe();
+                diagnostic(error);
+                rejectClosed(error);
+            }
+        );
+        return closed;
+    }
+
+    const unsubscribe = runtime.subscribe(
+        function runtimeChanged(state) {
+            if (state.state === 'draining') accepting = false;
+            if (state.state === 'closed') {
+                resolveRuntimeClosed();
+                close();
+            }
+        }
+    );
+    server.on(
+        'error',
+        function listenerFailed(error) {
+            terminalError = error;
+            close();
+        }
+    );
+    try {
+        await binding;
+        if (!accepting) {
+            await close();
+            throw failure('CORE_CLOSING', 'Core closed while its listener was starting.');
+        }
+        return {endpoint, closed, close};
+    } catch (error) {
+        try {
+            await close();
+        } catch (closeError) {
+            if (closeError !== error) throw new AggregateError([error, closeError], 'Core listener startup and cleanup failed.');
+        }
+        throw error;
+    }
+}
+
 /** Claim one app-selected pipe/socket before importing or creating services. */
 export async function startSharedCoreHost({
     endpoint, application, version, configure, getReplayEvents, signal, onError = reportError
@@ -30,13 +261,10 @@ export async function startSharedCoreHost({
     signal?.throwIfAborted();
     if (typeof endpoint !== 'string' || !endpoint) throw new TypeError('A shared Core endpoint must be a nonempty local pipe/socket path.');
     const peers = new Set();
-    const requests = new Map();
     const incoming = new Set();
     const lifetime = new AbortController();
     const prefix = `shared-${randomUUID()}:`;
-    let sequence = 0;
     let runtime;
-    let unsubscribe;
     let closing;
     let preparation = Promise.resolve();
     let ready = false;
@@ -65,89 +293,61 @@ export async function startSharedCoreHost({
             if (!peer.closed) return write(peer.socket, content);
         }).catch(function outputFailed(error) { diagnostic(error); peer.socket.destroy(); });
     }
-    function cancel(record) {
-        observe(runtime.handle({protocol: CORE_PROTOCOL, type: 'control',
-            control: 'request.cancel', requestId: record.internalId}));
-    }
     function disconnect(peer) {
         if (peer.closed) return;
         peer.closed = true;
         peers.delete(peer);
-        for (const record of peer.requests.values()) cancel(record);
+        if (peer.connection) observe(peer.connection.close());
     }
-    function stateFor(peer, state) {
-        return {...state, activeRequests: state.activeRequests.map(function requestState(record) {
-            const owned = requests.get(record.id);
-            return owned?.peer === peer ? {...record, id: owned.id} : record;
-        })};
-    }
-    function replay(peer) {
-        const state = runtime.current();
-        if (state.state === 'ready') send(peer, event('core.ready', {version: state.version, app: state.application}));
-        send(peer, event('core.state', stateFor(peer, state)));
-        for (const service of state.services) send(peer, event('core.service.state', service));
-        // Domain snapshots belong to the app/service owner, never event history.
-        for (const snapshot of getReplayEvents?.() ?? []) send(peer, event(snapshot.event, snapshot.data));
-    }
-    function route(frame) {
-        if (frame.type === 'response') {
-            const record = requests.get(frame.id);
-            if (record) send(record.peer, {...frame, id: record.id});
-            return;
-        }
-        if (frame.type !== 'event') return;
-        if (Object.hasOwn(frame, 'requestId')) {
-            const owned = requests.get(frame.requestId);
-            if (owned) send(owned.peer, {...frame, requestId: owned.id,
-                data: frame.data?.requestId === owned.internalId ? {...frame.data, requestId: owned.id} : frame.data});
-            return;
-        }
-        const id = frame.data?.requestId;
-        const record = requests.get(id);
-        if (record) {
-            send(record.peer, {...frame, data: {...frame.data, requestId: record.id}});
-            return;
-        }
-        // A retired transport correlation is not a new app-wide event.
-        if (typeof id === 'string' && id.startsWith(prefix)) return;
-        for (const peer of peers) send(peer, frame.event === 'core.state'
-            ? {...frame, data: stateFor(peer, frame.data)} : frame);
+    function attach(peer) {
+        peer.connection = createCoreRuntimeConnection(
+            {
+                runtime,
+                requestPrefix: prefix,
+                preserveContextRequestId: false,
+                getReplayEvents,
+                send(frame) { send(peer, frame); },
+                mapFrame(frame, record) {
+                    // Preserve this owning adapter's established data correlation.
+                    // The borrowed listener and stdio never apply this mapping.
+                    if (record) {
+                        return frame.type === 'event' && frame.data?.requestId === record.internalId
+                            ? {...frame, data: {...frame.data, requestId: record.id}} : frame;
+                    }
+                    if (frame.event === 'core.state') {
+                        return {...frame, data: {...frame.data, activeRequests: frame.data.activeRequests.map(
+                            function requestState(request) {
+                                const owned = peer.connection.request(request.id);
+                                return owned ? {...request, id: owned.id} : request;
+                            }
+                        )}};
+                    }
+                    const id = frame.data?.requestId;
+                    const owned = peer.connection.request(id);
+                    if (owned) return {...frame, data: {...frame.data, requestId: owned.id}};
+                    // A retired transport correlation is not a new app-wide event.
+                    if (is.string(id) && id.startsWith(prefix)) return;
+                    return frame;
+                }
+            }
+        );
     }
     async function dispatch(peer, frame) {
         if (frame?.protocol !== CORE_PROTOCOL) throw failure('INVALID_RPC_REQUEST', 'Unknown Core protocol.');
         if (frame.type === 'control') {
-            if (frame.control === 'runtime.replay') { replay(peer); return; }
-            if (frame.control === 'request.cancel') {
-                const record = peer.requests.get(frame.requestId);
-                if (record) cancel(record);
-                return;
-            }
-            if (frame.control === 'requests.cancelAll') {
-                for (const record of peer.requests.values()) cancel(record);
-                return;
-            }
-            throw failure('INVALID_RPC_CONTROL', 'Unknown Core control.');
+            return peer.connection.handle(frame);
         }
         if (frame.type !== 'request' || typeof frame.id !== 'string' || !frame.id || typeof frame.method !== 'string') {
             throw failure('INVALID_RPC_REQUEST', 'A Core request requires an id and method.');
         }
-        if (peer.requests.has(frame.id)) throw failure('RPC_REQUEST_ID_ACTIVE', 'The request id is already active on this connection.');
+        if (peer.connection.has(frame.id)) throw failure('RPC_REQUEST_ID_ACTIVE', 'The request id is already active on this connection.');
         if (frame.method === 'core.host.shutdown') {
             peer.shutdownIds.push(frame.id);
             close();
             return;
         }
         if (closing) throw failure('CORE_CLOSING', 'Core is closing.');
-        const record = {peer, id: frame.id, internalId: `${prefix}${++sequence}`};
-        peer.requests.set(record.id, record);
-        requests.set(record.internalId, record);
-        try {
-            // Only protocol correlation changes; parameters remain untouched.
-            await runtime.handle({...frame, id: record.internalId});
-        } finally {
-            peer.requests.delete(record.id);
-            requests.delete(record.internalId);
-        }
+        return peer.connection.handle(frame);
     }
     function receive(peer, frame) {
         if (peer.closed) return;
@@ -157,8 +357,9 @@ export async function startSharedCoreHost({
         }));
     }
     function accept(socket) {
-        const peer = {socket, requests: new Map(), shutdownIds: [], closed: false, writes: Promise.resolve()};
+        const peer = {socket, connection: null, shutdownIds: [], closed: false, writes: Promise.resolve()};
         peers.add(peer);
+        if (runtime) attach(peer);
         const decoder = createCoreFrameDecoder(function receiveFrame(frame) { receive(peer, frame); });
         socket.on('data', function data(chunk) {
             try { decoder.push(chunk); } catch (error) { diagnostic(error); socket.destroy(); }
@@ -196,7 +397,6 @@ export async function startSharedCoreHost({
             await Promise.all([...peers].map(function drainWrites(peer) { return peer.writes; }));
             for (const peer of peers) { peer.socket.resume(); peer.socket.end(); }
             await stopped;
-            unsubscribe?.();
             signal?.removeEventListener('abort', abortHost);
             if (error) throw error;
             return runtime?.current() ?? {state: 'closed'};
@@ -222,7 +422,7 @@ export async function startSharedCoreHost({
         // The endpoint is already owned. A losing launcher never calls configure.
         signal?.throwIfAborted();
         runtime = createCoreRuntime({application, version});
-        unsubscribe = runtime.onFrame(route);
+        for (const peer of peers) attach(peer);
         signal?.addEventListener('abort', abortHost, {once: true});
         preparation = Promise.resolve().then(function configureClaimedHost() {
             lifetime.signal.throwIfAborted();

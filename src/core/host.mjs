@@ -5,7 +5,7 @@ import Is from 'strong-type';
 import {createCoreRuntime} from './runtime.mjs';
 import {startCoreStdio} from './stdio.mjs';
 
-export {startSharedCoreHost, connectSharedCoreHost, runSharedCoreHost, startSharedCoreBridge} from './shared-host.mjs';
+export {startCoreListener, startSharedCoreHost, connectSharedCoreHost, runSharedCoreHost, startSharedCoreBridge} from './shared-host.mjs';
 
 const is = new Is(false);
 
