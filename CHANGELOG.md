@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.69.0
+
+- Add explicit `textFormat:'plain'` speech input through prepared speech,
+  direct TTS requests and the browser Kokoro provider. Preserve complete input,
+  whitespace and formatting characters, original-part cache identity and
+  cancellation while leaving default narration behavior unchanged. This input
+  option does not change the selected engine's synthesis limits.
+- Add optional `native.window` width, height and resizable configuration.
+  Forward logical client dimensions through native manifests; the matching
+  Windows host applies initial DPI-aware usable-screen fitting while preserving
+  omitted defaults and subsequent application/user sizing. Other platform
+  adapters retain their existing sizing behavior.
+- Preserve selected theme-switcher colors during hover by applying ordinary
+  hover fill only to unselected enabled buttons. Keep complete labels, focus,
+  disabled states, tokens and per-instance configuration unchanged.
+
 ## 0.68.0
 
 - Add per-instance theme-switcher `configure({modes,labels})` and initial
