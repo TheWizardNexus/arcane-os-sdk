@@ -165,8 +165,11 @@ test('stdio and listener peers own correlation, replay and cancellation independ
     input.write(encodeCoreFrame({protocol, type: 'request', id: collision, method: 'echo.wait', parameters: {owner: 'window'}}));
     await accepted.get('window').promise;
     assert.equal(contexts.get('window').requestId, collision);
+    assert.equal(contexts.get('window').clientRequestId, collision);
     assert.equal(contexts.get('first').requestId, 'same-id');
+    assert.equal(contexts.get('first').clientRequestId, 'same-id');
     assert.equal(contexts.get('second').requestId, 'same-id');
+    assert.equal(contexts.get('second').clientRequestId, 'same-id');
     assert.notEqual(contexts.get('first').coreRequestId, contexts.get('second').coreRequestId);
     assert.notEqual(contexts.get('window').coreRequestId, collision);
     input.write(encodeCoreFrame({protocol, type: 'control', control: 'requests.cancelAll'}));
@@ -302,6 +305,12 @@ test('equal request IDs remain connection-local and complete payloads and correl
     first.send({type: 'request', id: 'same-id', method: 'echo.wait', parameters: {owner: 'first', streamId: 'same-stream', content}});
     second.send({type: 'request', id: 'same-id', method: 'echo.wait', parameters: {owner: 'second', streamId: 'same-stream', content}});
     await accepted.promise;
+    for (const context of contexts.values()) {
+        assert.equal(context.clientRequestId, 'same-id');
+        assert.notEqual(context.requestId, 'same-id');
+        assert.equal(context.requestId, context.coreRequestId);
+    }
+    assert.notEqual(contexts.get('first').coreRequestId, contexts.get('second').coreRequestId);
     gates.get('second').resolve();
     assert.deepEqual((await second.next(function answer(frame) { return frame.type === 'response'; })).result,
         {owner: 'second', streamId: 'same-stream', content});

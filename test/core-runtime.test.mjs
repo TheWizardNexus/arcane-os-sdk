@@ -56,6 +56,7 @@ test('transport context IDs preserve service data while internal IDs own frames 
     const operation = runtime.handle(request('internal-operation', 'courier.wait', payload), {contextRequestId: 'client-operation'});
     await entered.promise;
     assert.equal(context.requestId, 'client-operation');
+    assert.equal(context.clientRequestId, 'client-operation');
     assert.equal(context.coreRequestId, 'internal-operation');
     assert.equal(received, payload);
     assert.equal(runtime.current().activeRequests[0].id, 'internal-operation');
@@ -72,8 +73,32 @@ test('transport context IDs preserve service data while internal IDs own frames 
     assert.equal(payload.requestId, 'authored-payload-id');
     assert.deepEqual((await runtime.handle(request('direct-operation', 'courier.wait', payload))).result, payload);
     assert.equal(context.requestId, 'direct-operation');
+    assert.equal(context.clientRequestId, 'direct-operation');
     assert.equal(context.coreRequestId, 'direct-operation');
+    const explicit = await runtime.handle(
+        request('mapped-core-operation', 'courier.wait', payload),
+        {contextRequestId: 'compatibility-operation', contextClientRequestId: 'actual-client-operation'}
+    );
+    assert.equal(explicit.id, 'mapped-core-operation');
+    assert.equal(explicit.result, payload);
+    assert.equal(context.requestId, 'compatibility-operation');
+    assert.equal(context.clientRequestId, 'actual-client-operation');
+    assert.equal(context.coreRequestId, 'mapped-core-operation');
+    await runtime.handle(
+        request('owning-host-operation', 'courier.wait', payload),
+        {contextClientRequestId: 'actual-client-operation'}
+    );
+    assert.equal(context.requestId, 'owning-host-operation');
+    assert.equal(context.clientRequestId, 'actual-client-operation');
+    assert.equal(context.coreRequestId, 'owning-host-operation');
     await assert.rejects(runtime.handle(request('invalid', 'system.ping'), {contextRequestId: ''}), {code: 'INVALID_RPC_REQUEST'});
+    await assert.rejects(
+        runtime.handle(
+            request('invalid-client', 'system.ping'),
+            {contextClientRequestId: ''}
+        ),
+        {code: 'INVALID_RPC_REQUEST'}
+    );
 });
 
 test('native service lookup shares startup and preserves independent service readiness', async function nativeDependencies(t) {

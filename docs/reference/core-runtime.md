@@ -67,7 +67,7 @@ complete diagnostic serialization; the startup promise retains its original
 rejection value.
 
 Each lifecycle hook receives `{application, service, emit, getService}`. Each request handler
-receives `(parameters, {application, service, emit, getService, requestId, coreRequestId, signal})`, with
+receives `(parameters, {application, service, emit, getService, requestId, clientRequestId, coreRequestId, signal})`, with
 `this` bound to its service definition. A hook or handler may publish a complete
 service-owned event through `emit(event, data)`.
 
@@ -133,16 +133,25 @@ availability errors remain observable; unavailable services are not replaced
 with browser behavior.
 
 A transport that assigns internal dispatch IDs may call
-`runtime.handle(frame, {contextRequestId})`. This optional nonempty string sets
-only the service handler's `context.requestId`. `context.coreRequestId` always
-exposes the actual `frame.id`; it distinguishes simultaneous requests whose
-clients selected equal IDs. The supplied `frame.id` still
-owns active-request state, cancellation lookup, response correlation and the
-request event's top-level envelope. Parameters and event data remain unchanged.
-Ordinary `handle(frame)` keeps its existing behavior: `context.requestId` equals
-`frame.id`, and `coreRequestId` equals that same ID. Stdio and
-the borrowed IPC listener use this metadata to preserve the original client ID
-in service-facing data while their transport owner routes unique dispatch IDs.
+`runtime.handle(frame, {contextRequestId, contextClientRequestId})`. Each supplied
+metadata value must be a nonempty string. Handler identities are:
+
+| Field | Value |
+|---|---|
+| `requestId` | `contextRequestId ?? frame.id`, preserving the transport's established handler contract |
+| `clientRequestId` | `contextClientRequestId ?? contextRequestId ?? frame.id`, exposing the actual incoming client identity |
+| `coreRequestId` | `frame.id`, the actual internal dispatch identity |
+
+Ordinary `handle(frame)` exposes all three equal to `frame.id`. Existing callers
+that supply only `contextRequestId` also receive that value as `clientRequestId`.
+Stdio and both IPC listener forms always supply the actual client ID separately.
+Stdio and the borrowed listener preserve it as `requestId` too; the owning
+shared-host adapter retains its established internal `requestId` contract.
+
+The supplied `frame.id` still owns active-request state, cancellation lookup,
+response correlation and the request event's top-level envelope. It distinguishes
+simultaneous requests whose clients selected equal IDs. Parameters, results and
+event data remain unchanged; these identity fields are separate context metadata.
 
 A request with no registered handler retains code `METHOD_NOT_ALLOWED` and
 adds the exact `method`, its first dotted `namespace`, and a `reason`.

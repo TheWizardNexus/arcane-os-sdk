@@ -150,6 +150,43 @@ test('native Core listener opt-in attaches to the existing stdio runtime and joi
     assert.ok(entry.indexOf('listener = await startCoreListener') < entry.indexOf("} else if (process.argv.includes('--arcane-core-headless'))"));
 });
 
+test(
+    'native listener observation reuses selected service objects without changing ordinary or headless composition',
+    function nativeModelObservationEntry() {
+        const selectedServices = [{module: 'services/decisions.mjs', options: {name: 'moon-cheese-oracle'}}];
+        const entry = coreEntrySource(
+            {...application, native: {launchContext: {coreListener: {endpoint: 'selected-observer'}}}},
+            '1.2.3',
+            selectedServices,
+            {localAI: {runtimes: ['onnx', 'stable-diffusion.cpp']}}
+        );
+        const created = entry.indexOf('host = startCoreHost({application, version, services});');
+        const optedIn = entry.indexOf('if (context.coreListener !== undefined) {');
+        const observation = entry.indexOf('const observation = createModelObservationService(');
+        const registered = entry.indexOf('host.runtime.registerService(observation);');
+        const listening = entry.indexOf('listener = await startCoreListener(');
+        const headless = entry.indexOf("} else if (process.argv.includes('--arcane-core-headless'))");
+        assert.ok(entry.includes("import {createModelObservationService} from 'arcane-os/core/model-observation';"));
+        assert.ok(created < optedIn && optedIn < observation && observation < registered && registered < listening && listening < headless);
+        assert.ok(entry.includes('runtime: host.runtime,'));
+        for (const [role, method] of [['localAI', 'localai.status'], ['image', 'image.status'], ['decisions', 'decisions.status']]) {
+            assert.ok(entry.includes(`${role}: services.find(`));
+            assert.ok(entry.includes(`Object.hasOwn(service.methods ?? {}, '${method}')`));
+        }
+        assert.ok(entry.includes(JSON.stringify(JSON.stringify(selectedServices[0].options))));
+        assert.equal(entry.includes("service.name === 'decisions'"), false);
+        assert.equal(entry.includes('await host.runtime.getService'), false);
+        assert.equal(entry.includes('await observation'), false);
+        assert.ok(entry.includes('await host.close();'));
+        assert.ok(entry.includes('configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); }'));
+        const unselected = coreEntrySource(application, '1.2.3', []);
+        assert.ok(unselected.includes('if (context.coreListener !== undefined) {'));
+        assert.ok(unselected.includes('                    ) ?? null'));
+        assert.equal(unselected.includes('register(createLocalAIService('), false);
+        assert.equal(unselected.includes('register(createLocalImageService('), false);
+    }
+);
+
 test('portable assembly preserves complete app and dependency files and authors service composition without executing it', async function completePayload(t) {
     const fixture = await createFixture(t);
     const dependencyRoot = path.join(fixture.root, 'selected-dependency');

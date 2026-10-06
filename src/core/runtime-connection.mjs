@@ -137,7 +137,10 @@ export function createCoreRuntimeConnection({
         try {
             return await runtime.handle(
                 {...frame, id: record.internalId},
-                preserveContextRequestId ? {contextRequestId: record.id} : undefined
+                {
+                    contextRequestId: preserveContextRequestId ? record.id : undefined,
+                    contextClientRequestId: record.id
+                }
             );
         } finally {
             releaseRequest();

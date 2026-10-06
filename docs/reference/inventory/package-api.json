@@ -6,12 +6,54 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 303,
+  "memberCount": 306,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "core-model-observation:createModelObservationService",
+      "name": "createModelObservationService",
+      "displayName": "createModelObservationService()",
+      "kind": "function",
+      "signature": "createModelObservationService({runtime,localAI=null,image=null,decisions=null}={})",
+      "entrypoints": ["arcane-os/core/model-observation"],
+      "primaryImport": "arcane-os/core/model-observation",
+      "group": "Existing model observation",
+      "summary": "Observes an existing Core runtime and supplied actual native model service owners without creating or starting them.",
+      "availability": "Node with an existing Core runtime and optional existing native model services",
+      "protocol": "arcane/1 model.observation current, watch, renderer.attach and renderer.publish methods",
+      "normalization": "Returns name:model-observation, current(), dispose() and four methods. Complete current snapshots retain core, optional native localAI/image/decisions and request-owned renderer attachments. Missing owners are null; watch diagnostics defaults false and explicit true exposes complete live failed response frames for supplied native method keys without retained failure history. Actual clientRequestId identifies acknowledgements; coreRequestId keys renderer lifetime. Disposal cancels only observation requests/subscriptions, never models or the supplied runtime. No getService, readiness barrier, model creation, inference, polling or fabricated operation identities."
+    },
+    {
+      "id": "ai-model-observation:attachModelObservation",
+      "name": "attachModelObservation",
+      "displayName": "attachModelObservation()",
+      "kind": "function",
+      "signature": "attachModelObservation({client,aiRuntimeState=null,imageRuntime=null,decisionModel=null,modelController=null,signal,onError}={})",
+      "entrypoints": ["arcane-os/ai/model-observation"],
+      "primaryImport": "arcane-os/ai/model-observation",
+      "group": "Existing model observation",
+      "summary": "Attaches the application's existing renderer model owners through its existing Core client.",
+      "availability": "JavaScript with an existing Core client and optional existing renderer owners",
+      "protocol": "Request-owned model.observation.renderer attachment and complete snapshot publication",
+      "normalization": "Returns ready, closed, current() and close(). Ready acknowledges actual attachmentRequestId/coreRequestId; subscriptions publish complete current owner snapshots and reread after acknowledgement. Existing Core serialization encodes owner Error fields at the JSON boundary without changing other fields. Abort, page retirement, exact installed-client retirement, transport failure or explicit close retires only observation RPCs/subscriptions and leaves models/client owned by the caller. Normal cancellation closes cleanly; pre-acknowledgement cancellation rejects ready. Other failures reject public promises and reach onError or complete console diagnostics. No automatic reattachment, owner creation, model work or page-render barrier."
+    },
+    {
+      "id": "ai-model-observation:subscribeModelObservation",
+      "name": "subscribeModelObservation",
+      "displayName": "subscribeModelObservation()",
+      "kind": "function",
+      "signature": "subscribeModelObservation({client,signal,onState,onDiagnostic,onError}={})",
+      "entrypoints": ["arcane-os/ai/model-observation"],
+      "primaryImport": "arcane-os/ai/model-observation",
+      "group": "Existing model observation",
+      "summary": "Subscribes to complete existing model-owner snapshots and explicitly selected live Core diagnostics.",
+      "availability": "JavaScript with an existing Core client and composed observation service",
+      "protocol": "Request-owned model.observation.watch with targeted state and optional error events",
+      "normalization": "Requires onState; returns ready, closed, current() and close(). Ready resolves the first current snapshot; onDiagnostic explicitly selects diagnostics:true and receives complete correlated live failed Core response frames, without recovered history or inferred model IDs. Closing, abort, page/client retirement and transport failures retire only observation work. Normal cancellation closes cleanly; other errors reach onError and reject public promises. Callback errors close the observation while callback promises remain caller-owned. No model refresh, inference, polling, host launch, endpoint discovery, reconnect or saved conversation content."
+    },
     {
       "id": "core-app-control:connectAppControl",
       "name": "connectAppControl",
@@ -4374,7 +4416,7 @@
       "summary": "Creates an app-neutral Core dispatcher with explicit services, request lifetimes, events and graceful drain.",
       "availability": "Node on Windows, Linux and macOS native hosts; Android requires its host adaptation",
       "protocol": "arcane/1 dispatcher and service lifecycle",
-      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. runtime.handle(frame,{contextRequestId}) optionally sets handler requestId while coreRequestId remains frame.id; omitted metadata exposes both equal. Internal IDs continue to own cancellation/state/event envelopes and payloads remain unchanged. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order. Missing dispatch retains METHOD_NOT_ALLOWED with exact method/namespace and core-namespace-unavailable or core-method-unavailable; named services, registered methods and built-in namespaces establish presence. Handler/startup/permission errors remain unchanged."
+      "normalization": "Starts services independently; runtime.getService(name) and context.getService(name) return the same registered object after only its shared startup, without a renderer or global barrier. Lookup is readiness, not a lifetime lease; new lookups reject during shutdown. runtime.handle(frame,{contextRequestId,contextClientRequestId}) sets requestId=contextRequestId??frame.id, clientRequestId=contextClientRequestId??contextRequestId??frame.id and coreRequestId=frame.id; omitted metadata exposes all three equal. Transports always supply the actual client ID separately, preserving the owning shared-host internal requestId contract. Internal IDs continue to own cancellation/state/event envelopes and payloads remain unchanged. Preserves complete results/errors, cancels request-lifetime work and drains accepted service work; runtime.replay publishes current dispatcher/service state without restart and preserves reentrant lifecycle publication order. Missing dispatch retains METHOD_NOT_ALLOWED with exact method/namespace and core-namespace-unavailable or core-method-unavailable; named services, registered methods and built-in namespaces establish presence. Handler/startup/permission errors remain unchanged."
     },
     {
       "id": "core-stdio:encodeCoreFrame",
@@ -4416,7 +4458,7 @@
       "summary": "Attaches an existing Core runtime to framed input and output with concurrent dispatch and graceful shutdown.",
       "availability": "Node with readable input and writable output streams",
       "protocol": "Content-Length framed arcane/1 stdio",
-      "normalization": "Returns {runtime,closed,close}; scopes responses/request events, cancellation and current-state replay to its connection, preserving original service-facing requestId and complete payloads while routing unique internal IDs. Preserves queued output order, reports parser and stream failures, drains accepted runtime work on EOF and never exits the host or ends caller-owned output"
+      "normalization": "Returns {runtime,closed,close}; scopes responses/request events, cancellation and current-state replay to its connection, preserving original service-facing requestId/clientRequestId and complete payloads while coreRequestId identifies unique internal dispatch. Preserves queued output order, reports parser and stream failures, drains accepted runtime work on EOF and never exits the host or ends caller-owned output"
     },
     {
       "id": "native-portable-provider:createPortableNativeProvider",
@@ -4430,7 +4472,7 @@
       "summary": "Creates the SDK-owned provider that assembles one selected app and explicit services into a portable Core payload.",
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
-      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; optional appDescriptor.native.window carries positive integral logical client width/height and optional resizable into manifest.window with omitted fields preserved; reports executable:false and never substitutes for an unavailable platform host"
+      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; optional appDescriptor.native.window carries positive integral logical client width/height and optional resizable into manifest.window with omitted fields preserved. Generated coreListener opt-in composes one passive model-observation service from the existing host.runtime and actual services exposing localai.status/image.status/decisions.status before listener binding, with absent owners null and renderer attachment separate. Ordinary stdio and sharedHost/headless behavior remains unchanged; no model creation, getService or readiness barrier. Reports executable:false and never substitutes for an unavailable platform host"
     },
     {
       "id": "native-portable-provider:arcaneNativeBuilderProvider",
@@ -4640,7 +4682,7 @@
       "summary": "Attaches local IPC to an existing window-owned Core runtime without changing its services or lifetime.",
       "availability": "Node named pipes on Windows and Unix-domain sockets on Linux/macOS; Android requires its host adaptation",
       "protocol": "arcane/1 over local IPC with per-connection correlation, cancellation and current-state replay",
-      "normalization": "Returns {endpoint,closed,close}; never constructs, starts or closes the supplied runtime. Explicit close flushes queued output and disconnects its clients while accepted service work remains runtime-owned. Runtime shutdown retains the endpoint through service drain then closes the listener. Preserves parameters/results/event data, original handler requestId and internal coreRequestId; no host shutdown RPC. Bind errors reject startup; transport errors reach onError and terminal errors reject closed. Native launchContext.coreListener:{endpoint} selects the existing stdio branch; no sharedHost/headless selection or inferred endpoint."
+      "normalization": "Returns {endpoint,closed,close}; never constructs, starts or closes the supplied runtime or registers services. Explicit close flushes queued output and disconnects its clients while accepted service work remains runtime-owned. Runtime shutdown retains the endpoint through service drain then closes the listener. Preserves parameters/results/event data, original handler requestId/clientRequestId and internal coreRequestId; no host shutdown RPC. Bind errors reject startup; transport errors reach onError and terminal errors reject closed. Native launchContext.coreListener:{endpoint} selects the existing stdio branch and its existing-instance observation composition; no sharedHost/headless selection or inferred endpoint."
     },
     {
       "id": "core-host:startSharedCoreHost",
@@ -4654,7 +4696,7 @@
       "summary": "Claims an app-selected local endpoint before composing one shared Core runtime.",
       "availability": "Node named pipes on Windows and Unix-domain sockets on Linux/macOS; Android requires its host adaptation",
       "protocol": "arcane/1 over local IPC with per-connection request correlation and current-state replay",
-      "normalization": "Returns {runtime,endpoint,closed,close}; configure(runtime,{signal}) registers independently started services after the endpoint claim. Close joins composition, accepted service work, disposal and queued frames before releasing the endpoint. Complete transport/startup/shutdown errors remain observable; an occupied endpoint never invokes the factory"
+      "normalization": "Returns {runtime,endpoint,closed,close}; configure(runtime,{signal}) registers independently started services after the endpoint claim. Preserves internal handler requestId/coreRequestId and the existing matching data.requestId adapter mapping while additive clientRequestId exposes the actual client ID independently. Other payload fields remain unchanged. Close joins composition, accepted service work, disposal and queued frames before releasing the endpoint. Complete transport/startup/shutdown errors remain observable; an occupied endpoint never invokes the factory"
     },
     {
       "id": "core-host:connectSharedCoreHost",

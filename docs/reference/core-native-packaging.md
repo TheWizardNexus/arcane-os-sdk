@@ -245,6 +245,20 @@ listener endpoint has no default and its parent directory must already exist
 where required by the operating system. `coreListener` and `sharedHost` are
 alternative selections; supplying both reports `TypeError`.
 
+That same `coreListener` opt-in registers one
+[`createModelObservationService()`](model-observation.md) after `startCoreHost()`
+and before binding the listener. It receives `host.runtime` and the exact
+already-created service objects exposing `localai.status`, `image.status` and
+`decisions.status`; a configurable decision-service name remains supported.
+Absent owners are `null`. Composition creates no model or second runtime,
+performs no service lookup and adds no model-readiness wait. Ordinary stdio
+without this opt-in and the existing `sharedHost` branches retain their behavior.
+The application separately calls `attachModelObservation()` with its existing
+renderer owners and Core client; native composition cannot infer those objects.
+Observers select `onDiagnostic` to receive complete live model failure frames
+in their developer diagnostic surface. Observation does not start inference or
+establish that an existing model failure has been corrected.
+
 Clients use `connectSharedCoreHost({endpoint})` with `start` omitted and close
 only their own connection. This listener provides no host-shutdown RPC. Closing
 the window still drains its Core, including accepted service-owned operations,

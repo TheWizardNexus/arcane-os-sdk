@@ -55,6 +55,8 @@ runtime layouts.
 | `arcane-os/core/contracts` | Shared Core protocol, frame, method and diagnostic error contracts. |
 | `arcane-os/core/classic-source` | Node generator for the canonical classic-script Core client projection. |
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
+| `arcane-os/core/model-observation` | Passive observation of an existing Core and its actual native model service owners. |
+| `arcane-os/ai/model-observation` | Attach existing renderer model owners and subscribe through an existing Core client. |
 | `arcane-os/core/development` | App-service composition and document-owned Core transport during source development, independently of local AI. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle, app-selected native launch defaults and shared native location resolution. |
@@ -420,6 +422,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `McpProtocolError` | class | `arcane-os/mcp/stdio` | MCP STDIO | Node |
 | `createCoreClassicSource()` | function | `arcane-os/core/classic-source` | Core classic client projection | Node; generated source runs in browser and native WebView renderers |
 | `createCoreRuntime()` | function | `arcane-os/core/runtime` | Native Core runtime | Node on Windows, Linux and macOS native hosts; Android requires host adaptation |
+| `createModelObservationService()` | function | `arcane-os/core/model-observation` | Existing model observation | Node with an existing Core runtime and optional existing native model services |
+| `attachModelObservation()` | function | `arcane-os/ai/model-observation` | Existing model observation | JavaScript with an existing Core client and optional existing renderer owners |
+| `subscribeModelObservation()` | function | `arcane-os/ai/model-observation` | Existing model observation | JavaScript with an existing Core client and composed observation service |
 | `encodeCoreFrame()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
 | `createCoreFrameDecoder()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
 | `startCoreStdio()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
@@ -7395,13 +7400,17 @@ Import it from `arcane-os/core/runtime`. The runtime exposes `current()`,
 `subscribe()`, `onFrame()`, `emit()`, `registerService()`, `getService()`, `start()`, `handle()`
 and idempotent `close()`.
 
-`runtime.handle(frame, {contextRequestId})` optionally preserves a transport's
-original client ID in handler `context.requestId`, while `context.coreRequestId`
-always exposes the actual internal `frame.id`. Active requests, cancellation,
-response IDs and request-event envelopes retain that internal ID. Ordinary
-`handle(frame)` exposes both context IDs equal to `frame.id`. This metadata
-does not change parameters or event data; transports own client-facing protocol
-correlation. See [the runtime contract](core-runtime.md#state-and-frames).
+`runtime.handle(frame, {contextRequestId, contextClientRequestId})` accepts
+optional nonempty transport metadata strings. Handler `requestId` remains
+`contextRequestId ?? frame.id`; additive `clientRequestId` is
+`contextClientRequestId ?? contextRequestId ?? frame.id`; `coreRequestId` always
+exposes the actual internal `frame.id`. Direct `handle(frame)` exposes all three
+equal. Stdio and both IPC paths supply the actual client identity separately,
+preserving the owning shared-host adapter's established internal `requestId`.
+Active requests, cancellation, response IDs and request-event envelopes retain
+the internal ID. Parameters, results and event data stay unchanged; transports
+own client-facing protocol correlation. See
+[the runtime contract](core-runtime.md#state-and-frames).
 
 `await runtime.getService(name)` and service `context.getService(name)` return
 the actual registered service after its shared startup. They wait for that
@@ -7588,6 +7597,80 @@ const transport = startCoreStdio({runtime});
 await transport.closed;
 ```
 
+## createModelObservationService()
+
+```text
+createModelObservationService({runtime,localAI=null,image=null,decisions=null}={})
+```
+
+Import from `arcane-os/core/model-observation`. Supply the existing Core runtime
+and actual native service definitions, including their `current()` and `methods`.
+Returns `{name:'model-observation',current,dispose,methods}`. Register it on that
+runtime after ordinary host creation and before opening an additional listener.
+Construction starts no service, model, worker or readiness wait.
+
+The four methods are `model.observation.current`, `model.observation.watch`,
+`model.observation.renderer.attach` and `model.observation.renderer.publish`.
+`current()` returns `{core,native:{localAI,image,decisions},renderers}` from the
+supplied owners. Absent model owners are `null`; absent attachments produce `[]`.
+The watch replays current state and remains pending until cancellation. Its
+`diagnostics:false` default excludes live failure frames; explicit `true`
+observes complete failed Core responses for the supplied owners' method keys.
+It retains no failure history and invents no model-operation identities.
+
+Renderer attachment and watch acknowledgements use actual `clientRequestId`;
+attachments are keyed by the actual `coreRequestId` to distinguish clients with
+equal local IDs. `dispose()` retires observation requests/subscriptions only.
+Core still owns model services and shutdown. See
+[complete methods, events and evidence limits](model-observation.md).
+
+## attachModelObservation()
+
+```text
+attachModelObservation({client,aiRuntimeState=null,imageRuntime=null,decisionModel=null,modelController=null,signal,onError}={})
+```
+
+Import from `arcane-os/ai/model-observation`. Pass the existing Core client and
+the application-owned instances already doing the work. Supported owner methods
+are AIRuntimeState's `getAIRuntimeState/subscribeAIRuntimeState`, image runtime's
+`current/subscribe`, decision model's `status/subscribe`, and ModelController's
+`status/on`. It creates no replacement owner or transport.
+
+Returns `{ready,closed,current,close}`. `ready` resolves with the Core-supplied
+`{attachmentRequestId,coreRequestId}` acknowledgement. Subscriptions then publish
+complete current owner snapshots, including a fresh read after acknowledgement.
+`current()` returns the latest renderer snapshot, initially `null`. The existing
+Core error serializer represents owner `Error` fields at the JSON boundary;
+other fields remain unchanged.
+
+Caller abort, page retirement, retirement of the exact installed client,
+transport failure or `close()` retires only observation RPCs/subscriptions.
+`close()` returns `closed`; it never closes the supplied client or unloads models.
+Normal cancellation closes cleanly; cancellation before acknowledgement rejects
+`ready`. Other errors reject public promises and reach `onError`, defaulting to
+complete console diagnostics. A replacement client requires a new explicit
+attachment. Keep attachment readiness independent of page rendering. See
+[renderer ownership and lifecycle](model-observation.md#attach-existing-renderer-owners).
+
+## subscribeModelObservation()
+
+```text
+subscribeModelObservation({client,signal,onState,onDiagnostic,onError}={})
+```
+
+Import from `arcane-os/ai/model-observation`. Requires an existing client and
+`onState`; returns `{ready,closed,current,close}`. `ready` resolves with the first
+current-state snapshot and `current()` retains the latest snapshot, initially
+`null`. Providing `onDiagnostic` explicitly selects live complete correlated Core
+model failure frames; omission selects state only. These are developer
+diagnostics, not ordinary user status or saved conversation content.
+
+The observer uses the same observation-only cancellation/error lifecycle as
+the attachment. Callback failures retire it and reach `onError`; callback
+promises may await `close()` without becoming its completion barrier. It starts
+no model, refresh, polling, endpoint discovery, host or reconnect. See
+[observation records and limits](model-observation.md#read-or-subscribe-from-an-existing-client).
+
 ## createPortableNativeProvider()
 
 ### Overview
@@ -7620,6 +7703,13 @@ reports `ARCANE_NATIVE_RUN_UNSUPPORTED`.
 published SDK/runtime dependencies and the canonical Core entry/client into a
 fresh output directory. Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.
+
+Explicit `native.launchContext.coreListener:{endpoint}` also composes one passive
+model observation service after `startCoreHost()` and before listener binding,
+using that runtime and existing services exposing `localai.status`, `image.status`
+and `decisions.status`. Missing owners remain `null`; renderer attachment stays
+application-owned. Ordinary stdio and shared/headless branches gain no model
+startup or readiness barrier. See [native observation composition](core-native-packaging.md#launch-time-locations).
 
 An optional `appDescriptor.native.window` record carries `width`, `height` and
 `resizable` into `manifest.window`. Dimensions are positive integral logical
@@ -8848,7 +8938,7 @@ borrowed listener implements no `core.host.shutdown` operation; use client
 `close()` for disconnection and the existing runtime's owner for host shutdown.
 
 Each connection owns response/event correlation and request cancellation.
-Handler `requestId` preserves the client ID; `coreRequestId` is the distinct
+Handler `requestId` and `clientRequestId` preserve the client ID; `coreRequestId` is the distinct
 internal dispatch ID. Parameters, results and event data, including
 `data.requestId`, remain unchanged. Runtime-state snapshots retain internal
 active IDs; no service event is invented or retained for later replay.
@@ -8867,6 +8957,9 @@ try {
 `host` is the application's existing stdio host. Generated native entries
 select this attachment with `native.launchContext.coreListener:{endpoint}`,
 preserving their actual runtime, service set, profile, origin and state root.
+That generated opt-in registers the passive observation service from existing
+native model owners before binding; direct `startCoreListener()` itself never
+registers services. Renderer owners are attached separately by the application.
 Omit `sharedHost`; the two options describe alternative lifetimes. Full
 contract: [existing-runtime listener](core-shared-host.md#attach-to-an-existing-window-owned-core).
 
@@ -8893,6 +8986,11 @@ Request-lifetime work is cancelled; accepted service-lifetime work remains
 service-owned. The supplied signal begins the same shutdown. `closed` rejects
 on shutdown failure; `onError` observes transport/background failures, with
 complete console diagnostics by default.
+
+The owning adapter preserves its existing internal handler `requestId`, equal
+to `coreRequestId`, and its matching `data.requestId` compatibility mapping.
+Additive `clientRequestId` exposes the original client ID independently; other
+parameters, results and event data remain unchanged.
 
 ### Availability and example
 

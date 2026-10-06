@@ -58,7 +58,8 @@ the supplied runtime alive. A draining/closed runtime rejects attachment with
 
 Stdio and each IPC connection have independent request correlation and
 cancellation. Handlers reached through stdio or this listener receive the
-original client ID in `context.requestId`; `context.coreRequestId` exposes the
+original client ID in both `context.requestId` and `context.clientRequestId`;
+`context.coreRequestId` exposes the
 fresh internal ID used by runtime dispatch and protocol routing. Responses and
 top-level event correlation return to their originating connection. The new listener leaves all event data,
 including any authored `data.requestId`, and all parameters/results unchanged.
@@ -186,8 +187,13 @@ substitutes an internal Core request ID and restores the originating ID on respo
 the optional top-level event `requestId`. Existing `data.requestId` values that
 carry that same Core correlation ID are restored too. `parameters`, returned results, schemas,
 documents, and content remain complete and unchanged. A handler's
-`context.requestId` is the Core-side correlation ID; put it in the event's
-separate `requestId` field, not inside application content.
+`context.requestId` remains the Core-side correlation ID, equal to
+`context.coreRequestId`; put it in the event's separate `requestId` field, not
+inside application content. The additive `context.clientRequestId` exposes the
+actual incoming client ID independently of that compatibility behavior. Services
+such as [model observation](model-observation.md) can therefore publish explicit
+client-facing acknowledgement fields without changing the existing adapter or
+rewriting application payloads.
 
 Responses and request-context events go to the originating connection in
 order. Core supplies the top-level request correlation outside `data`, so two
