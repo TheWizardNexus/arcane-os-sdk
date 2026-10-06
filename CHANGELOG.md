@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.82.0
+
+- Add `connectAppControl` from `arcane-os/core/app-control` and the
+  `arcane app-control` CLI for an explicitly selected running Windows WebView2
+  application. Inspect complete document content and live controls, capture the
+  rendered viewport, and perform targeted click, fill, select and scroll actions
+  without activating the desktop window or injecting global input. Preserve the
+  application's existing Core, profile and lifecycle; closing the client closes
+  only its connection. The matching Windows host archive includes the generated
+  DOM operation source. Other native host adapters remain unavailable.
+- Render stored `arcane-media:` images in shared Chat through MarkdownMedia,
+  including restored history, live chunks and final responses. Preserve complete
+  original Markdown and immediate text rendering. Release obsolete display URLs
+  on replacement, removal and destruction; retain requested print snapshots
+  through `afterprint` and await current images for explicit printing.
+- Keep dependencies, saved-data formats, model and speech routing unchanged.
+  Package verification and host compilation do not establish actual built-app,
+  Core/profile, covered-window capture or model behavior.
+
 ## 0.81.0
 
 - Add per-activation native decision `family`, `model`, `revision`, and `dtype`
