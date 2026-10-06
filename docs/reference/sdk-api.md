@@ -7942,16 +7942,24 @@ readGitIdentity({directory,signal,onEvent,run=runProcess}={})
 
 Import from `arcane-os/core/repositories`. Returns a promise for
 `{global,local,effective}`, each observed scope containing `{name,email,githubUser}`.
-Fields preserve complete strings, including empty values; unset fields are
-`null`. With no directory, only global configuration is read and local/effective
+Fields preserve complete UTF-8 strings, including empty values, leading U+FEFF
+and newlines; unset fields are `null`. Git values outside UTF-8 fail with
+`ARCANE_GIT_IDENTITY_NOT_TEXT` instead of replacement characters.
+With no directory, only global configuration is read and local/effective
 are `null`. Existing repository directories, including bare caches, select the
 context for all three observations. Configured includes and ordinary Git
 precedence remain in effect. These are config observations, not authenticated
 accounts or environment-resolved commit identities.
 
 Independent scope queries run concurrently and join cleanup before settlement.
-Errors retain complete process diagnostics; one failure is rethrown unchanged
-and multiple failures use `AggregateError`. See the [complete contract and
+Raw stdout is parser-owned rather than emitted as text events; an injected
+`run` must honor the existing raw-output process contract. Lifecycle and stderr
+events retain their ordinary route. Errors preserve their original object,
+code, cause and process diagnostics, with complete captured output added as
+`rawStdout` (a Buffer). The raw-mode process result retains `stdout:null`.
+Decoding failures include their cause, complete process details and raw output.
+Already-represented observer errors appear once; separate failures use
+`AggregateError`. See the [complete contract and
 per-process selection example](core-repositories.md#git-identity-configuration).
 
 ## createCoreLocalAIProvider()

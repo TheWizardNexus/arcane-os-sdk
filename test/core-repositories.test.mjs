@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import {createRepositoryWorkspace, readGitIdentity, resolveArcaneDataPaths} from '../src/core/repositories.mjs';
 import {createGitIdentityRunner} from '../src/git-identity.mjs';
+import {ArcaneError} from '../src/errors.mjs';
 
 const fixtures = fileURLToPath(new URL('../.arcane/core-repositories-fixtures/', import.meta.url));
 
@@ -56,11 +57,17 @@ test('Git identity observations distinguish global, local, effective, empty and 
         assert.equal(options.cwd, directory);
         assert.equal(options.signal, signal);
         assert.equal(options.allowNonzero, true);
+        assert.deepEqual(options.outputEncoding, {stdout: null});
+        assert.deepEqual(options.captureOutput, {stdout: false});
+        assert.deepEqual(options.emitOutputEvents, {stdout: false});
         assert.deepEqual(args.slice(-4), ['--includes', '--null', '--get-regexp', '^(user[.](name|email)|github[.]user)$']);
+        const output = args.includes('--global')
+            ? `user.name\nEarlier value\0user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`
+            : args.includes('--local') ? `user.name\n${name}\0`
+                : `user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`;
+        await options.onOutput({stream: 'stdout', chunk: Buffer.from(output)});
         await options.onEvent({type: 'process.completed', message: 'Complete scope observation.', data: {scope: args[1]}});
-        if (args.includes('--global')) return processResult(`user.name\nEarlier value\0user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`);
-        if (args.includes('--local')) return processResult(`user.name\n${name}\0`);
-        return processResult(`user.name\n${name}\0user.email\n\0github.user\nmoon-account\0`);
+        return processResult(null);
     }
     assert.deepEqual(await readGitIdentity({directory, signal, onEvent, run}), {
         global: {name, email: '', githubUser: 'moon-account'},
@@ -72,13 +79,98 @@ test('Git identity observations distinguish global, local, effective, empty and 
     assert.equal(observing, false);
 });
 
+test('identity decoding preserves split UTF-8 and BOM values and retains undecodable output', async function rawIdentity() {
+    const chunks = [Buffer.from('user.name\n\uFEFF Moon '), Buffer.from([0xf0, 0x9f]),
+        Buffer.from([0xa7, 0x80]), Buffer.from('\n \0user.email\n\0')];
+    async function valid(command, args, options) {
+        for (const chunk of chunks) await options.onOutput({stream: 'stdout', chunk});
+        await options.onOutput({stream: 'stderr', chunk: 'Complete diagnostic\n'});
+        return processResult(null, 'Complete diagnostic\n');
+    }
+    assert.deepEqual(await readGitIdentity({run: valid}), {
+        global: {name: '\uFEFF Moon 🧀\n ', email: '', githubUser: null}, local: null, effective: null
+    });
+    const invalid = [Buffer.from('user.name\nBefore '), Buffer.from([0x80]), Buffer.from(' after\0')];
+    const result = processResult(null, 'Complete diagnostic\n');
+    await assert.rejects(readGitIdentity({run: async function undecodable(command, args, options) {
+        for (const chunk of invalid) await options.onOutput({stream: 'stdout', chunk});
+        return result;
+    }}), function complete(error) {
+        assert.equal(error.code, 'ARCANE_GIT_IDENTITY_NOT_TEXT');
+        assert.equal(error.details, result);
+        assert.ok(error.cause instanceof TypeError);
+        assert.deepEqual(error.rawStdout, Buffer.concat(invalid));
+        return true;
+    });
+    const controller = new AbortController();
+    await assert.rejects(readGitIdentity({signal: controller.signal,
+        run: async function cancelled(command, args, options) {
+            for (const chunk of chunks) await options.onOutput({stream: 'stdout', chunk});
+            controller.abort('Caller cancelled after output.');
+            return result;
+        }
+    }), function cancelledOutput(error) {
+        assert.equal(error.code, 'ARCANE_CANCELLED');
+        assert.equal(error.details, result);
+        assert.equal(error.cause, 'Caller cancelled after output.');
+        assert.deepEqual(error.rawStdout, Buffer.concat(chunks));
+        return true;
+    });
+});
+
+test('identity discovery retains wrapped observer failures once and preserves independent siblings', async function wrappedIdentityFailure() {
+    const observerFailure = new Error('Complete observer failure.');
+    const result = processResult(null, 'Complete process diagnostic\n');
+    const raw = Buffer.from('user.name\nMoon dispatcher\0');
+    const failure = new ArcaneError('ARCANE_OPERATION_FAILED', observerFailure.message,
+        {cause: observerFailure, details: result});
+    failure.errors = [observerFailure];
+    async function run(command, args, options) {
+        await options.onOutput({stream: 'stdout', chunk: raw});
+        try { await options.onEvent({type: 'process.completed', message: 'Scope finished.'}); }
+        catch (error) { assert.equal(error, observerFailure); throw failure; }
+        assert.fail('Observer failure must reach the process owner.');
+    }
+    function onEvent() { throw observerFailure; }
+    await assert.rejects(readGitIdentity({run, onEvent}), function original(error) {
+        assert.equal(error, failure);
+        assert.equal(error.code, 'ARCANE_OPERATION_FAILED');
+        assert.equal(error.details, result);
+        assert.equal(error.cause, observerFailure);
+        assert.deepEqual(error.errors, [observerFailure]);
+        assert.deepEqual(error.rawStdout, raw);
+        return true;
+    });
+    const cancellation = new ArcaneError('ARCANE_CANCELLED', 'Caller cancelled.', {details: result, exitCode: 130});
+    const combined = new ArcaneError(cancellation.code, cancellation.message,
+        {cause: cancellation, details: result, exitCode: cancellation.exitCode});
+    combined.errors = [cancellation, observerFailure];
+    const sibling = new Error('Independent local configuration failure.');
+    await assert.rejects(readGitIdentity({directory: path.resolve('moon-repository'), onEvent,
+        run: async function concurrent(command, args, options) {
+            if (args.includes('--local')) throw sibling;
+            if (!args.includes('--global')) return processResult(null);
+            await options.onOutput({stream: 'stdout', chunk: raw});
+            try { await options.onEvent({type: 'process.cancelled', message: 'Scope cancelled.'}); }
+            catch (error) { assert.equal(error, observerFailure); throw combined; }
+        }
+    }), function distinct(error) {
+        assert.ok(error instanceof AggregateError);
+        assert.deepEqual(error.errors, [combined, sibling]);
+        assert.equal(combined.cause, cancellation);
+        assert.equal(combined.details, result);
+        assert.deepEqual(combined.rawStdout, raw);
+        return true;
+    });
+});
+
 test('global-only identity reads preserve unset values and complete rejected failures', async function identityFailures() {
     let calls = 0;
     const empty = await readGitIdentity({run: async function absent(command, args, options) {
         calls += 1;
         assert.equal(options.cwd, undefined);
         assert.ok(args.includes('--global'));
-        return {code: 1, stdout: '', stderr: ''};
+        return {code: 1, stdout: null, stderr: ''};
     }});
     assert.equal(calls, 1);
     assert.deepEqual(empty, {global: {name: null, email: null, githubUser: null}, local: null, effective: null});
@@ -86,9 +178,15 @@ test('global-only identity reads preserve unset values and complete rejected fai
     failure.details = {code: 1, stdout: 'Complete output.', stderr: 'Complete diagnostic.'};
     await assert.rejects(readGitIdentity({run: async function rejected() { throw failure; }}),
         function original(error) { return error === failure; });
-    const result = {code: 3, stdout: '  Entire output\n', stderr: 'Entire configuration failure\n'};
-    await assert.rejects(readGitIdentity({run: async function invalidConfig() { return result; }}),
-        function complete(error) { return error.code === 'ARCANE_OPERATION_FAILED' && error.details === result; });
+    const output = Buffer.from('  Entire output\n');
+    const result = {code: 3, stdout: null, stderr: 'Entire configuration failure\n'};
+    await assert.rejects(readGitIdentity({run: async function invalidConfig(command, args, options) {
+        await options.onOutput({stream: 'stdout', chunk: output});
+        return result;
+    }}), function complete(error) {
+        assert.deepEqual(error.rawStdout, output);
+        return error.code === 'ARCANE_OPERATION_FAILED' && error.details === result;
+    });
     const controller = new AbortController();
     controller.abort('Caller cancelled.');
     await assert.rejects(readGitIdentity({signal: controller.signal, run: function never() { assert.fail('No process may start.'); }}),
@@ -105,7 +203,7 @@ test('identity discovery joins each accepted observation and preserves sibling f
         if (args.includes('--local')) throw localFailure;
         await gate.promise;
         effectiveFinished = true;
-        return processResult();
+        return processResult(null);
     }});
     const rejected = assert.rejects(reading, function everyFailure(error) {
         assert.equal(effectiveFinished, true);

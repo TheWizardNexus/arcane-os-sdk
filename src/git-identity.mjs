@@ -16,32 +16,51 @@ export async function readGitIdentity({directory, signal, onEvent, run = runProc
         const args = ['config'];
         if (scope !== 'effective') args.push(`--${scope}`);
         args.push('--includes', '--null', '--get-regexp', '^(user[.](name|email)|github[.]user)$');
-        const result = await run('git', args, {
-            cwd, signal, onEvent: events.send, allowNonzero: true,
-            // Use the process owner's complete output-aware failure record even
-            // if event delivery fails; stdout/stderr already retain the text.
-            onOutput: function observeOutput() {}
-        });
-        try { throwIfAborted(signal); }
-        catch (error) { error.details = result; throw error; }
-        const identity = {name: null, email: null, githubUser: null};
-        if (result.code === 1) return identity;
-        if (result.code !== 0) {
-            throw new ArcaneError('ARCANE_OPERATION_FAILED',
-                `Git ${scope} identity lookup exited with code ${String(result.code)}.`, {details: result});
-        }
-        const fields = {'user.name': 'name', 'user.email': 'email', 'github.user': 'githubUser'};
-        // Git's NUL record framing preserves complete values, including newlines
-        // and empty strings. The last occurrence is the effective scalar value.
-        for (const record of result.stdout.split('\0')) {
-            if (record === '') continue;
-            const separator = record.indexOf('\n');
-            const key = separator === -1 ? record : record.slice(0, separator);
-            if (Object.hasOwn(fields, key)) {
-                identity[fields[key]] = separator === -1 ? '' : record.slice(separator + 1);
+        const chunks = [];
+        try {
+            const result = await run('git', args, {
+                cwd, signal, onEvent: events.send, allowNonzero: true,
+                outputEncoding: {stdout: null},
+                captureOutput: {stdout: false},
+                emitOutputEvents: {stdout: false},
+                // Git configuration may contain non-UTF-8 values. Keep its raw
+                // output until close rather than silently replacing characters.
+                onOutput: function observeOutput({stream, chunk}) {
+                    if (stream === 'stdout') chunks.push(chunk);
+                }
+            });
+            try { throwIfAborted(signal); }
+            catch (error) { error.details = result; throw error; }
+            const identity = {name: null, email: null, githubUser: null};
+            if (result.code === 1) return identity;
+            if (result.code !== 0) {
+                throw new ArcaneError('ARCANE_OPERATION_FAILED',
+                    `Git ${scope} identity lookup exited with code ${String(result.code)}.`, {details: result});
             }
+            let output;
+            try { output = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(Buffer.concat(chunks)); }
+            catch (cause) {
+                throw new ArcaneError('ARCANE_GIT_IDENTITY_NOT_TEXT',
+                    `Git ${scope} identity configuration cannot be represented as UTF-8 text.`, {cause, details: result});
+            }
+            const fields = {'user.name': 'name', 'user.email': 'email', 'github.user': 'githubUser'};
+            // Git's NUL record framing preserves complete values, including newlines
+            // and empty strings. The last occurrence is the effective scalar value.
+            for (const record of output.split('\0')) {
+                if (record === '') continue;
+                const separator = record.indexOf('\n');
+                const key = separator === -1 ? record : record.slice(0, separator);
+                if (Object.hasOwn(fields, key)) {
+                    identity[fields[key]] = separator === -1 ? '' : record.slice(separator + 1);
+                }
+            }
+            return identity;
+        } catch (error) {
+            // Keep the process error and its native details intact. Raw stdout
+            // belongs to this reader because the process owner did not decode it.
+            if (error !== null && (is.object(error) || is.function(error))) error.rawStdout = Buffer.concat(chunks);
+            throw error;
         }
-        return identity;
     }
 
     const scopes = cwd === undefined ? ['global'] : ['global', 'local', 'effective'];
@@ -50,7 +69,13 @@ export async function readGitIdentity({directory, signal, onEvent, run = runProc
         return result.status === 'rejected';
     }).map(function cause(result) { return result.reason; });
     try { await events.drain(); }
-    catch (error) { if (!failures.includes(error)) failures.push(error); }
+    catch (error) {
+        const represented = failures.some(function containsObserverFailure(failure) {
+            return failure === error || failure?.cause === error
+                || (is.array(failure?.errors) && failure.errors.includes(error));
+        });
+        if (!represented) failures.push(error);
+    }
     if (failures.length === 1) throw failures[0];
     if (failures.length) throw new AggregateError(failures, 'Git identity observations failed.');
     const result = {global: null, local: null, effective: null};

@@ -112,9 +112,12 @@ const repository = createRepositoryWorkspace({
 }
 ```
 
-Every observed field is the complete Git configuration string, including an
-empty string, or `null` when unset. Global and local observations select Git's
-corresponding file scopes and honor configured includes. With an existing
+Every observed field is the complete UTF-8 Git configuration string, including
+an empty string, leading U+FEFF and embedded newlines, or `null` when unset.
+Git can store values outside UTF-8; those produce
+`ARCANE_GIT_IDENTITY_NOT_TEXT` instead of replacement characters. Global and
+local observations select Git's corresponding file scopes and honor configured
+includes. With an existing
 repository `directory`, `effective` reads ordinary Git configuration in that
 repository context, including system, global, local, worktree and command
 configuration where applicable. Equal local and global values remain separate
@@ -134,9 +137,20 @@ One targeted Git command reads each requested scope. Independent observations
 start concurrently and all accepted commands finish their process cleanup
 before the reader settles. `signal` uses the existing process owner; the shared
 SDK event queue serializes `onEvent` delivery with its usual backpressure.
+The reader consumes raw stdout through the existing process contract; stdout
+is parsed as configuration rather than emitted as text events. Process
+lifecycle and stderr events retain their ordinary route. A supplied `run`
+adapter must honor that raw-output contract.
 Git's no-match result produces unset fields; other process,
 configuration, observer and cancellation failures remain complete. A single
-failure is rethrown unchanged; concurrent failures use `AggregateError.errors`.
+failure retains its original object, code, cause and process `details`; the
+reader adds complete captured stdout as the `rawStdout` Buffer on that error.
+The process result's `stdout` remains `null` in raw mode, and its stderr and
+other diagnostics remain intact. A decoding failure likewise carries its
+original decoding `cause`, complete process `details` and `rawStdout`.
+An observer failure already represented by a process error is not added again;
+genuinely separate failures use `AggregateError.errors`, each retaining its
+own diagnostics.
 No configuration file is written and no credential helper is queried by this
 reader. The application owns any saved non-secret defaults and repository
 overrides through its existing preferences.
