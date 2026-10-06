@@ -50,6 +50,7 @@ alone does not make bare module names resolve in a browser.
 | Use a shared entity | [Runtime entity modules](runtime-entities.md) and [exact export contracts](core/arcane-entities.md) |
 | Load a reusable HTML component | [Runtime component catalog](runtime-components.md) |
 | Present Light / Dark / System choices with complete labels | [Theme-switcher configuration](runtime-components.md#theme-switcherhtml) |
+| Choose theme-switcher corner radii, label font and group background through host CSS | [Theme-switcher styling properties](runtime-components.md#theme-switcherhtml) |
 | Use optional Core preferences and appearance without masking real failures | [PreferenceStore](runtime-modules.md#preferencestorejs), [SystemAppearance](runtime-modules.md#systemappearancejs), and [Core lookup errors](core-runtime.md#state-and-frames) |
 | Submit complete speech parts immediately and play them in order | [`SpeechPlayback`](runtime-modules.md#speechplaybackjs) and the [basic browser example](ai/browser-speech.md#play-a-complete-array-with-speechplayback) |
 | Preserve exact text in an explicit complete synthesis call | [Exact complete synthesis input](ai/browser-speech.md#exact-complete-synthesis-input) and [managed AI narration](sdk-api.md#managed-ai-narration) |

@@ -967,7 +967,7 @@
     {
       "file": "runtime/arcane/components/theme-switcher.html",
       "name": "theme-switcher.html",
-      "purpose": "Selects and refreshes system, light, dark, or custom theme mode with per-instance choices and labels.",
+      "purpose": "Selects and refreshes system, light, dark, or custom theme mode with per-instance choices, labels, and CSS-configurable group/option radii, option font and group background.",
       "methods": [
         "configure()",
         "setMode()",

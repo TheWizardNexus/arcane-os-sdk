@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p><div class="doc-meta"><span>SDK 0.70.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane runtime component catalog</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-runtime-component-catalog">Arcane runtime component catalog</h1><p class="doc-lead">Arcane components are reusable HTML fragments loaded through the shared element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p><div class="doc-meta"><span>SDK 0.71.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="./" aria-current="page">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/runtime-components.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#shared-semantic-event-and-lifecycle-contract">Shared semantic-event and lifecycle contract</a><a href="#shared-print-presentation">Shared print presentation</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#browser-ai-setuphtml">browser-ai-setup.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#pwa-installhtml">pwa-install.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a><a href="#web-navigatorhtml">web-navigator.html</a><a href="#readiness-caveats">Readiness caveats</a></nav></details><p>Arcane components are reusable HTML fragments loaded through the shared <code>&lt;html-import&gt;</code> element. They are browser UI, so they run in an ordinary supported browser renderer and in native Arcane WebViews. They do not run in Node or as cloud services.</p>
@@ -341,7 +341,7 @@ snapshot remains owned until the browser&#39;s <code>afterprint</code> event.</p
 </tr>
 <tr>
 <td><a href="#theme-switcherhtml"><code>theme-switcher.html</code></a></td>
-<td>Selects and refreshes system, light, dark, or custom theme mode with per-instance choices and labels.</td>
+<td>Selects and refreshes system, light, dark, or custom theme mode with per-instance choices, labels, and CSS-configurable group/option radii, option font and group background.</td>
 <td><code>configure()</code><br><code>setMode()</code><br><code>refresh()</code></td>
 <td>No component-specific event</td>
 <td>Preference/native appearance behavior mixed; no component-ready contract</td>
@@ -1849,6 +1849,45 @@ operation is pending. Presentation configuration preserves that pending state.</
 <code>--app-bar-active-text</code> (then <code>--primary-color</code>), and <code>--focus-color</code> overrides
 remain supported. Applications own their palette and surrounding placement;
 the component adds no application-specific palette or settings section.</p>
+<p>Set these public CSS custom properties on the <code>html-import</code> host or an ancestor
+to style one instance through the ordinary cascade. Omitting them preserves the
+existing presentation:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Controls</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--theme-switcher-radius</code></td>
+<td>Outer group border radius</td>
+<td><code>1.6rem</code></td>
+</tr>
+<tr>
+<td><code>--theme-switcher-option-radius</code></td>
+<td>Each option&#39;s border radius</td>
+<td><code>1.4rem</code></td>
+</tr>
+<tr>
+<td><code>--theme-switcher-font</code></td>
+<td>Complete option <code>font</code> shorthand</td>
+<td><code>700 .875rem/1.25 system-ui,sans-serif</code></td>
+</tr>
+<tr>
+<td><code>--theme-switcher-background</code></td>
+<td>Group background, independent of option state</td>
+<td><code>color-mix(in srgb,currentColor 8%,transparent)</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>The font value includes its size and family, plus any weight and line height.
+Use an application-owned complete font token or value, rather than the
+CSS-wide keyword <code>inherit</code> as the custom-property value. The host still inherits
+text color. These properties do not alter the <code>2.75rem</code> minimum targets,
+full-label wrapping, selected/hover/focus/disabled states, or theme persistence.
+Applications retain responsibility for readable font and color choices.</p>
 <p>This fragment declares no component-specific readiness or action event; use the loader&#39;s <code>html-import-ready</code> only to know that import execution completed.</p>
 <p>Shared dependencies: <a href="../runtime-modules/#thememanagerjs"><code>ThemeManager.js</code></a>.</p>
 <h3 id="availability-and-normalization-36">Availability and normalization</h3>
@@ -1865,6 +1904,18 @@ the component adds no application-specific palette or settings section.</p>
 the two configuration attributes retains all four default choices. Both use
 the existing shared preference owner; presentation does not create a new store
 or migrate saved themes.</p>
+<p>An application can give that instance modest rounded corners and its own
+ordinary label font without accessing the shadow root:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>css</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-css">#theme-switcher {
+  --theme-switcher-radius: .65rem;
+  --theme-switcher-option-radius: .5rem;
+  --theme-switcher-font: 400 1rem/1.25 var(--app-font-family, system-ui, sans-serif);
+  --theme-switcher-background: transparent;
+  --app-bar-border: var(--border-color);
+}
+</code></pre></div>
+<p>These are example application values, not new component defaults. Other
+instances retain the defaults unless the application cascades overrides to them.</p>
 <h2 id="unified-inboxhtml">unified-inbox.html</h2>
 <h3 id="overview-37">Overview</h3>
 <p>Displays provider-neutral communication threads with active/loading state.</p>
@@ -2101,6 +2152,6 @@ application&#39;s real persistence callback:</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#basic-loading-pattern">Basic loading pattern</a><a href="#shared-semantic-event-and-lifecycle-contract">Shared semantic-event and lifecycle contract</a><a href="#shared-print-presentation">Shared print presentation</a><a href="#canonical-inventory">Canonical inventory</a><a href="#app-barhtml">app-bar.html</a><a href="#assistant-panelhtml">assistant-panel.html</a><a href="#browser-ai-setuphtml">browser-ai-setup.html</a><a href="#calculatorhtml">calculator.html</a><a href="#charthtml">chart.html</a><a href="#chathtml">chat.html</a><a href="#conversation-viewhtml">conversation-view.html</a><a href="#dashboard-confightml">dashboard-config.html</a><a href="#data-maintenancehtml">data-maintenance.html</a><a href="#data-viewhtml">data-view.html</a><a href="#directory-pickerhtml">directory-picker.html</a><a href="#document-inspectorhtml">document-inspector.html</a><a href="#file-drophtml">file-drop.html</a><a href="#file-inspectorhtml">file-inspector.html</a><a href="#file-managerhtml">file-manager.html</a><a href="#headerhtml">header.html</a><a href="#integration-settingshtml">integration-settings.html</a><a href="#local-ai-statushtml">local-ai-status.html</a><a href="#markdown-documenthtml">markdown-document.html</a><a href="#markdown-editorhtml">markdown-editor.html</a><a href="#media-embedhtml">media-embed.html</a><a href="#modalhtml">modal.html</a><a href="#output-panelhtml">output-panel.html</a><a href="#preferences-formhtml">preferences-form.html</a><a href="#pwa-installhtml">pwa-install.html</a><a href="#record-timelinehtml">record-timeline.html</a><a href="#relationship-boardhtml">relationship-board.html</a><a href="#screen-capturehtml">screen-capture.html</a><a href="#source-code-viewerhtml">source-code-viewer.html</a><a href="#source-explanationhtml">source-explanation.html</a><a href="#speechhtml">speech.html</a><a href="#summary-striphtml">summary-strip.html</a><a href="#tablehtml">table.html</a><a href="#task-progresshtml">task-progress.html</a><a href="#terminal-workspacehtml">terminal-workspace.html</a><a href="#theme-editorhtml">theme-editor.html</a><a href="#theme-switcherhtml">theme-switcher.html</a><a href="#unified-inboxhtml">unified-inbox.html</a><a href="#voice-transcriptionhtml">voice-transcription.html</a><a href="#weather-widgethtml">weather-widget.html</a><a href="#web-navigatorhtml">web-navigator.html</a><a href="#readiness-caveats">Readiness caveats</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.70.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.71.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
