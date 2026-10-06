@@ -79,7 +79,12 @@ installation. `client` is read again after cleanup, so a replacement installed
 reentrantly during cleanup or error reporting remains the current client.
 Notifications do not restore or close that replacement. A listener may also
 install a replacement after observing retirement; its installation produces
-the normal next notification.
+the normal next notification. Reentrant changes queue until the current
+notification finishes reaching its observers. Each notification retains the
+exact client and error references captured for that transition, so observers
+receive retirement before a replacement installed by another observer. Global
+installation changes remain synchronous; reading the accessor inside a callback
+may therefore show a newer client than that callback's transition snapshot.
 
 The existing shared SDK event owner delivers changes without polling or a
 second event bus. Classic host injection may install synchronously before that

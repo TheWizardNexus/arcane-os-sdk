@@ -101,18 +101,33 @@ test('transport retirement retains the actual failure and a reentrant replacemen
     assert.equal(snapshots.filter(function failed(snapshot){return snapshot.reason==='transport-failed';}).length,1);
 });
 
-test('a replacement installed by the closed listener retains its globals',function replacementDuringNotification(t){
+test('a replacement installed by the first retirement observer reaches both observers in order',function replacementDuringNotification(t){
     const global={console};
+    const first=[];
+    const second=[];
     let replacement;
     const stop=subscribeCoreClient(function replaceClosed(snapshot){
+        first.push(snapshot);
         if(snapshot.reason==='closed'&&!replacement){
             replacement=installCoreClient(global,{transport:transport()});
         }
-    },{global});
+    },{global,emitCurrent:false});
+    const stopSecond=subscribeCoreClient(function observeSuccessor(snapshot){
+        second.push(snapshot);
+    },{global,emitCurrent:false});
     const client=installCoreClient(global,{transport:transport()});
-    t.after(function cleanup(){stop();client.close();replacement?.close();});
+    t.after(function cleanup(){stop();stopSecond();client.close();replacement?.close();});
     client.close();
     assert.ok(replacement);
+    for(const snapshots of [first,second]){
+        assert.deepEqual(snapshots.map(function reason(snapshot){return snapshot.reason;}),['installed','closed','installed']);
+        assert.equal(snapshots[0].client,client);
+        assert.equal(snapshots[1].client,null);
+        assert.equal(snapshots[1].previousClient,client);
+        assert.equal(snapshots[1].error,null);
+        assert.equal(snapshots[2].client,replacement);
+        assert.equal(snapshots[2].previousClient,null);
+    }
     assert.equal(getInstalledCoreClient(global),replacement);
     assert.equal(global.__arcaneReceive,replacement.receive);
 });

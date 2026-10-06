@@ -11,10 +11,24 @@ const LONG_OPERATION_TIMEOUT=50*60*1000;
 function publishCoreClientInstallation(global,previousClient,reason,error=null){
     // A classic document-created installation may precede the ESM event owner.
     // The live installation already owns replay; retain no retired-client record.
-    global[CORE_CLIENT_OBSERVATION]?.source?.dispatch(
-        CORE_CLIENT_INSTALLATION_EVENT,
-        {client:getInstalledCoreClient(global),previousClient,reason,error}
-    );
+    const observation=global[CORE_CLIENT_OBSERVATION];
+    if(!observation?.source)return;
+    observation.notifications.push({client:getInstalledCoreClient(global),previousClient,reason,error});
+    if(observation.publishing)return;
+    observation.publishing=true;
+    let delivered=0;
+    try{
+        // A listener may change the installation. Finish notifying this
+        // transition's observers before publishing that successor transition.
+        while(delivered<observation.notifications.length){
+            const notification=observation.notifications[delivered];
+            observation.notifications[delivered++]=null;
+            observation.source.dispatch(CORE_CLIENT_INSTALLATION_EVENT,notification);
+        }
+    }finally{
+        observation.notifications.splice(0,delivered);
+        observation.publishing=false;
+    }
 }
 
 /** One RPC client. Native execution and service policy belong to the host. */
@@ -659,7 +673,7 @@ export function getInstalledCoreClient(global=globalThis){
 export function subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={}){
     if(typeof listener!=='function')throw new TypeError('The Core client installation listener must be a function.');
     if(signal?.aborted)return function alreadyAborted(){return false;};
-    const observation=global[CORE_CLIENT_OBSERVATION]??={source:null};
+    const observation=global[CORE_CLIENT_OBSERVATION]??={source:null,notifications:[],publishing:false};
     observation.source??=arcaneEvents.createSource(observation,{
         source:'core-client-installation',eventTypes:[CORE_CLIENT_INSTALLATION_EVENT]
     });
