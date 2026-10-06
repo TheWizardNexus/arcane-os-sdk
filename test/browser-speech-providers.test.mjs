@@ -577,6 +577,36 @@ test("Kokoro defaults to automatic GPU selection and a four-Worker pool", async 
   }));
 });
 
+test("direct Kokoro plain input keeps both public payload forms exact", async function plainKokoroInput(t) {
+  const { store } = createMemoryStore(["tts"]);
+  const worker = createSpeechWorkerContract({ role: "tts" });
+  installContractWorker(t, function createPlainInputWorker() { return worker; });
+  const kokoro = createBrowserKokoroProvider({
+    ...providerOptions("tts", store),
+    execution: { device: "wasm", maxConcurrentRequests: 1 },
+  });
+  t.after(async function disposePlainInputProvider() { await kokoro.dispose(); });
+  await kokoro.load({ role: "tts", selection: selection(kokoro) });
+  const input = "  **Moon raccoons launch.**\nThe *##* comet follows.  ";
+  const cases = [
+    { text: input, textFormat: "plain", voice: "af_heart", speed: 0.875 },
+    { model: kokoro.catalog()[0].id, input, textFormat: "plain", responseFormat: "wav", voice: "af_heart", speed: 0.875 },
+    { text: input, voice: "af_heart", speed: 0.875 },
+  ];
+  for(const payload of cases) {
+    const original = structuredClone(payload);
+    const result = await kokoro.request({ role: "tts", operation: "synthesize", payload });
+    const use = worker.posted.filter(function synthesisMessage(message) { return message.op === "use"; }).at(-1);
+    assert.deepEqual(use.payload, {
+      text: payload.textFormat === "plain" ? input : "  Moon raccoons launch.\nThe ** comet follows.  ",
+      voice: "af_heart",
+      speed: 0.875,
+    });
+    assert.deepEqual(payload, original);
+    assert.ok(result.audio instanceof (Object.hasOwn(payload, "input") ? Uint8Array : Float32Array));
+  }
+});
+
 test("automatic Kokoro execution replaces a rejected WebGPU pool with WASM", async (t) => {
   const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   Object.defineProperty(globalThis, "navigator", {

@@ -594,5 +594,112 @@ test(
                 assert.equal(requests.length, before + cases.length);
             }
         );
+
+        await t.test(
+            'public plain input preserves complete previews through preparation, fetch and queued runtime requests',
+            async function testPlainSpeechInput() {
+                const segmentation = ai.ttsSegmentation;
+                ai.configureTTSSegmentation({punctuation: 'none', wordCadence: null});
+                const input = '  **Moon raccoons launch.**\nThe *##* comet follows.  ';
+                const cleaned = '  Moon raccoons launch.\nThe ** comet follows.  ';
+                const store = storeFor('plain-preview');
+                const parts = [{input, voice: 'af_heart', speed: 0.875}];
+                const originalParts = structuredClone(parts);
+                try {
+                    for(const mode of [
+                        {punctuation: 'sentence', wordCadence: null},
+                        {punctuation: 'any', wordCadence: null},
+                        {punctuation: 'none', wordCadence: 2}
+                    ]) {
+                        ai.configureTTSSegmentation(mode);
+                        const segmented = prepare({parts, textFormat: 'plain'});
+                        const segmentedResponses = segmented.segments.map(function responseForPlainSegment(unused, index) {
+                            return responseFor(`plain-${mode.punctuation}-${index}`);
+                        });
+                        assert.equal(segmented.segments.map(function segmentInput(segment) {
+                            return segment.input;
+                        }).join(''), input);
+                        for(const response of segmentedResponses) response.release();
+                        await segmented.ready;
+                        assert.equal(segmentedResponses.map(function dispatchedSegment(response) {
+                            return response.request.payload.input;
+                        }).join(''), input);
+                    }
+                    ai.configureTTSSegmentation({punctuation: 'none', wordCadence: null});
+                    const exactResponse = responseFor('plain-preparation');
+                    const exact = prepare({parts, textFormat: 'plain', storage: store.storage});
+                    await exactResponse.requested.promise;
+                    assert.equal(exactResponse.request.payload.input, input);
+                    assert.equal(Object.hasOwn(exactResponse.request.payload, 'textFormat'), false);
+                    assert.deepEqual(parts, originalParts);
+                    exactResponse.release();
+                    const exactRecord = await exact.ready;
+                    assert.deepEqual(exactRecord.originalParts, originalParts);
+
+                    // The different synthesis text cannot reuse the plain preparation's audio.
+                    const defaultResponse = responseFor('default-preparation');
+                    const narration = prepare({parts, storage: store.storage});
+                    await defaultResponse.requested.promise;
+                    assert.equal(defaultResponse.request.payload.input, cleaned);
+                    defaultResponse.release();
+                    await narration.ready;
+
+                    const payload = {input, textFormat: 'plain', voice: 'af_heart', speed: 0.875};
+                    const originalPayload = structuredClone(payload);
+                    const fetchResponse = responseFor('plain-fetch');
+                    const fetched = ai.fetchTTS(payload);
+                    await fetchResponse.requested.promise;
+                    assert.equal(fetchResponse.request.payload.input, input);
+                    assert.equal(Object.hasOwn(fetchResponse.request.payload, 'textFormat'), false);
+                    assert.deepEqual(payload, originalPayload);
+                    fetchResponse.release();
+                    assert.equal(await (await fetched).text(), fetchResponse.token);
+
+                    const queuedResponses = Array.from({length: 5}, function createPlainResponse(unused, index) {
+                        return responseFor(`plain-runtime-${index}`);
+                    });
+                    const beforeQueued = requests.length;
+                    const runtimePayloads = [];
+                    const queuedRequests = queuedResponses.map(function requestPlainSpeech(response, index) {
+                        const request = {
+                            model: model.id,
+                            ...(index === 4 ? {input} : {text: input}),
+                            textFormat: 'plain',
+                            voice: 'af_heart'
+                        };
+                        runtimePayloads.push(request);
+                        return index === 4
+                            ? ai.providerRuntime.request('tts', {
+                                operation: 'synthesize', payload: request, localOnly: true
+                            })
+                            : ai.providerRuntime.synthesize(request, {localOnly: true});
+                    });
+                    await Promise.all(queuedResponses.filter(function firstFour(unused, index) {
+                        return index < 4;
+                    }).map(function waitForPlainRequest(response) { return response.requested.promise; }));
+                    assert.equal(requests.length, beforeQueued + 4);
+                    for(const response of queuedResponses) {
+                        if(response.request) response.release();
+                    }
+                    await queuedResponses[4].requested.promise;
+                    queuedResponses[4].release();
+                    await Promise.all(queuedRequests);
+                    for(const [index, response] of queuedResponses.entries()) {
+                        assert.equal(response.request.payload.input ?? response.request.payload.text, input);
+                        assert.equal(Object.hasOwn(response.request.payload, 'textFormat'), false);
+                        assert.equal(runtimePayloads[index].textFormat, 'plain');
+                        assert.equal(runtimePayloads[index].input ?? runtimePayloads[index].text, input);
+                    }
+
+                    const cancelled = new AbortController();
+                    cancelled.abort();
+                    const beforeCancelled = requests.length;
+                    await assert.rejects(ai.fetchTTS(payload, cancelled.signal), {name: 'AbortError'});
+                    assert.equal(requests.length, beforeCancelled);
+                } finally {
+                    ai.configureTTSSegmentation(segmentation);
+                }
+            }
+        );
     }
 );

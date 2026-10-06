@@ -3386,15 +3386,19 @@ export class AIProviderRuntime {
         if (options.signal?.aborted) {
             return Promise.reject(normalizedAbort());
         }
-        if (role === 'tts' && !queued && speechInputPrepared !== true) {
+        if (role === 'tts' && !queued) {
             const payload = options.payload;
             const field = Object.hasOwn(payload ?? {}, 'input') ? 'input' : 'text';
             const text = Object.getOwnPropertyDescriptor(payload ?? {}, field)?.value;
             if (is.string(text)) {
-                const input = stripSpeechFormatting(text);
-                if (input !== text) {
+                const textFormat = Object.getOwnPropertyDescriptor(payload, 'textFormat')?.value;
+                const input = speechInputPrepared === true || textFormat === 'plain'
+                    ? text
+                    : stripSpeechFormatting(text);
+                if (input !== text || Object.hasOwn(payload, 'textFormat')) {
                     const payloadProperties = Object.getOwnPropertyDescriptors(payload);
                     payloadProperties[field] = {...payloadProperties[field], value: input};
+                    delete payloadProperties.textFormat;
                     const requestProperties = Object.getOwnPropertyDescriptors(options);
                     requestProperties.payload = {
                         ...requestProperties.payload,

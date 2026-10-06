@@ -805,14 +805,17 @@ does not select another page or speak background work.
 
 ### Preparation inputs and reuse
 
-`ai.prepareTTS({parts,storage,identity,signal,onState})` accepts an ordered array
+`ai.prepareTTS({parts,textFormat,storage,identity,signal,onState})` accepts an ordered array
 of strings or `{input,voice?,speed?,pauseAfterMs?}` records. An omitted voice
 uses the selected model default; omitted speed uses `ai.voiceSpeed`; omitted
 pause is zero. The SDK snapshots the selected speech configuration and current
 punctuation/word-cadence options for that preparation. A part's pause applies
 after its final extracted segment. Complete original input remains available
-for semantic comparison; automatic Markdown cleanup affects only the speech
-copy and occurs once before segmentation.
+for semantic comparison; default Markdown cleanup affects only the speech
+copy and occurs once before segmentation. Set `textFormat:'plain'` to preserve
+each supplied input exactly through that segmentation. The prepared segment
+text participates in semantic reuse, so a changed synthesis input does not
+reuse audio produced from the cleaned version.
 
 `storage` is optional. When supplied, `{db,table,key}` names the caller's ready
 DBOPFS instance and its application-owned table/key. The SDK stores complete
@@ -977,7 +980,7 @@ speech method retain their existing behavior.
 ## Automatic speech-input formatting cleanup
 
 The shared streaming, audio-file, and `SpeechPlayback` paths remove repeated
-same formatting marks from the outbound speech-input copy automatically:
+same formatting marks from the outbound speech-input copy by default:
 
 ```javascript
 ai.streamTTS('## Heading\n**Hello');
@@ -994,10 +997,13 @@ waits for its next character or the final flush.
 
 `end:true`, `finishTTS()`, or cancellation clears pending streaming formatting
 state. `fetchTTS()`, provider-runtime TTS requests, direct Kokoro provider
-requests, and `SpeechPlayback` apply the same cleanup to complete input. An
-existing `textFormat` extra is ignored and cannot disable or select cleanup.
+requests, and `SpeechPlayback` apply the same default cleanup to complete input.
+Complete-input APIs can explicitly select `textFormat:'plain'` as described
+below. The streaming `streamTTS()` options still ignore `textFormat`;
+streaming narration and `SpeechPlayback` keep their existing cleanup.
 SDK-internal delegation carries `{speechInputPrepared:true}` outside the speech
-payload only after one cleanup pass, preventing a second non-idempotent pass.
+payload after its owner selects text treatment, preventing a second
+non-idempotent cleanup pass or cleanup of explicitly plain input.
 Applications omit that internal metadata. Displayed messages, saved history,
 model input, caller payload objects, language, voice, synthesis capacity, and
 playback timing are not changed by the filter.
@@ -1022,6 +1028,39 @@ const speechText = new MarkdownSpeech();
 console.log(speechText.append('## Head', false)); // ' Head'
 console.log(speechText.append('ing', true)); // ing
 ```
+
+### Exact complete synthesis input
+
+Use the public `textFormat:'plain'` selection for already-authored speech or an
+exact generated preview. It belongs in `prepareTTS` options, or alongside the
+`input`/`text` field of a complete synthesis payload:
+
+```javascript
+function preparePreview(ai, preview, signal) {
+  return ai.prepareTTS({parts: [preview], textFormat: 'plain', signal});
+}
+
+function fetchPreview(ai, preview, signal) {
+  return ai.fetchTTS({input: preview, textFormat: 'plain'}, signal);
+}
+```
+
+The same payload field is supported by `AI.prepareTTSPlayback()` for audio-file
+providers, `AIProviderRuntime.request('tts', {operation:'synthesize', payload,
+localOnly, signal})`, its `synthesize(payload, options)` alias, and direct
+Kokoro `request()` calls using either `{text,...}` or `{model,input,...}`.
+The SDK consumes `textFormat` before engine/host dispatch. The original nonblank input,
+including whitespace and repeated formatting marks, remains unchanged; voice,
+speed, selected model, cancellation and audio ordering retain their existing
+owners. Only `'plain'` selects exact input; omission and other values retain
+the existing narration cleanup. Applications never supply the internal
+`speechInputPrepared` argument.
+
+This selection governs SDK text treatment, not the selected engine's input
+capacity or pronunciation. [Kokoro.js 1.2.1](https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js)
+still tokenizes with truncation in both `generate()` and `stream()`; plain input
+does not establish complete audio for an oversized engine input. The SDK's existing complete-text forwarding
+fixture does not prove upstream synthesis completeness.
 
 ## Choose a device or reduce memory use
 
@@ -1610,10 +1649,11 @@ const result = await kokoro.request({
 The voice belongs to the caller-selected inventory; omission uses that model's
 default voice. The provider-native result is
 `{audio:Float32Array,sampleRate,voice}`. The provider/2 shared request form accepts
-`{model,input,responseFormat:'wav',voice?,speed?}` and returns
+`{model,input,textFormat?,responseFormat:'wav',voice?,speed?}` and returns
 `{audio:Uint8Array,contentType:'audio/wav'}`. High-level `AI.fetchTTS()` wraps
 that provider result in a WAV `Blob`. Returned provider records remain ordinary
-mutable values.
+mutable values. Both payload forms accept `textFormat:'plain'` to retain exact
+input; omission keeps the default speech-formatting cleanup.
 
 ## Lifecycle and cancellation
 

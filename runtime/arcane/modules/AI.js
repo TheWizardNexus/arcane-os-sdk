@@ -6336,7 +6336,7 @@ class AI {
         return result;
     }
 
-    prepareTTS({parts, storage = null, identity = null, signal = null, onState = null} = {}) {
+    prepareTTS({parts, textFormat, storage = null, identity = null, signal = null, onState = null} = {}) {
         if(this.#providerSpeechModel()?.speech?.playback==='native'){
             const error=new Error('Native browser speech has no audio file to prepare or store; use prepareTTSPlayback.');
             error.code='ARCANE_AI_TTS_AUDIO_EXPORT_UNAVAILABLE';
@@ -6384,7 +6384,7 @@ class AI {
             if(!is.finite(pauseAfterMs) || pauseAfterMs < 0) {
                 throw new RangeError('Prepared speech pauses must be nonnegative milliseconds.');
             }
-            const cleaned = stripSpeechFormatting(source.input);
+            const cleaned = textFormat === 'plain' ? source.input : stripSpeechFormatting(source.input);
             const {segments: outputs} = this.#segmentSpeechText(cleaned, true, segmentation);
             for(const [index, input] of outputs.entries()) {
                 if(!input.trim()) continue;
@@ -7175,6 +7175,7 @@ class AI {
                 'model',
                 'voice',
                 'input',
+                'textFormat',
                 'responseFormat',
                 'speed'
             ]);
@@ -7183,7 +7184,7 @@ class AI {
                     ||!acceptedKeys.has(key)
                     ||!Object.hasOwn(descriptors[key],'value')){
                     const error=new TypeError(
-                        'AI.fetchTTS accepts only model, voice, input, responseFormat, and speed data properties.'
+                        'AI.fetchTTS accepts only model, voice, input, textFormat, responseFormat, and speed data properties.'
                     );
                     error.code='ARCANE_AI_TTS_REQUEST_INVALID';
                     throw error;
@@ -7208,7 +7209,7 @@ class AI {
                 error.code='ARCANE_AI_TTS_INPUT_INVALID';
                 throw error;
             }
-            const input=speechInputPrepared===true
+            const input=speechInputPrepared===true||descriptors.textFormat?.value==='plain'
                 ?suppliedInput
                 :stripSpeechFormatting(suppliedInput);
             const selection=this.#providerRuntime.selection('tts');

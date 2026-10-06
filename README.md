@@ -469,11 +469,16 @@ keeping apostrophes, commas, and hyphens that join Unicode letters or numbers
 inside the same segment.
 Mute, stop, provider transition, and cancellation still govern the whole queue.
 
-Every TTS call automatically removes repeated same formatting marks (`*`, `#`,
+TTS narration removes repeated same formatting marks (`*`, `#`,
 `_`, backtick, `~`) from its outbound speech-input copy before synthesis.
 Streaming calls also recognize a run split across chunks. Single marks and
-ordinary repeated punctuation remain literal. No application option is needed;
-an existing `textFormat` extra is ignored and cannot disable cleanup. Original
+ordinary repeated punctuation remain literal. Complete synthesis calls may
+select `textFormat:'plain'` to preserve exact input: supply it in `prepareTTS`
+options or the payload of `fetchTTS`, provider-runtime TTS requests, or direct
+Kokoro requests. The SDK consumes this control before engine/host dispatch;
+omission keeps the default cleanup. Streaming narration and `SpeechPlayback`
+retain their existing formatting behavior. This option does not change the
+selected engine's input capacity or establish complete upstream synthesis. Original
 messages and caller payloads remain unchanged for display, storage, and model
 input. The `arcane-os/speech-text` entrypoint exports the same
 `MarkdownSpeech` streaming class and `stripSpeechFormatting()` one-pass helper

@@ -170,7 +170,7 @@ default `AI`; read-only `providerRuntime`, `speechActivationPending`, `browserSp
 `streamRequest()`, `streamMessage()`, `fetchRequest()`, `fetch()`,
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
-`prepareTTS({parts,storage,identity,signal,onState})`,
+`prepareTTS({parts,textFormat,storage,identity,signal,onState})`,
 `playPreparedTTS(prepared,{signal,onState})`,
 `finishTTS()`, `prepareTTSPlayback()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
@@ -393,14 +393,17 @@ synthesis payload to `Arcane.speech.synthesize(request, {signal})`; Core aborts
 are normalized to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`. Actual engine
 interruption belongs to the registered service. It does not independently
 choose a provider, cloud fallback, model, runtime, or
-voice policy for the application. Every call removes repeated same formatting
-marks from a cloned outbound input before delegation; the caller's payload stays
-unchanged. The third `preparation` argument is reserved for SDK-internal
+voice policy for the application. By default, calls remove repeated same
+formatting marks from a cloned outbound input before delegation; the caller's
+payload stays unchanged. Public payload field `textFormat:'plain'` preserves
+the complete input, including whitespace and repeated marks. The SDK consumes
+that field before provider/host dispatch. Omission and other values retain the
+default cleanup. The third `preparation` argument is reserved for SDK-internal
 delegation, where `{speechInputPrepared:true}` prevents a second cleanup pass;
 applications omit it. `streamTTS(text='',end=false,options={})` and
 `finishTTS()` use the selected playback boundary. The third-argument options below
-are available in SDK `0.5.12`. The `textFormat` compatibility extra added in
-SDK `0.5.16` is ignored beginning in `0.5.17`:
+are available in SDK `0.5.12`. In these streaming options, the `textFormat`
+compatibility extra added in SDK `0.5.16` remains ignored:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -408,7 +411,7 @@ SDK `0.5.16` is ignored beginning in `0.5.17`:
 | `speed` | Current `ai.voiceSpeed` | A supplied positive speed is captured for those segments and forwarded to `fetchTTS()`. It does not change `ai.voiceSpeed`. |
 | `pauseAfterMs` | `0` | Finite, nonnegative milliseconds placed after the final extracted segment on the existing audio clock. Invalid values throw `RangeError`; no pause is inserted between this call's other segments. |
 | `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
-| `textFormat` | Ignored compatibility extra | Repeated same formatting marks are removed automatically from every TTS call. This value no longer selects or disables cleanup. |
+| `textFormat` | Ignored streaming compatibility extra | Streaming narration retains automatic cleanup. The public plain selection belongs to complete synthesis payloads or `prepareTTS` options. |
 
 Audio-file voice and speed use the existing `fetchTTS()` validation and error path.
 The automatic cleanup changes only the outbound speech-input copy; displayed,
@@ -418,7 +421,7 @@ text, single marks, ordinary punctuation, and other characters remain literal.
 A trailing candidate mark waits for the next character so a repeated run split
 across chunks is still omitted. Ordinary prose streams immediately.
 `end:true`, `finishTTS()`, muted terminal calls, and `stopAudio()` clear pending
-formatting state. `textFormat` is not an opt-out.
+formatting state. Streaming `textFormat` is not an opt-out.
 
 Voice, speed, pause, and playback overrides belong to the segments
 extracted in that invocation, including any text buffered by an earlier call.
@@ -458,12 +461,16 @@ last audio buffer ends, without waiting out that pause. Completion describes
 the playback lifecycle, not proof that a listener heard the sound. See the
 [complete-passage example](ai/browser-speech.md#queue-complete-passages-and-wait-for-playback).
 
-`prepareTTS({parts,storage,identity,signal,onState})` returns an immediate
+`prepareTTS({parts,textFormat,storage,identity,signal,onState})` returns an immediate
 `{segments,state,ready,getAudio(index),cancel()}` handle for detached complete
 speech preparation. Parts are strings or `{input,voice?,speed?,pauseAfterMs?}`
 records. It retains the full source for semantic matching, snapshots the
 selected speech configuration and segmentation, and applies automatic
-formatting cleanup once to the speech copy. Generation uses the existing
+formatting cleanup once to the speech copy by default. `textFormat:'plain'`
+preserves each complete input before the same ordered segmentation. Prepared
+segment text participates in reuse, keeping cleaned and exact synthesis inputs
+distinct when they differ. This SDK text-treatment choice does not change the
+selected engine's own input capacity. Generation uses the existing
 bounded provider queue without adding playback. Optional
 `storage:{db,table,key}` saves complete audio files and their MIME metadata in
 the caller's ready DBOPFS instance; the separate JSON-compatible `identity`
@@ -1032,9 +1039,12 @@ records are the closed `{llm,stt,tts}`, `{stt,tts}`, or
 `{providers,routes,expectedProviders}` shapes described below.
 `configureFromTuple()` accepts exactly six provider/model preference entries.
 
-Every direct TTS `request()` or `synthesize()` call removes repeated same
-formatting marks from a cloned outbound payload's `input` or `text` field. The
-caller's payload and request records remain unchanged. The optional
+By default, direct TTS `request()` and `synthesize()` remove repeated same
+formatting marks from a cloned outbound payload's `input` or `text` field.
+Public payload field `textFormat:'plain'` preserves that input exactly. The SDK
+consumes this field before queuing/dispatch; queued requests retain their
+selected text treatment. Omission and other values keep the default cleanup.
+The caller's payload and request records remain unchanged. The optional
 `preparation` argument is reserved for SDK-owned delegation;
 `{speechInputPrepared:true}` prevents a second pass after another SDK speech
 boundary has already cleaned the copy. Applications omit that argument. LLM

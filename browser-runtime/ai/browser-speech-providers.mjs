@@ -906,7 +906,7 @@ function normalizeSynthesisPayload(payload, authority, speechInputPrepared) {
   if (shared) {
     descriptors = genericPayloadDescriptors(
       payload,
-      ["model", "voice", "input", "responseFormat", "speed"],
+      ["model", "voice", "input", "textFormat", "responseFormat", "speed"],
       ["model", "input", "responseFormat"],
       "Shared speech synthesis payload",
       "tts-synthesis",
@@ -927,7 +927,7 @@ function normalizeSynthesisPayload(payload, authority, speechInputPrepared) {
   } else {
     descriptors = genericPayloadDescriptors(
       payload,
-      ["model", "voice", "text", "speed"],
+      ["model", "voice", "text", "textFormat", "speed"],
       ["text"],
       "Browser Kokoro synthesis payload",
       "tts-synthesis",
@@ -936,7 +936,9 @@ function normalizeSynthesisPayload(payload, authority, speechInputPrepared) {
     textValue = descriptors.text.value;
   }
   const suppliedText = is.string(textValue) ? textValue : "";
-  const text = speechInputPrepared === true ? suppliedText : stripSpeechFormatting(suppliedText);
+  const text = speechInputPrepared === true || descriptors.textFormat?.value === "plain"
+    ? suppliedText
+    : stripSpeechFormatting(suppliedText);
   const voiceValue = Object.hasOwn(descriptors, "voice")
     ? descriptors.voice.value
     : authority.defaultVoice;
