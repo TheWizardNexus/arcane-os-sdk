@@ -14,8 +14,8 @@ diagnostics. On Windows, when the upstream distribution omits import libraries,
 the selected MSVC `dumpbin` and `lib` generate ordinary import libraries from
 the actual DLL exports. This does not rebuild Whisper, ggml, or CUDA.
 The Windows MSVC installation also uses CMake's
-`InstallRequiredSystemLibraries` module to place the selected release CRT
-redistributables beside the helper in `bin/`. Debug runtimes, MFC, OpenMP, and
+`InstallRequiredSystemLibraries` module to place the selected release CRT and
+OpenMP redistributables beside the helper in `bin/`. Debug runtimes, MFC, and
 Windows Universal CRT files are excluded; Windows 10/11 supplies the latter.
 An explicit `-DMSVC_REDIST_DIR=...` in `cmakeArgs` can select the permitted
 installed compiler redistributable tree for that build.
