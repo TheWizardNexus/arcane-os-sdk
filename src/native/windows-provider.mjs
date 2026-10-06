@@ -41,13 +41,30 @@ function portableRequest(target) {
     return {...target, target: 'portable', format: 'portable'};
 }
 
+function applicationExecutable(application) {
+    const name = is.string(application.displayName) && application.displayName
+        ? application.displayName : application.id;
+    // Derive a Windows filename without changing the application's name.
+    // These substitutions belong only to Windows' reserved filename syntax.
+    const filename = `${name}.exe`.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '_');
+    return /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/iu.test(filename)
+        ? `_${filename}` : filename;
+}
+
+function hostAssetPath(relative, executable) {
+    if (relative === 'Arcane.exe') return executable;
+    if (relative === 'Arcane.exe.config') return `${executable}.config`;
+    return relative;
+}
+
 async function emit(onEvent, event) {
     if (is.function(onEvent)) await onEvent(event);
 }
 
-async function hostFilesMissing(directory) {
+async function hostFilesMissing(directory, executable = 'Arcane.exe') {
     const missing = [];
-    for (const relative of HOST_FILES) {
+    for (const source of HOST_FILES) {
+        const relative = hostAssetPath(source, executable);
         try {
             if (!(await stat(path.join(directory, relative))).isFile()) missing.push(relative);
         } catch (error) {
@@ -58,9 +75,9 @@ async function hostFilesMissing(directory) {
     return missing;
 }
 
-async function requireHostDirectory(directory) {
+async function requireHostDirectory(directory, executable = 'Arcane.exe') {
     const resolved = await realpath(directory);
-    const missing = await hostFilesMissing(resolved);
+    const missing = await hostFilesMissing(resolved, executable);
     if (missing.length) {
         throw new ArcaneError(ERROR_CODES.prerequisiteMissing, 'The selected Windows host assets are incomplete.', {
             details: {hostDirectory: resolved, missing}
@@ -126,7 +143,7 @@ function contains(root, candidate) {
     return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
 }
 
-async function copyHostAssets(source, root, files, signal, relative = '', ancestors = new Set()) {
+async function copyHostAssets(source, root, files, signal, executable, relative = '', ancestors = new Set()) {
     throwIfAborted(signal);
     const canonical = await realpath(source);
     const output = await realpath(root);
@@ -139,11 +156,12 @@ async function copyHostAssets(source, root, files, signal, relative = '', ancest
     for (const entry of await readdir(source, {withFileTypes: true})) {
         throwIfAborted(signal);
         const selected = path.join(source, entry.name);
-        const destination = relative ? `${relative}/${entry.name}` : entry.name;
+        const sourceRelative = relative ? `${relative}/${entry.name}` : entry.name;
+        const destination = hostAssetPath(sourceRelative, executable);
         const information = await stat(selected);
         if (information.isDirectory()) {
             await mkdir(path.join(root, destination), {recursive: true});
-            await copyHostAssets(selected, root, files, signal, destination, parents);
+            await copyHostAssets(selected, root, files, signal, executable, sourceRelative, parents);
         } else if (information.isFile()) {
             await writeOutput(root, destination, await readFile(selected, {signal}), files, signal);
         } else {
@@ -152,7 +170,7 @@ async function copyHostAssets(source, root, files, signal, relative = '', ancest
     }
 }
 
-async function applyApplicationIcon(request, root, files) {
+async function applyApplicationIcon(request, root, files, executableName) {
     const {appDescriptor, release, signal, onEvent} = request;
     const icon = appDescriptor.native?.icon;
     if (!icon) return {};
@@ -168,7 +186,7 @@ async function applyApplicationIcon(request, root, files) {
         {signal}
     );
     throwIfAborted(signal);
-    const executable = path.join(root, 'Arcane.exe');
+    const executable = path.join(root, executableName);
     let branded;
     try {
         const launcher = await readFile(
@@ -268,14 +286,15 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
             try {
                 const host = selectedHost ?? await releasedHostDirectory(path.resolve(request.outputRoot), artifact.manifest.sdk.version, {signal, onEvent});
                 const files = [...artifact.manifest.files];
-                await copyHostAssets(host, root, files, signal);
-                const branding = await applyApplicationIcon(request, root, files);
+                const executable = applicationExecutable(request.appDescriptor);
+                await copyHostAssets(host, root, files, signal, executable);
+                const branding = await applyApplicationIcon(request, root, files, executable);
                 const manifest = {
                     ...artifact.manifest,
                     kind: 'arcane-windows-native',
                     target,
                     host: {
-                        executable: 'Arcane.exe',
+                        executable,
                         platform: 'windows', architecture: 'x64', runtime: 'webview2',
                         coreExecutable: 'runtime/ArcaneCore.exe',
                         coreLoader: 'runtime/arcane-core-loader.cjs',
@@ -296,7 +315,7 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
             throwIfAborted(signal);
             const target = windowsTarget(targetRequest);
             const result = await portable.verify({artifact, targetRequest: portableRequest(target), signal});
-            await requireHostDirectory(result.outputRoot);
+            await requireHostDirectory(result.outputRoot, result.manifest.host.executable);
             const verified = {...result, target: 'windows-x64', executable: true};
             await emit(onEvent, {type: 'native.verified', target: 'windows-x64', outputRoot: result.outputRoot});
             throwIfAborted(signal);
@@ -308,8 +327,13 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
             if (process.platform !== 'win32' || process.arch !== 'x64') {
                 throw new ArcaneError(ERROR_CODES.nativeRunUnsupported, 'Running this Windows x64 artifact requires a Windows x64 host.');
             }
-            const root = await requireHostDirectory(artifact?.target?.rootDir);
-            return runProcess(path.join(root, 'Arcane.exe'), ['--close-on-stdin-eof'], {
+            const directory = artifact?.target?.rootDir;
+            const manifest = JSON.parse(
+                await readFile(path.join(directory, MANIFEST), 'utf8')
+            );
+            const executable = manifest.host.executable;
+            const root = await requireHostDirectory(directory, executable);
+            return runProcess(path.join(root, executable), ['--close-on-stdin-eof'], {
                 cwd: root, signal, onEvent, cancellationMode: 'close-input'
             });
         }

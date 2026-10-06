@@ -14,8 +14,20 @@ const hostFiles = [
     'Microsoft.Web.WebView2.WinForms.dll', 'WebView2Loader.dll',
     'runtime/ArcaneCore.exe', 'runtime/arcane-core-loader.cjs',
     'runtime/NODE-LICENSE', 'WEBVIEW2-LICENSE', 'LICENSE', 'NOTICE', 'COMMERCIAL-LICENSE.md',
-    'extra/complete-host-note.txt'
+    'extra/complete-host-note.txt', 'extra/Arcane.exe', 'extra/Arcane.exe.config'
 ];
+
+function assembledHostAssets(assets, executable = 'Moon Cheese Hotline.exe') {
+    return new Map(
+        [...assets].map(
+            function emittedAsset([relative, content]) {
+                if (relative === 'Arcane.exe') return [executable, content];
+                if (relative === 'Arcane.exe.config') return [`${executable}.config`, content];
+                return [relative, content];
+            }
+        )
+    );
+}
 
 async function writeContents(root, contents) {
     for (const [relative, content] of contents) {
@@ -127,7 +139,7 @@ test('Windows assembly preserves complete selected payloads, app services and th
     assert.equal(artifact.manifest.kind, 'arcane-windows-native');
     assert.deepEqual(artifact.manifest.target, target);
     assert.deepEqual(artifact.manifest.host, {
-        executable: 'Arcane.exe', platform: 'windows', architecture: 'x64', runtime: 'webview2',
+        executable: 'Moon Cheese Hotline.exe', platform: 'windows', architecture: 'x64', runtime: 'webview2',
         coreExecutable: 'runtime/ArcaneCore.exe', coreLoader: 'runtime/arcane-core-loader.cjs'
     });
     assert.equal(artifact.manifest.start, './pages/dispatch.html');
@@ -136,13 +148,24 @@ test('Windows assembly preserves complete selected payloads, app services and th
     assert.deepEqual(artifact.manifest.core.services, fixture.services);
     await assertContents(path.join(root, 'app'), fixture.contents);
     await assertContents(path.join(root, 'dependencies', '0'), dependencyContents);
-    await assertContents(root, fixture.assets);
+    const emittedAssets = assembledHostAssets(fixture.assets);
+    await assertContents(root, emittedAssets);
     assert.deepEqual(await readdir(path.join(root, 'extra', 'empty-directory')), []);
     assert.equal(JSON.parse(await readFile(path.join(root, 'node_modules/arcane-os/package.json'), 'utf8')).name, 'arcane-os');
     const entry = await readFile(path.join(root, 'runtime/arcane-core.mjs'), 'utf8');
     assert.ok(entry.includes('services/cheese.mjs'));
     assert.ok(entry.includes(JSON.stringify(JSON.stringify(fixture.services[0].options))));
-    for (const relative of hostFiles) assert.ok(artifact.manifest.files.includes(relative), relative);
+    for (const relative of emittedAssets.keys()) assert.ok(artifact.manifest.files.includes(relative), relative);
+    assert.equal(artifact.manifest.files.includes('Arcane.exe'), false);
+    assert.equal(artifact.manifest.files.includes('Arcane.exe.config'), false);
+    await assert.rejects(
+        readFile(path.join(root, 'Arcane.exe')),
+        {code: 'ENOENT'}
+    );
+    await assert.rejects(
+        readFile(path.join(root, 'Arcane.exe.config')),
+        {code: 'ENOENT'}
+    );
     assert.deepEqual(JSON.parse(await readFile(path.join(root, 'arcane-native.json'), 'utf8')), artifact.manifest);
     assert.deepEqual(events.filter(function completed(event) { return event.type === 'native.payload.completed'; }), [
         {type: 'native.payload.completed', target: 'windows-x64', appId: fixture.request.appDescriptor.id, outputRoot: root}
@@ -151,7 +174,7 @@ test('Windows assembly preserves complete selected payloads, app services and th
     assert.equal(verified.executable, true);
     assert.equal(verified.target, 'windows-x64');
     assert.deepEqual(verified.manifest, artifact.manifest);
-    await rm(path.join(root, 'Arcane.exe'));
+    await rm(path.join(root, 'Moon Cheese Hotline.exe'));
     await assert.rejects(provider.verify({artifact, targetRequest: target}), {code: 'ENOENT'});
     await assertContents(fixture.hostDirectory, fixture.assets);
     await assertContents(fixture.appReleaseRoot, fixture.contents);
@@ -166,7 +189,7 @@ test('Windows assembly reuses the exact SDK-version output cache and explicit em
     const artifact = await withFetch(function unexpectedFetch() { throw new Error('The completed exact-version cache must be reused.'); },
         function build() { return provider.build(fixture.request); });
     assert.deepEqual(artifact.manifest.core.services, []);
-    await assertContents(artifact.target.rootDir, fixture.assets);
+    await assertContents(artifact.target.rootDir, assembledHostAssets(fixture.assets));
     await assertContents(cachedHost, fixture.assets);
     assert.equal(artifact.manifest.sdk.version, metadata.version);
 });
@@ -286,8 +309,96 @@ test(
             )
         );
         await assertContents(path.join(artifact.target.rootDir, 'app'), contents);
-        await assertContents(artifact.target.rootDir, fixture.assets);
+        await assertContents(artifact.target.rootDir, assembledHostAssets(fixture.assets));
         await assertContents(fixture.appReleaseRoot, contents);
+        await assertContents(fixture.hostDirectory, fixture.assets);
+    }
+);
+
+test(
+    'Windows emitted names preserve app text and derive only platform-required filename syntax',
+    async function applicationNames(t) {
+        const cases = [
+            {displayName: 'KEMPO', executable: 'KEMPO.exe'},
+            {displayName: '月: "Cheese"/\\|?*<>\u0001. ', executable: '月_ _Cheese_________. .exe'},
+            {displayName: 'COM¹.dispatch', executable: '_COM¹.dispatch.exe'},
+            {displayName: undefined, executable: 'moon-cheese-hotline.exe'}
+        ];
+        for (const selected of cases) {
+            const fixture = await createFixture(t);
+            const appDescriptor = {...fixture.request.appDescriptor};
+            if (selected.displayName === undefined) delete appDescriptor.displayName;
+            else appDescriptor.displayName = selected.displayName;
+            const original = JSON.stringify(appDescriptor);
+            const provider = createWindowsNativeProvider(
+                {hostDirectory: fixture.hostDirectory}
+            );
+            const artifact = await provider.build(
+                {...fixture.request, appDescriptor}
+            );
+            assert.equal(artifact.manifest.host.executable, selected.executable);
+            assert.equal(JSON.stringify(appDescriptor), original);
+            assert.deepEqual(artifact.manifest.app, appDescriptor);
+            await assertContents(
+                artifact.target.rootDir,
+                assembledHostAssets(fixture.assets, selected.executable)
+            );
+            const verified = await provider.verify(
+                {artifact, targetRequest: target}
+            );
+            assert.equal(verified.manifest.host.executable, selected.executable);
+            await assertContents(fixture.hostDirectory, fixture.assets);
+        }
+    }
+);
+
+test(
+    'Windows verification follows the saved launcher name of an existing generic artifact',
+    async function existingGenericArtifact(t) {
+        const fixture = await createFixture(t);
+        const provider = createWindowsNativeProvider(
+            {hostDirectory: fixture.hostDirectory}
+        );
+        const artifact = await provider.build(
+            {
+                ...fixture.request,
+                appDescriptor: {...fixture.request.appDescriptor, displayName: 'Arcane'}
+            }
+        );
+        const manifest = {
+            ...artifact.manifest,
+            app: {...artifact.manifest.app, displayName: 'Original application name'}
+        };
+        await writeFile(
+            path.join(artifact.target.rootDir, 'arcane-native.json'),
+            JSON.stringify(manifest)
+        );
+        const verified = await provider.verify(
+            {artifact: {...artifact, manifest: null}, targetRequest: target}
+        );
+        assert.equal(verified.manifest.host.executable, 'Arcane.exe');
+        assert.equal(verified.manifest.app.displayName, 'Original application name');
+        await assertContents(artifact.target.rootDir, fixture.assets);
+    }
+);
+
+test(
+    'An app-named launcher never overwrites an independent host asset',
+    async function applicationNameCollision(t) {
+        const fixture = await createFixture(t);
+        const extra = new Map(
+            [['Moon Cheese Hotline.exe', Buffer.from('An independent selected host asset remains complete. 🧀\n')]]
+        );
+        await writeContents(fixture.hostDirectory, extra);
+        const provider = createWindowsNativeProvider(
+            {hostDirectory: fixture.hostDirectory}
+        );
+        await assert.rejects(
+            provider.build(fixture.request),
+            {code: 'EEXIST'}
+        );
+        assert.deepEqual(await readdir(fixture.outputRoot), []);
+        await assertContents(fixture.hostDirectory, extra);
         await assertContents(fixture.hostDirectory, fixture.assets);
     }
 );
