@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.63.0
+
+- Add the approved FLUX.2 Klein 4B text-to-image model descriptor to the
+  existing retained local image runtime, with its separate diffusion, VAE
+  and text-encoder resources and four-step Euler defaults. Applications keep
+  their model choice, complete prompts and image persistence.
+- Name assembled Windows launchers from the application display name, with a
+  matching executable configuration and manifest-selected launch path.
+  Preserve supported spaces, case and Unicode, existing generic artifacts,
+  icon embedding and the unchanged shared host archive.
+- Add `createSpeechService({stt, tts, signal})` through `arcane-os/core/speech`
+  for independently supplied native engines, immediate service registration,
+  sticky role state, complete requests/results, cancellation and joined close.
+  This service does not install or select a speech engine.
+- Preserve existing image generation/editing and native host behavior. No
+  additional GPU setup, SDXL, Whisper engine, Kokoro/Sherpa adoption or browser
+  AI native-speech readiness correction is included in this increment.
+
 ## 0.62.0
 
 - Add whole-image PNG editing through the existing local image runtime, Core
