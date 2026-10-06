@@ -17,6 +17,7 @@ import {
     readWorkspaceAssetVersion,resolveAssetReference,rewriteAssetReferences,versionAssetUrl
 } from './import-map.mjs';
 import {createPwaArtifacts,selectPwaFiles} from './pwa.mjs';
+import {createPwaRetirementWorkerScript} from './pwa-worker.mjs';
 
 const is = new Is(false);
 
@@ -1300,6 +1301,30 @@ async function startOwnedDevServer({
                     }
                 );
                 return;
+            }
+            if (mode === 'source' && selectedRoutes.config.appsRoot === '.'
+                && selectedRoutes.app?.pwa?.enabled === false && target.path === '/arcane-sw.js') {
+                let rootWorkerExists = true;
+                try {
+                    await lstat(path.join(selectedRoutes.workspaceRoot, 'arcane-sw.js'));
+                } catch (error) {
+                    if (error?.code !== 'ENOENT') throw error;
+                    rootWorkerExists = false;
+                }
+                if (!rootWorkerExists) {
+                    response.setHeader('Cache-Control', 'no-cache');
+                    await serveGeneratedRepresentation(
+                        fileServer,
+                        request,
+                        response,
+                        {
+                            // A former enabled worker's date cannot validate this retirement script.
+                            contentType: contentTypes.js,
+                            body: createPwaRetirementWorkerScript
+                        }
+                    );
+                    return;
+                }
             }
             const rootRequest = segments.length === 0;
             if (rootRequest && !selectedRoutes.rootDocument) {

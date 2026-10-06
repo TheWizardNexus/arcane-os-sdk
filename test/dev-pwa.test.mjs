@@ -8,6 +8,7 @@ import {createWorkspace} from '../src/scaffold.mjs';
 import {developApplication, executeOperation} from '../src/toolchain.mjs';
 import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 import {ARCANE_PROTOCOL, SDK_VERSION} from '../src/constants.mjs';
+import {createPwaRetirementWorkerScript} from '../src/pwa-worker.mjs';
 import {
     fetchSyntheticTls as fetch,repositoryRoot,temporaryDirectory,useSyntheticTls,writeSyntheticTlsFiles
 } from './helpers.mjs';
@@ -825,6 +826,140 @@ test('ordinary source serving keeps stable URLs and does not add PWA routes', as
     assert.equal(await (await fetch(`${instance.origin}/apps/fixture/documents/payload.html`)).text(), documentHtml);
 });
 
+for (const authored of [false, true]) {
+    test(
+        `standalone source retires an absent disabled worker for ${authored ? 'authored descriptors' : 'package descriptors'}`,
+        async function retireDisabledSourceWorker(context) {
+            const {workspaceRoot, instance, documentHtml} = await sourceFixture(
+                context,
+                {rootApp: true, directPackage: 'node_modules/arcane-os', http: true, authored}
+            );
+            const workerUrl = `${instance.origin}/arcane-sw.js`;
+            const enabledWorker = await globalThis.fetch(workerUrl);
+            assert.equal(enabledWorker.status, 200);
+            const lastModified = enabledWorker.headers.get('last-modified');
+            assert.ok(lastModified);
+            assert.ok((await enabledWorker.text()).includes('installPwaWorker'));
+
+            const descriptorPath = path.join(workspaceRoot, authored ? 'arcane-app.json' : 'arcane-package.json');
+            const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+            const app = authored ? descriptor.package : descriptor;
+            app.pwa.enabled = false;
+            const disabledSource = `${JSON.stringify(descriptor, null, 4)}\n`;
+            await writeFile(descriptorPath, disabledSource);
+            const conditional = {headers: {'If-Modified-Since': lastModified}};
+            const retired = await globalThis.fetch(workerUrl, conditional);
+            assert.equal(retired.status, 200);
+            assert.equal(retired.headers.get('cache-control'), 'no-cache');
+            assert.equal(retired.headers.get('last-modified'), null);
+            assert.ok(retired.headers.get('content-type').includes('javascript'));
+            assert.equal(await retired.text(), createPwaRetirementWorkerScript());
+            const head = await globalThis.fetch(
+                workerUrl,
+                {method: 'HEAD', headers: conditional.headers}
+            );
+            assert.equal(head.status, 200);
+            assert.equal(await head.text(), '');
+            for (const route of ['/arcane.webmanifest', '/arcane-offline.json', '/arcane-pwa.mjs']) {
+                const response = await globalThis.fetch(`${instance.origin}${route}`);
+                assert.equal(response.status, 404, route);
+                await response.text();
+            }
+            assert.equal(await (await globalThis.fetch(`${instance.origin}/documents/payload.html`)).text(), documentHtml);
+            assert.equal(await readFile(descriptorPath, 'utf8'), disabledSource);
+            await assert.rejects(
+                lstat(path.join(workspaceRoot, 'arcane-sw.js')),
+                {code: 'ENOENT'}
+            );
+
+            app.pwa.enabled = true;
+            await writeFile(descriptorPath, `${JSON.stringify(descriptor, null, 4)}\n`);
+            const reenabled = await globalThis.fetch(workerUrl);
+            assert.equal(reenabled.status, 200);
+            assert.ok((await reenabled.text()).includes('installPwaWorker'));
+        }
+    );
+}
+
+test(
+    'source retirement preserves omitted PWA and authored root workers',
+    async function preserveRootWorkerOwnership(context) {
+        const {workspaceRoot, instance} = await sourceFixture(
+            context,
+            {rootApp: true, directPackage: 'node_modules/arcane-os', http: true, enabled: false}
+        );
+        const workerUrl = `${instance.origin}/arcane-sw.js`;
+        const omitted = await globalThis.fetch(workerUrl);
+        assert.equal(omitted.status, 404);
+        await omitted.text();
+        const packagePath = path.join(workspaceRoot, 'arcane-package.json');
+        const app = JSON.parse(await readFile(packagePath, 'utf8'));
+        app.pwa = {enabled: false};
+        app.include.push('arcane-sw.js');
+        const workerPath = path.join(workspaceRoot, 'arcane-sw.js');
+        const authoredWorker = 'self.addEventListener("fetch", function authoredFetch() {});\n';
+        await writeFile(workerPath, authoredWorker);
+        await writeFile(packagePath, `${JSON.stringify(app, null, 4)}\n`);
+        const authored = await globalThis.fetch(workerUrl);
+        assert.equal(authored.status, 200);
+        assert.equal(await authored.text(), authoredWorker);
+        assert.equal(await readFile(workerPath, 'utf8'), authoredWorker);
+        app.include = app.include.filter(
+            function retainOtherInputs(input) {
+                return input !== 'arcane-sw.js';
+            }
+        );
+        await writeFile(packagePath, `${JSON.stringify(app, null, 4)}\n`);
+        const unselected = await globalThis.fetch(workerUrl);
+        assert.equal(unselected.status, 404);
+        await unselected.text();
+        await unlink(workerPath);
+        const absent = await globalThis.fetch(workerUrl);
+        assert.equal(absent.status, 200);
+        assert.equal(await absent.text(), createPwaRetirementWorkerScript());
+        await mkdir(workerPath);
+        const directory = await globalThis.fetch(workerUrl);
+        assert.equal(directory.status, 404);
+        await directory.text();
+    }
+);
+
+test(
+    'disabled source configuration does not add retirement to packaged serving',
+    async function preservePackagedWorker(context) {
+        const {workspaceRoot} = await sourceFixture(
+            context,
+            {rootApp: true, http: true, enabled: false, serve: false}
+        );
+        const packagePath = path.join(workspaceRoot, 'arcane-package.json');
+        const app = JSON.parse(await readFile(packagePath, 'utf8'));
+        app.pwa = {enabled: false};
+        await writeFile(packagePath, `${JSON.stringify(app, null, 4)}\n`);
+        const releaseRoot = path.join(workspaceRoot, 'dist/fixture');
+        await mkdir(
+            releaseRoot,
+            {recursive: true}
+        );
+        await writeFile(path.join(releaseRoot, 'index.html'), '<!doctype html><p>Packaged page.</p>\n');
+        const instance = await startDevServer(
+            {workspaceRoot, releaseRoot, mode: 'packaged', http: true, port: 0}
+        );
+        context.after(
+            async function closePackagedRetirementFixture() {
+                await instance.close();
+            }
+        );
+        const absent = await globalThis.fetch(`${instance.origin}/arcane-sw.js`);
+        assert.equal(absent.status, 404);
+        await absent.text();
+        const packagedWorker = 'self.addEventListener("fetch", function packagedFetch() {});\n';
+        await writeFile(path.join(releaseRoot, 'arcane-sw.js'), packagedWorker);
+        const present = await globalThis.fetch(`${instance.origin}/arcane-sw.js`);
+        assert.equal(present.status, 200);
+        assert.equal(await present.text(), packagedWorker);
+    }
+);
+
 test(
     'conditional offline requests discover added and removed files while retaining unchanged generated responses',
     async function refreshConditionalOfflineInventory(context) {
@@ -969,6 +1104,7 @@ test(
         app.pwa.enabled = false;
         await writeFile(packagePath, `${JSON.stringify(app, null, 4)}\n`);
         assert.equal((await fetch(`${instance.origin}/arcane.webmanifest`)).status, 404);
+        assert.equal((await fetch(`${instance.origin}/arcane-sw.js`)).status, 404);
         const ordinaryEntry = await (await fetch(`${instance.origin}/apps/fixture/current.html`)).text();
         assert.equal(ordinaryEntry.includes('data-arcane-pwa'), false);
         assert.equal(ordinaryEntry.includes('arcaneVersion='), false);

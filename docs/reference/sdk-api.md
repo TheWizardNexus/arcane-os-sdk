@@ -4248,6 +4248,17 @@ External source mode accepts both the installed-package route layout and the
 existing physical runtime layout. Installed-package mode serves the configured
 SDK resources directly from `node_modules` at their logical browser URLs;
 it does not create a workspace `arcane/` directory or require `arcane.lock.json`.
+
+For a standalone `appsRoot:'.'` source application with explicit
+`pwa.enabled:false` and an absent root `arcane-sw.js`, the exact worker URL
+returns a small retirement worker. Its native install requests `skipWaiting()`;
+activation unregisters only its own registration, without a fetch handler,
+storage/cache changes, client claiming or page reload. The browser owns update
+timing and an open page may retain the neutral controller until its lifetime
+ends. An existing authored worker, omitted/enabled PWA, multi-app source routes
+and packaged mode stay unchanged. See the complete
+[disabled-worker lifecycle](pwa.md#disabled-worker-retirement-on-the-source-server).
+
 `host` defaults to `127.0.0.1` and accepts an
 explicit network address or hostname. Use `0.0.0.0` for all IPv4 interfaces or
 `::` for the platform's IPv6 wildcard listeners. `port` selects the HTTPS
@@ -4756,6 +4767,14 @@ It returns their application endpoints and shared shutdown
 lifecycle. Package-only apps remain unchanged. The operation generates
 no packaged output; enabled PWA manifests
 are served directly from the selected source resources.
+
+The source listener also supplies the
+[disabled-worker retirement lifecycle](pwa.md#disabled-worker-retirement-on-the-source-server)
+for explicit disabled standalone PWA configuration when the root worker is
+absent. This does not grant filesystem retirement authority or change the
+refresh operation's preservation of authored files. Browser activation and
+unregistration proceed through the native lifecycle without clearing saved data
+or reloading an open page.
 
 ### Signature and result
 

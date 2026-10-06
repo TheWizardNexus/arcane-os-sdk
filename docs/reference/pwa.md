@@ -169,6 +169,44 @@ Reference updates finish before file removal begins. Cancellation or a file
 error is reported without undoing earlier completed changes; a later call can
 finish retirement. The operation does not claim an all-or-nothing transaction.
 
+### Disabled worker retirement on the source server
+
+`startDevServer()` and `developApplication()` serve a retirement worker at
+`/arcane-sw.js` when source mode selects a standalone `appsRoot:"."` application
+with explicit `pwa.enabled:false` and that root worker file is absent. This
+browser lifecycle is separate from the import-map filesystem operation above.
+The existing server returns JavaScript with `Cache-Control: no-cache`, including
+when the request carries a former enabled worker's `If-Modified-Since` date.
+It writes no replacement worker file and performs no offline-inventory scan.
+
+When the browser updates the existing registration from that URL, the
+retirement worker calls `skipWaiting()` during installation and unregisters its
+own registration during activation. It has no fetch handler, so subsequent
+requests reaching it use the ordinary network path. It never clears caches,
+DBOPFS, profiles or other saved data; it does not enumerate or claim clients,
+reload pages, or start a polling loop. Other service-worker registrations remain
+untouched.
+
+Native service-worker update and activation timing remains browser-owned. An
+already open page may retain the neutral retirement worker as its controller
+for the rest of its lifetime, and its already rendered content stays unchanged.
+Unregistration removes the registration from future navigation matching;
+retirement does not promise immediate `controller === null` or automatic page
+refresh. These boundaries follow the platform's
+[activation](https://w3c.github.io/ServiceWorker/#activate-algorithm) and
+[unregistration](https://w3c.github.io/ServiceWorker/#dom-serviceworkerregistration-unregister)
+contracts.
+
+An existing root `arcane-sw.js` retains its ordinary authored-file routing,
+including its normal application selection; only an `ENOENT` filesystem result
+selects the retirement response. Omitted PWA configuration, enabled PWA,
+multi-app source workspaces, other URLs and packaged serving keep their existing
+behavior. A separately operated static host must own its worker lifecycle;
+filesystem retirement alone does not establish browser retirement on that host.
+The server path uses the existing portable Node serving owner, and browser
+retirement requires the browser's native service-worker support and an existing
+registration eligible for that update.
+
 ### Authored host root and app entry
 
 An authored `index.html` at the source host root keeps `/` separate from the

@@ -2,6 +2,25 @@ export function createPwaWorkerScript(manifest, clientUrl = 'arcane/sdk/pwa.mjs'
     return `(${installPwaWorker.toString()})(${JSON.stringify(manifest, null, 4)}, ${JSON.stringify(clientUrl)});\n`;
 }
 
+export function createPwaRetirementWorkerScript() {
+    return `(${installPwaRetirementWorker.toString()})();\n`;
+}
+
+function installPwaRetirementWorker() {
+    self.addEventListener(
+        'install',
+        function installRetiringWorker(event) {
+            event.waitUntil(self.skipWaiting());
+        }
+    );
+    self.addEventListener(
+        'activate',
+        function activateRetiringWorker(event) {
+            event.waitUntil(self.registration.unregister());
+        }
+    );
+}
+
 function installPwaWorker(manifest, clientUrl) {
     const scope = self.registration.scope;
     const scopeOrigin = new URL(scope).origin;

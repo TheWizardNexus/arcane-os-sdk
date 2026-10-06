@@ -1,10 +1,64 @@
 import assert from 'node:assert/strict';
 import {createContext, Script} from 'node:vm';
 import test from '../src/testing.mjs';
-import {createPwaWorkerScript} from '../src/pwa-worker.mjs';
+import {createPwaRetirementWorkerScript, createPwaWorkerScript} from '../src/pwa-worker.mjs';
 import {createPwaArtifacts} from '../src/pwa.mjs';
 
 const scope = 'https://example.test/app/';
+
+test(
+    'retirement worker requests activation and unregisters only its own registration',
+    async function retirePwaWorker() {
+        const handlers = new Map();
+        const calls = [];
+        const installing = Promise.resolve();
+        const unregistering = Promise.resolve(true);
+        const context = createContext(
+            {
+                self: {
+                    addEventListener(type, handler) {
+                        handlers.set(type, handler);
+                    },
+                    skipWaiting() {
+                        calls.push('skipWaiting');
+                        return installing;
+                    },
+                    registration: {
+                        unregister() {
+                            calls.push('unregister');
+                            return unregistering;
+                        }
+                    }
+                }
+            }
+        );
+        new Script(createPwaRetirementWorkerScript()).runInContext(context);
+        assert.deepEqual(
+            [...handlers.keys()],
+            ['install', 'activate']
+        );
+        assert.equal(calls.length, 0);
+        let pending;
+        function waitUntil(value) {
+            pending = value;
+        }
+        const event = {waitUntil};
+        handlers.get('install')(event);
+        assert.equal(pending, installing);
+        await pending;
+        assert.deepEqual(
+            calls,
+            ['skipWaiting']
+        );
+        handlers.get('activate')(event);
+        assert.equal(pending, unregistering);
+        await pending;
+        assert.deepEqual(
+            calls,
+            ['skipWaiting', 'unregister']
+        );
+    }
+);
 
 function workerManifest(overrides = {}) {
     return {
