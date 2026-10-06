@@ -171,10 +171,11 @@ default `AI`; read-only `providerRuntime`, `speechActivationPending`, `browserSp
 read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `streamTTS(text='',end=false,options={})`,
 `prepareTTS({parts,textFormat,storage,identity,signal,onState})`,
-`playPreparedTTS(prepared,{signal,onState})`,
+`prepareAudioOutput()`, `playPreparedTTS(prepared,{signal,onState,audioOutput})`,
 `finishTTS()`, `prepareTTSPlayback()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
-installs `window.ai`, and emits `ai-ready` and `ai-tts-failure`.
+installs `window.ai`, and emits `ai-ready`, `ai-tts-failure`, and
+`AI_AUDIO_OUTPUT_STATE_EVENT` (`'ai-audio-output-state'`).
 
 `fetch(...)` and `fetchRequest(options)` are asynchronous complete-response
 entry points. `streamMessage(...)` and `streamRequest(options)` deliver
@@ -496,7 +497,7 @@ cancelling one handle does not cancel another active matching caller.
 Preparation cancellation prevents later synthesis and releases its activation
 interest. The provider's operation remains responsible for actual cleanup.
 
-`playPreparedTTS(prepared,{signal,onState})` can attach immediately. Its returned
+`playPreparedTTS(prepared,{signal,onState,audioOutput})` can attach immediately. Its returned
 `{state,error,finished,pause(),resume(),stop()}` handle schedules segments in
 their original order using the existing AI audio clock. `finished` resolves `true` after
 natural completion and `false` after stop, cancellation, or failure; genuine
@@ -520,6 +521,38 @@ Fully stored replay enables playback without loading the selected speech
 model even when the AI starts muted. Missing audio alone requests the shared
 TTS readiness path. See [prepared narration](ai/browser-speech.md#prepare-narration-once-and-replay-stored-audio)
 for full record shapes, storage ownership, and a complete example.
+
+`prepareAudioOutput()` synchronously creates or reuses this AI's persistent
+WebAudio context and returns the same handle until disposed or closed. It is
+silent: no resume, unmute, model load, source creation, test sound, or gesture
+listener registration. The handle exposes `kind:'web-audio'`, current
+`state`, `contextState`, and complete `error` getters, plus
+`subscribe(listener)`, `resume()`, and `dispose()`.
+`subscribe` immediately replays `{kind,state,contextState,error}`, observes
+future changes for this output, and returns an idempotent unsubscribe function.
+The named `AI_AUDIO_OUTPUT_STATE_EVENT` export identifies canonical occurrences
+with that snapshot as `detail` and an output-specific `operationId`.
+
+Output `ready` means its context is actually `running`, independently of model
+readiness, HTML audio, native speech, future autoplay permission, or audible
+delivery. Other states are the platform's current state (including `suspended`
+or `interrupted`), `gesture-required` after an actual `NotAllowedError`,
+`unavailable` when context creation fails, `error`, `disposing`, `disposed`,
+or `closed`. Explicit `resume()` resolves a boolean for actual readiness;
+unavailable/disposed, superseded, or paused-playback cases resolve `false`.
+Platform rejection rejects with the actual error and retains observable state.
+
+Pass `{audioOutput}` to `playPreparedTTS` to borrow that same AI's live output;
+another owner's, closed, or disposing handle throws `TypeError`. Borrowed
+playback leaves the context open after completion or stop. Omission or `null`
+preserves the existing per-playback context and terminal context close.
+Owner `dispose()` stops context-bound playback and dependent clock work,
+observes cleanup, and awaits actual close without cancelling detached speech
+preparation or deleting saved audio. Concurrent disposal calls share their
+promise; failures remain observable and a failed close can be retried.
+Disposal/closure releases handle subscriptions after their final notification.
+See [silent reusable output](ai/browser-speech.md#prepare-a-silent-reusable-webaudio-output)
+for state details and usage.
 
 Streaming speech retains sentence
 segmentation by default. `configureTTSSegmentation({punctuation,wordCadence})`

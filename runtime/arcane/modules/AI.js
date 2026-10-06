@@ -51,6 +51,7 @@ credentials='omit';
 const BUILT_IN_AI_SERVICES=new Set(['TWIN','OLLAMA','LOCAL_SPEACH']);
 const AI_REASONING_EFFORTS=new Set(['none','low','medium','high','max']);
 export const AI_READY_EVENT='ai-ready';
+export const AI_AUDIO_OUTPUT_STATE_EVENT='ai-audio-output-state';
 const AI_TTS_FAILURE_EVENT='ai-tts-failure';
 export const AI_INITIALIZATION_ERROR_CODES=completeValue({
     userReadyRegistrationCollision:
@@ -1128,6 +1129,7 @@ class AI {
                 eventTypes:completeValue(
                     [
                         AI_READY_EVENT,
+                        AI_AUDIO_OUTPUT_STATE_EVENT,
                         AI_TTS_FAILURE_EVENT,
                         ...Object.values(AI_BROWSER_SPEECH_EVENT_TYPES)
                     ]
@@ -1183,8 +1185,12 @@ class AI {
     #stopOllamaReady=null;
     #ttsSegmentation={...DEFAULT_TTS_SEGMENTATION};
     #preparedSpeechPlaybacks = new Set();
+    #activePreparedSpeechPlayback = null;
     #nativeSpeechPlaybacks = new Set();
     #speechUnlockContext = null;
+    #speechResumeContext = null;
+    #audioOutput = null;
+    #audioOutputSequence = 0;
 
     #traceSpeech(phase,detail={}){
         if(!arcaneLogging.enabled)return null;
@@ -6434,7 +6440,7 @@ class AI {
         );
     }
 
-    playPreparedTTS(prepared, {signal = null, onState = null} = {}) {
+    playPreparedTTS(prepared, {signal = null, onState = null, audioOutput = null} = {}) {
         if(!is.array(prepared?.segments) || !is.function(prepared?.getAudio)) {
             throw new TypeError('AI.playPreparedTTS requires a speech preparation handle.');
         }
@@ -6442,9 +6448,19 @@ class AI {
         if(onState !== null && !is.function(onState)) {
             throw new TypeError('Prepared playback onState must be a function when provided.');
         }
+        const output = audioOutput === null ? null : this.#audioOutput;
+        if(audioOutput !== null && (output?.handle !== audioOutput
+            || output.disposing || output.disposed || !output.context
+            || output.context.state === 'closed')) {
+            throw new TypeError('Prepared playback requires a live audio output from this AI.');
+        }
         // One playback lane per AI; detached preparation has its own lifetime.
         this.stopAudio();
-        const group = {jobs: [], context: null, paused: false, stopped: false, state: 'waiting', error: null};
+        const group = {
+            jobs: [], context: output?.context ?? null, output,
+            paused: false, stopped: false, state: 'waiting', error: null
+        };
+        this.#activePreparedSpeechPlayback = group;
         const completions = [];
         const generation = this.speechGeneration;
         this.#traceSpeech('playPreparedTTS.call', {segments: prepared.segments});
@@ -6464,8 +6480,16 @@ class AI {
         function stopPreparedPlayback() {
             if(group.stopped) return false;
             group.stopped = true;
-            runtime.speechResumeAttempt += 1;
-            runtime.speechResumePending = false;
+            if(runtime.#activePreparedSpeechPlayback === group) {
+                runtime.#activePreparedSpeechPlayback = null;
+                runtime.speechResumeAttempt += 1;
+                runtime.speechResumePending = false;
+                if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
+                if(runtime.speechScheduleContext === group.context) {
+                    runtime.speechScheduleContext = null;
+                    runtime.speechScheduleTime = 0;
+                }
+            }
             publishPreparedPlaybackState('stopped');
             for(const job of group.jobs) {
                 if(job.state === 'complete') continue;
@@ -6481,13 +6505,10 @@ class AI {
                 }
                 runtime.#cancelSpeechJob(job);
             }
-            if(runtime.speechScheduleContext === group.context) {
-                runtime.speechScheduleContext = null;
-                runtime.speechScheduleTime = 0;
-            }
             runtime.#requestSpeechPlayback();
             return true;
         }
+        group.stop = stopPreparedPlayback;
         const control = {
             finished: null,
             get state() { return group.state; },
@@ -6496,9 +6517,23 @@ class AI {
                 if(group.stopped || !group.context || group.context.state === 'closed') return false;
                 group.paused = true;
                 if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
-                await group.context.suspend();
-                if(!group.stopped) publishPreparedPlaybackState('paused');
-                return true;
+                let suspension;
+                try {
+                    suspension = Promise.resolve(group.context.suspend());
+                    if(output) output.suspending = suspension;
+                    await suspension;
+                    if(group.stopped || generation !== runtime.speechGeneration) return false;
+                    publishPreparedPlaybackState('paused');
+                    return true;
+                } catch(error) {
+                    if(output) {
+                        output.reportError(error);
+                        if(!group.stopped) group.fail(error);
+                    }
+                    throw error;
+                } finally {
+                    if(output?.suspending === suspension) output.suspending = null;
+                }
             },
             async resume() {
                 if(group.stopped || !group.context || group.context.state === 'closed') return false;
@@ -6558,15 +6593,18 @@ class AI {
             async function finishPreparedPlayback(results) {
                 const completed = !group.stopped && results.every(Boolean);
                 group.stopped = true;
+                if(runtime.#activePreparedSpeechPlayback === group) {
+                    runtime.#activePreparedSpeechPlayback = null;
+                    if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
+                    if(runtime.speechScheduleContext === group.context) {
+                        runtime.speechScheduleContext = null;
+                        runtime.speechScheduleTime = 0;
+                    }
+                }
                 publishPreparedPlaybackState(completed ? 'complete' : group.error ? 'error' : 'stopped');
                 signal?.removeEventListener('abort', stopPreparedPlayback);
                 runtime.#preparedSpeechPlaybacks.delete(control);
-                if(runtime.#speechUnlockContext === group.context) runtime.#clearSpeechUnlock();
-                if(runtime.speechScheduleContext === group.context) {
-                    runtime.speechScheduleContext = null;
-                    runtime.speechScheduleTime = 0;
-                }
-                if(group.context && group.context.state !== 'closed') {
+                if(!output && group.context && group.context.state !== 'closed') {
                     try {
                         await group.context.close();
                     } catch(error) {
@@ -6577,17 +6615,25 @@ class AI {
                 return completed;
             }
         );
+        group.finished = control.finished;
         signal?.addEventListener('abort', stopPreparedPlayback, {once: true});
         publishPreparedPlaybackState('waiting');
+        if(group.stopped) return control;
         if(signal?.aborted) {
             stopPreparedPlayback();
         } else if(group.jobs.length) {
             // Playing saved audio does not require activating a synthesis provider.
             this.muted = false;
             try {
-                const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
-                if(!is.function(AudioContext)) throw new TypeError('Audio playback is unavailable in this browser.');
-                group.context = new AudioContext();
+                if(output) {
+                    if(output.disposing || output.disposed || output.context.state === 'closed') {
+                        throw new Error('The prepared playback audio output has been disposed.');
+                    }
+                } else {
+                    const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+                    if(!is.function(AudioContext)) throw new TypeError('Audio playback is unavailable in this browser.');
+                    group.context = new AudioContext();
+                }
                 this.resumeAudio(group.context, true).catch(
                     function failPreparedSpeechUnlock(error) {
                         for(const job of group.jobs) runtime.#failSpeechJob(job, error, 'playback-resume');
@@ -7096,12 +7142,209 @@ class AI {
         return new Blob(normalized.chunks,{type:normalized.type||this.audioType});
     }
 
+    prepareAudioOutput(){
+        if(this.#audioOutput && !this.#audioOutput.disposed
+            && this.#audioOutput.context?.state !== 'closed') {
+            return this.#audioOutput.handle;
+        }
+        const runtime = this;
+        const output = {
+            context: null, handle: null, error: null,
+            disposing: false, disposed: false, suspending: null,
+            resumeAttempt: 0, disposal: null, reportError: null, publish: null
+        };
+        const operationId = `${this.#events.instanceId}:audio-output:${++this.#audioOutputSequence}`;
+        const subscriptions = new Set();
+        function snapshot(){
+            const contextState = output.context?.state ?? null;
+            const state = output.disposed ? 'disposed'
+                : output.disposing ? 'disposing'
+                : !output.context ? 'unavailable'
+                : contextState === 'closed' ? 'closed'
+                : output.error?.name === 'NotAllowedError' && contextState !== 'running' ? 'gesture-required'
+                : output.error ? 'error'
+                : contextState === 'running' ? 'ready'
+                : contextState;
+            return {kind: 'web-audio', state, contextState, error: output.error};
+        }
+        function publish(){
+            runtime.#events.dispatch(AI_AUDIO_OUTPUT_STATE_EVENT, snapshot(), {operationId});
+        }
+        output.publish = publish;
+        function reportError(error){
+            output.error = error;
+            publish();
+            if(error?.name !== 'NotAllowedError') {
+                arcaneLogging.error('AI audio output operation failed.', error);
+            }
+        }
+        output.reportError = reportError;
+        function observeContextState(){
+            if(output.context.state === 'running') output.error = null;
+            publish();
+            if(output.context.state === 'closed' && !output.disposing) {
+                output.context.removeEventListener?.('statechange', observeContextState);
+                for(const unsubscribe of [...subscriptions]) unsubscribe();
+            }
+        }
+        function observeRejection(promise, attempt = null){
+            // The owner retains failures even when a caller observes state only.
+            promise.catch(function observeOutputFailure(error){
+                if(attempt === null || (attempt === output.resumeAttempt && !output.disposing && !output.disposed)) {
+                    reportError(error);
+                } else {
+                    arcaneLogging.error('A retired AI audio output resume failed.', error);
+                }
+            });
+            return promise;
+        }
+        async function resumeOutput(attempt){
+            const context = output.context;
+            if(!context || output.disposing || output.disposed || context.state === 'closed') return false;
+            // A pending suspend targets this exact context; resume must follow it.
+            if(output.suspending) await output.suspending;
+            if(output.disposing || output.disposed || attempt !== output.resumeAttempt) return false;
+            const paused = runtime.speechJobs.some(function hasPausedOutputPlayback(job){
+                return job.preparedPlayback?.context === context && job.preparedPlayback.paused;
+            });
+            if(paused) return false;
+            await context.resume();
+            if(output.disposing || output.disposed || attempt !== output.resumeAttempt) return false;
+            output.error = null;
+            publish();
+            if(context.state !== 'running') return false;
+            if(runtime.#speechUnlockContext === context) runtime.#clearSpeechUnlock();
+            if(runtime.speechJobs.some(function usesResumedOutput(job){
+                return job.audioContext === context || job.preparedPlayback?.context === context;
+            })) runtime.#requestSpeechPlayback();
+            return true;
+        }
+        async function disposeOutput(){
+            const context = output.context;
+            const errors = [];
+            const groups = new Set();
+            output.disposing = true;
+            output.resumeAttempt += 1;
+            publish();
+            if(context) {
+                if(runtime.#speechUnlockContext === context) runtime.#clearSpeechUnlock();
+                if(runtime.#speechResumeContext === context) {
+                    runtime.speechResumeAttempt += 1;
+                    runtime.speechResumePending = false;
+                    runtime.#speechResumeContext = null;
+                }
+                for(const job of [...runtime.speechJobs]) {
+                    if(job.preparedPlayback?.context === context) {
+                        groups.add(job.preparedPlayback);
+                    } else if(job.audioContext === context || job.sourceNode?.context === context
+                        || job.precedingSpeechContext === context) {
+                        if(job.sourceNode) {
+                            job.sourceNode.onended = null;
+                            if(job.sourceNode.__arcaneStarted) {
+                                try { job.sourceNode.stop(); }
+                                catch(error) { errors.push(error); }
+                            }
+                        }
+                        try { runtime.#cancelSpeechJob(job); }
+                        catch(error) { errors.push(error); }
+                    }
+                }
+                for(const group of groups) {
+                    try { group.stop(); }
+                    catch(error) { errors.push(error); }
+                }
+                if(runtime.speechScheduleContext === context) {
+                    runtime.speechScheduleContext = null;
+                    runtime.speechScheduleTime = 0;
+                }
+                if(runtime.audioContext === context) runtime.audioContext = null;
+                const completions = await Promise.allSettled(
+                    [...groups].map(function finishOutputPlayback(group){ return group.finished; })
+                );
+                for(const completion of completions) {
+                    if(completion.status === 'rejected') errors.push(completion.reason);
+                }
+                try {
+                    if(context.state !== 'closed') await context.close();
+                } catch(error) {
+                    errors.push(error);
+                    output.disposing = false;
+                    output.disposal = null;
+                    if(runtime.#audioOutput === output && runtime.audioContext === null) {
+                        runtime.audioContext = context;
+                    }
+                    throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'AI audio output disposal failed.');
+                }
+                context.removeEventListener?.('statechange', observeContextState);
+            }
+            output.disposing = false;
+            output.disposed = true;
+            output.error = !errors.length ? null : errors.length === 1
+                ? errors[0] : new AggregateError(errors, 'AI audio output playback cleanup failed.');
+            publish();
+            for(const unsubscribe of [...subscriptions]) unsubscribe();
+            runtime.#requestSpeechPlayback();
+            if(errors.length) throw output.error;
+            return true;
+        }
+        output.handle = {
+            kind: 'web-audio',
+            get state(){ return snapshot().state; },
+            get contextState(){ return output.context?.state ?? null; },
+            get error(){ return output.error; },
+            subscribe(listener){
+                if(!is.function(listener)) throw new TypeError('Audio output subscriber must be a function.');
+                const remove = output.disposed || output.context?.state === 'closed' ? null : runtime.#events.subscribe(
+                    AI_AUDIO_OUTPUT_STATE_EVENT,
+                    function observeAudioOutput(occurrence){
+                        if(occurrence.operationId === operationId) listener(occurrence.detail);
+                    }
+                );
+                function unsubscribe(){
+                    remove?.();
+                    subscriptions.delete(unsubscribe);
+                }
+                if(remove) subscriptions.add(unsubscribe);
+                try { listener(snapshot()); }
+                catch(error) { arcaneLogging.error('AI audio output state observer failed.', error); }
+                return unsubscribe;
+            },
+            resume(){
+                const attempt = ++output.resumeAttempt;
+                return observeRejection(resumeOutput(attempt), attempt);
+            },
+            dispose(){
+                if(output.disposed) return output.disposal ?? Promise.resolve(true);
+                if(!output.disposal) {
+                    let resolve;
+                    let reject;
+                    output.disposal = observeRejection(new Promise(function retainOutputDisposal(accept, decline){
+                        resolve = accept;
+                        reject = decline;
+                    }));
+                    disposeOutput().then(resolve, reject);
+                }
+                return output.disposal;
+            }
+        };
+        this.#audioOutput = output;
+        try {
+            output.context = this.#getSpeechAudioContext();
+            output.context.addEventListener?.('statechange', observeContextState);
+            publish();
+        } catch(error) {
+            reportError(error);
+        }
+        return output.handle;
+    }
+
     #getSpeechAudioContext(){
         if(this.audioContext&&this.audioContext.state!=='closed'){
             return this.audioContext;
         }
 
-        const AudioContext=window.AudioContext||window.webkitAudioContext;
+        const AudioContext=globalThis.AudioContext||globalThis.webkitAudioContext
+            ||window.AudioContext||window.webkitAudioContext;
 
         if(!is.function(AudioContext)){
             throw new TypeError('Audio playback is unavailable in this browser.');
@@ -7396,6 +7639,7 @@ class AI {
         this.speechGeneration+=1;
         this.speechResumeAttempt+=1;
         this.speechResumePending=false;
+        this.#speechResumeContext=null;
         this.speechScheduleGeneration=this.speechGeneration;
         this.speechScheduleContext=null;
         this.speechScheduleTime=0;
@@ -7461,13 +7705,20 @@ class AI {
         let attempt=0;
         let context;
         let preparedGroup = null;
+        let output = null;
 
         try{
             context=audioContext||this.#getSpeechAudioContext();
+            output = this.#audioOutput?.context === context ? this.#audioOutput : null;
+            if(output?.disposing || output?.disposed) return false;
             preparedGroup = this.speechJobs.find(function findPreparedResumeOwner(job) {
                 return job.preparedPlayback?.context === context;
             })?.preparedPlayback ?? null;
             if(preparedGroup?.paused || preparedGroup?.stopped) return false;
+            if(output?.suspending) {
+                await output.suspending;
+                if(output.disposing || output.disposed || preparedGroup?.paused || preparedGroup?.stopped) return false;
+            }
             this.#traceSpeech('resumeAudio.context',{
                 callId,state:context.state,audioTime:context.currentTime,
                 sampleRate:context.sampleRate
@@ -7490,11 +7741,26 @@ class AI {
 
             attempt=++this.speechResumeAttempt;
             this.speechResumePending=true;
+            this.#speechResumeContext=context;
             await context.resume();
+            if(output?.disposing || output?.disposed) return false;
             if(preparedGroup?.stopped) return false;
             if(preparedGroup?.paused) {
-                await context.suspend();
-                this.speechResumePending = false;
+                let suspension;
+                try {
+                    suspension = Promise.resolve(context.suspend());
+                    if(output) output.suspending = suspension;
+                    await suspension;
+                } catch(error) {
+                    output?.reportError(error);
+                    throw error;
+                } finally {
+                    if(output?.suspending === suspension) output.suspending = null;
+                }
+                if(attempt === this.speechResumeAttempt) {
+                    this.speechResumePending = false;
+                    this.#speechResumeContext = null;
+                }
                 return false;
             }
             this.#traceSpeech('resumeAudio.resumed',{
@@ -7509,6 +7775,11 @@ class AI {
             }
 
             this.speechResumePending=false;
+            this.#speechResumeContext=null;
+            if(output) {
+                output.error = null;
+                output.publish();
+            }
 
             if(context.state==='running'){
                 this.#clearSpeechUnlock();
@@ -7518,6 +7789,7 @@ class AI {
             }
         }catch(error){
             this.#traceSpeech('resumeAudio.error',{callId,error,state:context?.state});
+            if(output?.disposing || output?.disposed) return false;
             if(preparedGroup?.stopped || preparedGroup?.paused) return false;
             if(attempt&&attempt!==this.speechResumeAttempt){
                 return context?.state==='running';
@@ -7525,7 +7797,9 @@ class AI {
 
             if(attempt===this.speechResumeAttempt){
                 this.speechResumePending=false;
+                this.#speechResumeContext=null;
             }
+            output?.reportError(error);
             if(preparedGroup && error?.name !== 'NotAllowedError') {
                 for(const job of preparedGroup.jobs) this.#failSpeechJob(job, error, 'playback-resume');
                 return false;
@@ -7600,6 +7874,9 @@ class AI {
             const playbackContext=sourceNode?.context
                 ||audioContext
                 ||this.#getSpeechAudioContext();
+            // Retain the actual output before asynchronous decoding so disposal
+            // can cancel this job without cancelling unrelated synthesis.
+            job.audioContext=playbackContext;
             const audioBlob=new Blob(audioChunks,{type:audioType});
             const arrayBuffer=await audioBlob.arrayBuffer();
             const audioBuffer=await playbackContext.decodeAudioData(arrayBuffer);
@@ -7683,12 +7960,17 @@ class AI {
         const deadline=this.speechScheduleTime;
         if(!context||deadline<=context.currentTime)return Promise.resolve(true);
         const signal=job.abortController.signal;
+        job.precedingSpeechContext=context;
         return new Promise(function waitForScheduledSpeechGap(resolve,reject){
             let timer=null;
+            let settled=false;
             function finish(value,error=null){
+                if(settled)return;
+                settled=true;
                 globalThis.clearTimeout(timer);
                 signal.removeEventListener('abort',cancel);
                 context.removeEventListener('statechange',schedule);
+                if(job.precedingSpeechContext===context)job.precedingSpeechContext=null;
                 if(error)reject(error);
                 else resolve(value);
             }
@@ -7755,7 +8037,8 @@ class AI {
                     // the next turn, including when it follows buffered audio.
                     if(index!==0||job.state!=='ready')break;
                     if(!await this.#waitForPrecedingSpeechClock(job)
-                        ||job.generation!==this.speechGeneration||this.muted){
+                        ||job.generation!==this.speechGeneration||this.muted
+                        ||['cancelled','failed'].includes(job.state)){
                         return this.#cancelSpeechJob(job);
                     }
                     job.state='scheduled';
@@ -7783,6 +8066,10 @@ class AI {
                 const audioContext=job.sourceNode.context||job.audioContext;
 
                 if(job.preparedPlayback?.paused) break;
+                if(this.#audioOutput?.context === audioContext && this.#audioOutput.suspending) {
+                    this.resumeAudio(audioContext, false);
+                    return scheduled;
+                }
 
                 if(audioContext.state!=='running'){
                     this.#waitForSpeechGesture(null,audioContext);
@@ -7871,6 +8158,7 @@ class AI {
             return false;
         }finally{
             this.speechPlaybackStarting=false;
+            const output = this.#audioOutput;
             const nextJob=this.speechJobs.find(function findFirstUnscheduledSpeechJob(job){
                 return job.state!=='scheduled';
             });
@@ -7879,6 +8167,10 @@ class AI {
                 !this.muted
                 &&!this.speechAwaitingGesture
                 &&!this.speechResumePending
+                &&!this.speechJobs.some(function hasPendingOutputSuspension(job){
+                    return output?.suspending && (job.audioContext === output.context
+                        || job.preparedPlayback?.context === output.context);
+                })
                 &&!this.speechJobs.some(function hasPausedPreparedPlayback(job) {
                     return job.preparedPlayback?.paused;
                 })

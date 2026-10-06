@@ -889,7 +889,7 @@ provider cleanup remains observable through that operation's settlement.
 
 ### Playback controls and independent lifetimes
 
-`ai.playPreparedTTS(prepared,{signal,onState})` returns
+`ai.playPreparedTTS(prepared,{signal,onState,audioOutput})` returns
 `{state,error,finished,pause(),resume(),stop()}` immediately. It uses the
 existing AI audio-clock scheduler and waits for each earlier segment before scheduling
 later audio. Ready adjacent buffers retain contiguous scheduling. Requested
@@ -902,8 +902,9 @@ states are `waiting`, `waiting-for-gesture`, `scheduled`, `paused`, `complete`,
 `stopped`, and `error`. Use `waiting-for-gesture` to present an audio-unlock
 control. A `false` result from `resume()` is not a first-segment-ready signal;
 inspect `state` and `error` to distinguish a stopped or unavailable context
-from browser gesture waiting. The ordinary playback path creates its audio
-context immediately, before the first audio segment is ready.
+from browser gesture waiting. With `audioOutput` omitted or `null`, playback
+creates its own audio context immediately, before the first segment is ready,
+and closes that context after completion, stop, cancellation, or failure.
 
 `finished` resolves `true` after natural playback completion and `false` after
 stop, playback cancellation, or failure. Real failures also reach the existing
@@ -930,6 +931,87 @@ playback completion must not be used as a signal to cancel other background
 preparations. A page that starts several preparations owns and observes every
 `ready` promise, even when it plays only one handle. Browser autoplay permission
 still applies; neither promise proves that a person heard the audio.
+
+### Prepare a silent reusable WebAudio output
+
+`ai.prepareAudioOutput()` synchronously returns an AI-owned output handle.
+It creates or reuses that AI's persistent WebAudio context and observes its
+actual state. Preparation stays silent: it does not resume the context, unmute
+speech, load a model, create an audio source, play a test sound, or install
+gesture listeners. It does not wait for speech preparation or provider readiness.
+
+The handle exposes `kind:'web-audio'`, live `state`, `contextState`, and `error`
+getters, `subscribe(listener)`, `resume()`, and `dispose()`. Repeated preparation
+returns the same handle until its output is disposed or its context closes.
+`contextState` is the platform context's current state, or `null` when unavailable;
+`error` retains the complete actual error, or `null`.
+
+| Output state | Meaning |
+| --- | --- |
+| `ready` | This WebAudio context is currently `running`. |
+| `suspended`, `interrupted`, or another platform state | The context reports that state; suspension alone does not establish a gesture requirement. |
+| `gesture-required` | A resume operation actually reported `NotAllowedError` while the context was not running. |
+| `unavailable` | Context creation failed; `error` contains the actual failure. |
+| `error` | An output operation failed; inspect the complete `error`. |
+| `disposing`, `disposed` | Owner disposal is in progress or has completed. |
+| `closed` | The underlying context has closed outside completed owner disposal. |
+
+`subscribe(listener)` immediately replays `{kind,state,contextState,error}` and
+then delivers state changes through the canonical AI event owner. It returns
+an idempotent unsubscribe function. The named export
+`AI_AUDIO_OUTPUT_STATE_EVENT` from `AI.js` is `'ai-audio-output-state'`; its
+canonical occurrences carry the same snapshot in `detail` and an output-specific
+`operationId`. Handle subscriptions select only their own output. Disposal or
+context closure releases those subscriptions after the terminal notification;
+a later handle subscription still receives the current snapshot immediately.
+
+`resume()` is an explicit asynchronous action for the application's user-gesture
+flow. It resolves `true` only when the context is actually running, and `false`
+when unavailable, disposed, superseded, or held by a paused prepared playback.
+A platform rejection rejects with its actual error and retains that failure in
+the output state. It does not unmute speech or load a model. Output readiness
+does not establish HTML audio readiness, native-speech readiness, future autoplay
+permission, available speech audio, or audible delivery.
+
+Pass the handle explicitly to borrow that exact output for prepared playback:
+
+```javascript
+// ai and prepared are the same AI owner and preparation used above.
+const audioOutput = ai.prepareAudioOutput();
+
+function observeNarrationOutput(listener) {
+  return audioOutput.subscribe(listener);
+}
+
+function resumeNarrationOutput() {
+  // Call from the application's user action and observe the returned promise.
+  return audioOutput.resume();
+}
+
+function playNarration() {
+  return ai.playPreparedTTS(prepared, {audioOutput});
+}
+
+function disposeNarrationOutput() {
+  // Call when this owner no longer needs the output; observe its promise.
+  return audioOutput.dispose();
+}
+```
+
+The selected handle must be live and belong to the same AI instance; another
+owner's, closed, or disposing output throws `TypeError`. Borrowed playback
+retains the same ordered scheduling, pause/resume, cancellation, and single-lane
+replacement behavior. Completion or stopping playback leaves the output open
+for reuse. Merely preparing an output does not change the omitted-option path.
+
+The application owns the output lifetime and calls `dispose()` when finished
+with it. Disposal stops playback bound to that context and any following work
+waiting on its clock, observes cleanup, and awaits the actual context close.
+It preserves detached preparation, saved audio, unrelated contexts, and model
+selection. Concurrent calls share the disposal promise. Actual cleanup or close
+errors reject and remain observable; a failed context close permits a later
+disposal retry. Stop/mute controls retain their existing playback/provider scope
+and do not replace this explicit output disposal.
 
 ## Stream chunks as they arrive
 

@@ -127,12 +127,16 @@ test(
         let ai;
         let unregisterProvider;
 
-        class FakeAudioContext {
+        class FakeAudioContext extends EventTarget {
             state = 'running';
             currentTime = 10;
             destination = {};
+            suspendGate = null;
+            resumeCalls = 0;
+            closeCalls = 0;
 
             constructor() {
+                super();
                 contexts.push(this);
             }
 
@@ -172,9 +176,21 @@ test(
                 return source;
             }
 
-            async suspend() { this.state = 'suspended'; }
-            async resume() { this.state = 'running'; }
-            async close() { this.state = 'closed'; }
+            async suspend() {
+                if(this.suspendGate) await this.suspendGate.promise;
+                if(this.state !== 'closed') this.state = 'suspended';
+                this.dispatchEvent(new Event('statechange'));
+            }
+            async resume() {
+                this.resumeCalls += 1;
+                if(this.state !== 'closed') this.state = 'running';
+                this.dispatchEvent(new Event('statechange'));
+            }
+            async close() {
+                this.closeCalls += 1;
+                this.state = 'closed';
+                this.dispatchEvent(new Event('statechange'));
+            }
         }
         globalThis.AudioContext = FakeAudioContext;
 
@@ -188,6 +204,7 @@ test(
                         response.release();
                         response.decodeGate?.resolve();
                     }
+                    for(const context of contexts) context.suspendGate?.resolve();
                     for(const instance of instances) instance.stopAudio();
                     await Promise.allSettled(
                         preparations.map(function preparationReady(preparation) { return preparation.ready; })
@@ -487,6 +504,101 @@ test(
                 assert.equal(first.source.context.state, 'closed');
                 assert.equal(loads, initialLoads);
                 assert.equal(requests.length, initialRequests);
+            }
+        );
+
+        await t.test(
+            'explicit startup output is reused across prepared playback completion and replay',
+            async function testBorrowedOutputReplay() {
+                const output = ai.prepareAudioOutput();
+                const context = ai.audioContext;
+                const response = responseFor('borrowed-output-replay');
+                const prepared = prepare({parts: ['Read the orbital cookbook.']});
+                await response.requested.promise;
+                response.release();
+                await prepared.ready;
+                const playback = ai.playPreparedTTS(prepared, {audioOutput: output});
+                await response.scheduled.promise;
+                assert.equal(response.source.context, context);
+                response.source.finish();
+                assert.equal(await playback.finished, true);
+                assert.equal(output.state, 'ready');
+                assert.equal(context.closeCalls, 0);
+                response.scheduled = deferred();
+                const replay = ai.playPreparedTTS(prepared, {audioOutput: output});
+                await response.scheduled.promise;
+                assert.equal(response.source.context, context);
+                response.source.finish();
+                assert.equal(await replay.finished, true);
+                assert.equal(context.closeCalls, 0);
+                await output.dispose();
+                assert.equal(context.closeCalls, 1);
+                assert.equal(prepared.state, 'ready');
+            }
+        );
+
+        await t.test(
+            'borrowed replacement waits for the old context suspension without old completion clearing its schedule',
+            async function testBorrowedReplacement() {
+                const output = ai.prepareAudioOutput();
+                const context = ai.audioContext;
+                const first = responseFor('borrowed-old');
+                const second = responseFor('borrowed-new');
+                const firstPrepared = prepare({parts: ['Old dragon.']});
+                const secondPrepared = prepare({parts: ['New dragon.']});
+                await Promise.all([first.requested.promise, second.requested.promise]);
+                first.release();
+                second.release();
+                await Promise.all([firstPrepared.ready, secondPrepared.ready]);
+                const oldPlayback = ai.playPreparedTTS(firstPrepared, {audioOutput: output});
+                await first.scheduled.promise;
+                context.suspendGate = deferred();
+                const paused = oldPlayback.pause();
+                const beforeResume = context.resumeCalls;
+                const newPlayback = ai.playPreparedTTS(secondPrepared, {audioOutput: output});
+                assert.equal(await oldPlayback.finished, false);
+                assert.equal(context.closeCalls, 0);
+                assert.equal(context.resumeCalls, beforeResume);
+                context.suspendGate.resolve();
+                assert.equal(await paused, false);
+                await second.scheduled.promise;
+                assert.equal(second.source.context, context);
+                assert.equal(context.state, 'running');
+                assert.equal(ai.speechScheduleContext, context);
+                assert.equal(ai.speechScheduleTime, second.source.startTime + second.duration);
+                second.source.finish();
+                assert.equal(await newPlayback.finished, true);
+                await output.dispose();
+            }
+        );
+
+        await t.test(
+            'output disposal cancels a borrowed decode and leaves detached preparation available',
+            async function testBorrowedOutputDisposal() {
+                const output = ai.prepareAudioOutput();
+                const context = ai.audioContext;
+                const response = responseFor('borrowed-dispose-decode');
+                response.decodeGate = deferred();
+                const prepared = prepare({parts: ['Keep this saved dragon.']});
+                await response.requested.promise;
+                response.release();
+                await prepared.ready;
+                const playback = ai.playPreparedTTS(prepared, {audioOutput: output});
+                await response.decoded.promise;
+                const beforeSources = sources.length;
+                const disposed = output.dispose();
+                assert.equal(await playback.finished, false);
+                await disposed;
+                assert.equal(context.state, 'closed');
+                response.decodeGate.resolve();
+                await setImmediate();
+                assert.equal(sources.length, beforeSources);
+                assert.equal(prepared.state, 'ready');
+                assert.equal(await (await prepared.getAudio(0)).text(), response.token);
+                assert.throws(
+                    function rejectDisposedOutput(){ ai.playPreparedTTS(prepared, {audioOutput: output}); },
+                    /live audio output from this AI/
+                );
             }
         );
 
