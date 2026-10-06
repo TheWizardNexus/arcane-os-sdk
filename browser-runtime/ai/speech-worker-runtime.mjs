@@ -1,5 +1,6 @@
 import Is from "../dependencies/strong-type/index.js";
 import { createModelResourceClient, createModelResourceHost } from './model-resource-bridge.mjs';
+import { createCompleteKokoroSynthesis } from './kokoro-complete-input.mjs';
 
 const is = new Is(false);
 
@@ -1493,54 +1494,70 @@ async function createWhisperEngine(namespace, configuration, signal, report) {
 }
 
 async function createKokoroEngine(namespace, configuration, signal, report) {
-  if (!is.function(namespace?.KokoroTTS?.from_pretrained)) {
-    throw workerError(
-      "ARCANE_AI_PROVIDER_UNAVAILABLE",
-      "The Kokoro runtime does not export KokoroTTS.",
-      undefined,
-      "kokoro-tts-constructor-export-missing",
-    );
-  }
-  throwIfAborted(signal, "tts-load-cancelled");
-  const synthesizer = await namespace.KokoroTTS.from_pretrained(
-    configuration.model.repository,
-    {
-      device: configuration.execution?.device ?? "wasm",
-      dtype: configuration.model.dtype ?? "q8",
-      revision: configuration.model.revision,
-      progress_callback: report,
-    },
-  );
-  try {
-    throwIfAborted(signal, "tts-load-cancelled");
-  } catch (error) {
-    try {
-      await disposeEngine(synthesizer);
-    } catch {
-      // Preserve the cancellation boundary while the owning Worker terminates.
+    if (!is.function(namespace?.KokoroTTS?.from_pretrained)) {
+        throw workerError(
+            'ARCANE_AI_PROVIDER_UNAVAILABLE',
+            'The Kokoro runtime does not export KokoroTTS.',
+            undefined,
+            'kokoro-tts-constructor-export-missing',
+        );
     }
-    throw error;
-  }
-  return completeValue({
-    async synthesize(input, { signal: requestSignal } = {}) {
-      throwIfAborted(requestSignal, "tts-synthesis-cancelled");
-      const output = await synthesizer.generate(input.text, {
-        voice: input.voice,
-        speed: input.speed,
-        signal: requestSignal,
-      });
-      throwIfAborted(requestSignal, "tts-synthesis-cancelled");
-      const audio = is.instanceCheck(output?.audio, Float32Array)
-        ? output.audio
-        : new Float32Array(output?.audio ?? []);
-      return completeValue({
-        audio,
-        sampleRate: output?.sampling_rate,
-        voice: input.voice,
-      });
-    },
-    dispose: () => disposeEngine(synthesizer),
-  });
+    throwIfAborted(signal, 'tts-load-cancelled');
+    const synthesizer = await namespace.KokoroTTS.from_pretrained(
+        configuration.model.repository,
+        {
+            device: configuration.execution?.device ?? 'wasm',
+            dtype: configuration.model.dtype ?? 'q8',
+            revision: configuration.model.revision,
+            progress_callback: report,
+        },
+    );
+    let synthesize;
+    try {
+        throwIfAborted(signal, 'tts-load-cancelled');
+        synthesize = await createCompleteKokoroSynthesis({
+            KokoroTTS: namespace.KokoroTTS,
+            synthesizer,
+            repository: configuration.model.repository,
+            signal,
+            onProgress: report,
+        });
+        throwIfAborted(signal, 'tts-load-cancelled');
+    } catch (error) {
+        try {
+            await disposeEngine(synthesizer);
+        } catch (cleanupError) {
+            throw new AggregateError([error, cleanupError], 'Kokoro preparation and model cleanup failed.', { cause: error });
+        }
+        throwIfAborted(signal, 'tts-load-cancelled');
+        throw error;
+    }
+    return completeValue({
+        async synthesize(input, { signal: requestSignal } = {}) {
+            throwIfAborted(requestSignal, 'tts-synthesis-cancelled');
+            let output;
+            try {
+                output = await synthesize(input.text, {
+                    voice: input.voice,
+                    speed: input.speed,
+                    signal: requestSignal,
+                });
+            } catch (error) {
+                throwIfAborted(requestSignal, 'tts-synthesis-cancelled');
+                throw error;
+            }
+            throwIfAborted(requestSignal, 'tts-synthesis-cancelled');
+            const audio = is.instanceCheck(output?.audio, Float32Array)
+                ? output.audio
+                : new Float32Array(output?.audio ?? []);
+            return completeValue({
+                audio,
+                sampleRate: output?.sampling_rate,
+                voice: input.voice,
+            });
+        },
+        dispose: function disposeKokoroEngine() { return disposeEngine(synthesizer); },
+    });
 }
 
 function callerVoiceIds(configuration) {

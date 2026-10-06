@@ -1065,11 +1065,32 @@ owners. Only `'plain'` selects exact input; omission and other values retain
 the existing narration cleanup. Applications never supply the internal
 `speechInputPrepared` argument.
 
-This selection governs SDK text treatment, not the selected engine's input
-capacity or pronunciation. [Kokoro.js 1.2.1](https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js)
-still tokenizes with truncation in both `generate()` and `stream()`; plain input
-does not establish complete audio for an oversized engine input. The SDK's existing complete-text forwarding
-fixture does not prove upstream synthesis completeness.
+This selection governs SDK text treatment, not pronunciation. The browser Kokoro
+adapter preserves the selected runtime's own text normalization and phonemization,
+then uses a genuine tokenizer subclass with truncation disabled. Its Kokoro
+subclass sends every resulting content token through the public
+`generate_from_ids()` method. Short inputs retain one inference; longer inputs
+use ordered segments within the selected engine's inference capacity and return
+all audio in order. This is token-based engine transport, not a character limit,
+text estimate, summary, or input discard.
+
+The [selected Kokoro model](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/blob/1939ad2a8e416c0acfeecc08a694d14ef25f2231/README.md#python)
+accepts 510 content tokens plus its two outer padding positions per inference.
+Each segment receives that padding independently. Upstream voice-style selection,
+speed, waveform generation and sample rate remain upstream-owned. The SDK reuses
+one loaded model; it does not copy the private phonemizer, replace instance methods,
+load a second model, or import another Transformers runtime. Its tokenizer
+reconstruction uses the same effective selection as the
+[Kokoro 1.2.1 factory](https://github.com/hexgrad/kokoro/blob/664c76a704021239ba59c84dcbaa4d3dece01fe9/kokoro.js/src/kokoro.js).
+That factory ignores a `revision` option; this change does not establish revision
+pinning that the upstream factory does not implement.
+
+Cancellation is request-local and checked between inference segments and before
+returning audio. As with the existing Worker contract, cancellation prevents later
+work and output while an already-running upstream inference may finish. Unload
+and disposal retain their existing Worker-termination boundary. Source and
+controlled-fixture coverage of token/audio preservation are distinct from speech
+quality or execution evidence for a particular model, browser and device.
 
 ## Choose a device or reduce memory use
 
