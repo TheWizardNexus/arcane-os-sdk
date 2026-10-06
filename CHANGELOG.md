@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.79.1
+
+- Classify generic speech-model progress callbacks as loading, reserving
+  download status for the resource owner that actually transfers a resource.
+  Preserve initialization status, complete progress details and file counts.
+- Keep cancellation, cached-resource reporting, model selection and speech
+  behavior unchanged. This corrects a progress label; it does not establish or
+  repair a repeated network transfer.
+
 ## 0.79.0
 
 - Add public `createExecutionDeviceCatalog()` and `createExecutionDeviceService()`
