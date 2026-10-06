@@ -6,12 +6,82 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 278,
+  "memberCount": 283,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "codex-app-server:createCodexAppServerSession",
+      "name": "createCodexAppServerSession",
+      "displayName": "createCodexAppServerSession()",
+      "kind": "function",
+      "signature": "createCodexAppServerSession({executable,args,cwd,env,clientInfo,capabilities}={})",
+      "entrypoints": ["arcane-os/codex/app-server"],
+      "primaryImport": "arcane-os/codex/app-server",
+      "group": "Native Codex sessions",
+      "summary": "Creates an explicit native Codex App Server JSONL session without starting its process until connect.",
+      "availability": "Node with caller-selected native executable on Windows, Linux and macOS; Android requires host process adaptation",
+      "protocol": "Native Codex App Server JSONL",
+      "normalization": "Complete request/result/notification objects; ordered live delta/item callbacks, actual terminal turn outcomes and exact stored-turn recovery. Server requests retain real IDs and explicit replies. No automatic thread selection, retry, approval or desktop-task attachment."
+    },
+    {
+      "id": "codex-app-server:openCodexAppServerSession",
+      "name": "openCodexAppServerSession",
+      "displayName": "openCodexAppServerSession()",
+      "kind": "function",
+      "signature": "async openCodexAppServerSession(options)",
+      "entrypoints": ["arcane-os/codex/app-server"],
+      "primaryImport": "arcane-os/codex/app-server",
+      "group": "Native Codex sessions",
+      "summary": "Creates and connects the same explicit native session, disposing it before rejecting failed initialization.",
+      "availability": "Node with caller-selected native Codex executable",
+      "protocol": "Native Codex App Server JSONL",
+      "normalization": "Returns the connected session; creates or resumes no thread and changes no provider or authentication selection."
+    },
+    {
+      "id": "mcp-stdio:createMcpStdioServer",
+      "name": "createMcpStdioServer",
+      "displayName": "createMcpStdioServer()",
+      "kind": "function",
+      "signature": "createMcpStdioServer({serverInfo,instructions,tools=[],resources=[],onDiagnostic}={})",
+      "entrypoints": ["arcane-os/mcp/stdio"],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "Owns one MCP STDIO session for caller-authored tools and static resources.",
+      "availability": "Node streams on Windows, Linux and macOS; Android requires host adaptation",
+      "protocol": "MCP 2025-11-25 initialize-era JSON-RPC newline transport",
+      "normalization": "Explicit CallToolResult/ReadResourceResult preserve complete content. Returns start, cancel, drain, close and closed; concurrent handlers, ordered output, cooperative cancellation and graceful EOF drain. No process launch or application-service ownership."
+    },
+    {
+      "id": "mcp-stdio:MCP_PROTOCOL_VERSION",
+      "name": "MCP_PROTOCOL_VERSION",
+      "displayName": "MCP_PROTOCOL_VERSION",
+      "kind": "constant",
+      "signature": "MCP_PROTOCOL_VERSION",
+      "entrypoints": ["arcane-os/mcp/stdio"],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "The explicit supported MCP initialization profile, 2025-11-25.",
+      "availability": "Node",
+      "protocol": "MCP initialization version negotiation",
+      "normalization": "Later profiles and optional unimplemented capabilities are not implied."
+    },
+    {
+      "id": "mcp-stdio:McpProtocolError",
+      "name": "McpProtocolError",
+      "displayName": "McpProtocolError",
+      "kind": "class",
+      "signature": "new McpProtocolError(code,message,data)",
+      "entrypoints": ["arcane-os/mcp/stdio"],
+      "primaryImport": "arcane-os/mcp/stdio",
+      "group": "MCP STDIO",
+      "summary": "Represents an explicit JSON-RPC failure with complete message and optional data.",
+      "availability": "Node",
+      "protocol": "JSON-RPC error object",
+      "normalization": "Preserves code, message and supplied data; ordinary tool domain failures use CallToolResult.isError."
+    },
     {
       "id": "core-repositories:resolveArcaneDataPaths",
       "name": "resolveArcaneDataPaths",

@@ -57,6 +57,8 @@ runtime layouts.
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
+| `arcane-os/codex/app-server` | Explicit native Codex App Server session, complete live turns, server requests and recovery. |
+| `arcane-os/mcp/stdio` | Node MCP STDIO server for app-owned tools and static resources. |
 | `arcane-os/core/repositories` | Native persistent ArcaneData paths and explicitly selected connected working repositories. |
 | `arcane-os/core/packaged-web` | Core-owned packaged web listener with a persisted loopback origin and ready/failure events. |
 | `arcane-os/core/preferences` | Existing preference RPC methods with an application-selected file, ordered writes and owned drain. |
@@ -383,6 +385,11 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createCoreFacade()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `installCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `getInstalledCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `createCodexAppServerSession()` | function | `arcane-os/codex/app-server` | Native Codex sessions | Node with an explicitly selected Codex App Server executable |
+| `openCodexAppServerSession()` | function | `arcane-os/codex/app-server` | Native Codex sessions | Node with an explicitly selected Codex App Server executable |
+| `createMcpStdioServer()` | function | `arcane-os/mcp/stdio` | MCP STDIO | Node streams on Windows, Linux and macOS; Android needs host adaptation |
+| `MCP_PROTOCOL_VERSION` | constant | `arcane-os/mcp/stdio` | MCP STDIO | Node |
+| `McpProtocolError` | class | `arcane-os/mcp/stdio` | MCP STDIO | Node |
 | `createCoreClassicSource()` | function | `arcane-os/core/classic-source` | Core classic client projection | Node; generated source runs in browser and native WebView renderers |
 | `createCoreRuntime()` | function | `arcane-os/core/runtime` | Native Core runtime | Node on Windows, Linux and macOS native hosts; Android requires host adaptation |
 | `encodeCoreFrame()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
@@ -7101,6 +7108,49 @@ const source = await createCoreClassicSource({
 });
 nativeHost.setDocumentCreatedScript(source);
 ```
+
+## createCodexAppServerSession()
+
+Import from `arcane-os/codex/app-server`. Creates a synchronous session handle
+without starting a process. `connect()` starts the caller-selected executable
+and completes native JSONL initialization. The session owns explicit thread
+creation/resumption, complete native requests, live turn callbacks, exact-turn
+completion, interruption, real server-request replies and process retirement.
+Application-owned prompts, approvals and display policy stay with the caller.
+It neither attaches to desktop chats nor installs or authenticates Codex.
+See the complete [session options, methods, events, results, errors and recovery
+contract](codex-app-server.md).
+
+## openCodexAppServerSession()
+
+Import from `arcane-os/codex/app-server`. Creates the same session, awaits
+`connect()`, and returns it; failed opening disposes the owned process before
+rejecting. Prefer `createCodexAppServerSession()` when the caller must retain
+the handle during initialization. Neither factory creates or resumes a thread.
+See [connection ownership](codex-app-server.md#open-an-explicitly-selected-connection).
+
+## createMcpStdioServer()
+
+Import from `arcane-os/mcp/stdio`. Creates one optional Node STDIO session for
+application-owned tool and static-resource descriptors. `start()` attaches
+caller-owned streams; handlers receive complete arguments and return explicit
+MCP result containers. Requests run independently; protocol output writes are
+ordered. Normal EOF and `close()` drain accepted work. Cancellation is
+cooperative, and transport failures remain observable through `closed`.
+See [options, handlers, methods, errors and supported profile](mcp-stdio.md).
+
+## MCP_PROTOCOL_VERSION
+
+Import from `arcane-os/mcp/stdio`. The supported initialization profile is
+exactly `'2025-11-25'`. This does not claim later profiles or every optional
+capability. See [protocol support](mcp-stdio.md#mcp_protocol_version).
+
+## McpProtocolError
+
+Import from `arcane-os/mcp/stdio`. `new McpProtocolError(code,message,data)`
+represents an explicit JSON-RPC error with complete message and optional data.
+Ordinary domain tool failures use an explicit `CallToolResult` with `isError`.
+See [error outcomes](mcp-stdio.md#mcpprotocolerror).
 
 ## createCoreRuntime()
 
