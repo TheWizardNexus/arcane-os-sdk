@@ -1817,7 +1817,7 @@ export function createSpeechWorkerRuntime({ role, scope = globalThis, send } = {
                 : 'Loading model file';
         publishProgress(
             {
-                phase: initializing ? 'initialize' : 'download',
+                phase: initializing ? 'initialize' : 'load',
                 stage: 'model',
                 message,
                 file,

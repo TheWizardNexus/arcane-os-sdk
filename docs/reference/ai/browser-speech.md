@@ -1866,7 +1866,13 @@ callback and the shared sticky AI runtime state. Records include `phase`,
 `stage`, `message`, the current `file` when available, and `elapsedMs`.
 Known artifact inventories report `completed`, `total`, and `unit:'files'`.
 Upstream model files are discovered during loading, so their total remains
-`null` while completed files are counted. Remaining TTS pool initialization
+`null` while completed files are counted. Generic upstream model callbacks use
+`phase:'load'`; upstream readiness or completion of the current file set uses
+`phase:'initialize'`. These callbacks do not establish a network transfer or a
+cache miss. Resource-fetch progress owns `phase:'download'`, while an existing
+DBOPFS resource reports `phase:'load'` with `cached:true`. A later generic model
+callback reports model loading without reclassifying that stored read as a
+download. Remaining TTS pool initialization
 reports completed model sessions. Consumers use an indeterminate progress bar
 when no final total is known; transfer quantities do not determine this display.
 

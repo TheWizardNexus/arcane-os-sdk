@@ -330,15 +330,17 @@ test('speech client termination joins aborted resource writes for every caller',
     assert.equal(terminationNotifications, 1);
 });
 
-test('actual speech loader fetch forwards semantic shard progress to client onProgress', async function loaderResourceProgress(t) {
+test('speech loader distinguishes resource downloads, stored reads and generic model progress', async function loaderResourceProgress(t) {
     const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
     const listeners = new Set();
+    const workerProgress = [];
     const scope = { fetch: globalThis.fetch, Request };
     globalThis.__arcaneSpeechProgressFixtureScope = scope;
     const runtime = createSpeechWorkerRuntime({
         role: 'stt',
         scope,
         send: function sendWorkerMessage(message) {
+            if (message.type === 'progress') workerProgress.push(message.progress);
             queueMicrotask(function deliverWorkerMessage() {
                 for (const listener of listeners) listener({ data: message });
             });
@@ -369,18 +371,44 @@ test('actual speech loader fetch forwards semantic shard progress to client onPr
         url: 'https://speech.example/runtime/model.onnx',
         message: 'Stored complete model shard',
     };
+    const cachedProgress = {
+        phase: 'load',
+        unit: 'shards',
+        completed: 1,
+        total: 1,
+        cached: true,
+        url: 'https://speech.example/runtime/cached-model.onnx',
+        message: 'Reading stored model resource',
+    };
+    scope.modelDetails = [
+        { status: 'initiate', name: 'speech-model', file: 'cached-model.onnx' },
+        { status: 'progress', name: 'speech-model', file: 'cached-model.onnx', original: { message: 'Complete upstream loading detail', items: ['first', 'second'] } },
+        { status: 'initiate', name: 'speech-model', file: 'model.onnx' },
+        { status: 'done', name: 'speech-model', file: 'cached-model.onnx' },
+        { status: 'done', name: 'speech-model', file: 'model.onnx' },
+        { status: 'ready', task: 'automatic-speech-recognition' },
+    ];
     const progress = [];
     const client = createSpeechWorkerClient({
         role: 'stt',
         fetchResource: async function fetchLoaderResource(url, { onProgress }) {
-            onProgress(semanticProgress);
+            onProgress(url === cachedProgress.url ? cachedProgress : semanticProgress);
             return { file: new Blob(['complete model']), status: 200, statusText: 'OK', headers: [], url, redirected: false };
         },
     });
     const source = `
         export const env = { allowLocalModels: true, allowRemoteModels: false, backends: { onnx: { wasm: {} } } };
-        export async function pipeline() {
-            await globalThis.__arcaneSpeechProgressFixtureScope.fetch('https://speech.example/runtime/model.onnx');
+        export async function pipeline(task, repository, { progress_callback }) {
+            const scope = globalThis.__arcaneSpeechProgressFixtureScope;
+            scope.reportModelProgress = progress_callback;
+            progress_callback(scope.modelDetails[0]);
+            await scope.fetch('https://speech.example/runtime/cached-model.onnx');
+            progress_callback(scope.modelDetails[1]);
+            progress_callback(scope.modelDetails[2]);
+            await scope.fetch('https://speech.example/runtime/model.onnx');
+            progress_callback(scope.modelDetails[3]);
+            progress_callback(scope.modelDetails[4]);
+            progress_callback(scope.modelDetails[5]);
             async function transcribe() { return { text: 'complete progress result' }; }
             transcribe.dispose = async function disposeTranscriber() {};
             return transcribe;
@@ -390,13 +418,69 @@ test('actual speech loader fetch forwards semantic shard progress to client onPr
         await client.request('load', { configuration: configuration(source) }, {
             onProgress: function observeProgress(value) { progress.push(value); },
         });
-        assert.ok(progress.some(function isStoredShard(value) {
-            return value.unit === 'shards' && value.completed === 1;
-        }));
-        assert.deepEqual(progress.find(function isResourceProgress(value) { return value.unit === 'shards'; }), semanticProgress);
+        assert.deepEqual(progress.filter(function isResourceProgress(value) { return value.unit === 'shards'; }), [cachedProgress, semanticProgress]);
+        const modelProgress = progress.filter(function isModelCallback(value) {
+            return value.stage === 'model' && Object.hasOwn(value, 'detail');
+        });
+        assert.deepEqual(modelProgress.map(function phase(value) { return value.phase; }), ['load', 'load', 'load', 'load', 'initialize', 'initialize']);
+        assert.deepEqual(modelProgress.map(function completed(value) { return value.completed; }), [0, 0, 0, 1, 2, 2]);
+        assert.deepEqual(modelProgress.map(function detail(value) { return value.detail; }), scope.modelDetails);
+        assert.ok(modelProgress.every(function unknownFileTotal(value) { return value.total === null && value.unit === 'files'; }));
+        const cachedProgressIndex = progress.findIndex(function isCachedResource(value) {
+            return value.unit === 'shards' && value.cached === true;
+        });
+        assert.ok(cachedProgressIndex >= 0 && cachedProgressIndex < progress.indexOf(modelProgress[1]));
+        assert.deepEqual(progress.filter(function isDownload(value) { return value.phase === 'download'; }), [semanticProgress]);
+        const settledProgressCount = workerProgress.length;
+        scope.reportModelProgress({ status: 'progress', file: 'late-model.onnx' });
+        assert.equal(workerProgress.length, settledProgressCount);
     } finally {
         await client.request('unload');
         await client.terminate();
+    }
+});
+
+test('cancelled speech model loading suppresses later generic callbacks', async function cancelledModelProgress(t) {
+    const entered = deferred();
+    const release = deferred();
+    const messages = [];
+    const scope = { fetch: globalThis.fetch, entered, release };
+    globalThis.__arcaneSpeechCancelledProgressFixtureScope = scope;
+    t.after(function restoreCancelledProgressFixture() {
+        delete globalThis.__arcaneSpeechCancelledProgressFixtureScope;
+    });
+    const source = `
+        export const env = { allowLocalModels: true, allowRemoteModels: false, backends: { onnx: { wasm: {} } } };
+        export async function pipeline(task, repository, { progress_callback }) {
+            const scope = globalThis.__arcaneSpeechCancelledProgressFixtureScope;
+            scope.reportModelProgress = progress_callback;
+            progress_callback({ status: 'initiate', file: 'model.onnx' });
+            scope.entered.resolve();
+            await scope.release.promise;
+            async function transcribe() { return { text: 'unused after cancellation' }; }
+            transcribe.dispose = async function disposeTranscriber() {};
+            return transcribe;
+        }
+    `;
+    const runtime = createSpeechWorkerRuntime({
+        role: 'stt',
+        scope,
+        send: function captureWorkerMessage(message) { messages.push(message); },
+    });
+    const loading = request(runtime, 1, 'load', { configuration: configuration(source) });
+    const rejected = assert.rejects(loading, function cancelled(error) {
+        return error.code === 'ARCANE_AI_REQUEST_ABORTED';
+    });
+    try {
+        await entered.promise;
+        await request(runtime, 2, 'cancel', { targetId: 1 });
+        const progressCount = messages.filter(function isProgress(message) { return message.type === 'progress'; }).length;
+        scope.reportModelProgress({ status: 'progress', file: 'model.onnx', original: 'Complete late callback' });
+        assert.equal(messages.filter(function isProgress(message) { return message.type === 'progress'; }).length, progressCount);
+    } finally {
+        release.resolve();
+        await rejected;
+        await request(runtime, 3, 'unload');
     }
 });
 
