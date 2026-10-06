@@ -140,11 +140,15 @@ tree, not the composed rendering tree: slot-assigned light-DOM nodes remain in
 their own containing DOM tree and are not duplicated inside the selected shadow
 root.
 
-A missing or ambiguous host returns `ARCANE_APP_CONTROL_TARGET_COUNT` with the
-complete path, zero-based `index`, `selector` and match count. Invalid path or
-CSS input reports its actual error before any action. A host without an
-accessible open root returns `ARCANE_APP_CONTROL_UNSUPPORTED` with the path and
-failing step. Closed roots cannot be discovered, entered, or distinguished from
+A missing or ambiguous host produces document error `ARCANE_APP_CONTROL_TARGET_COUNT`
+with the complete path, zero-based `index`, `selector` and match count. Invalid
+path or CSS input reports its actual error before any action. A host without an
+accessible open root produces document error `ARCANE_APP_CONTROL_UNSUPPORTED`
+with the path and failing step. The Windows client rejects these document failures
+with top-level `error.code === 'ARCANE_APP_CONTROL_FAILED'`; the original document
+error, including its `code` and `details`, is available at
+`error.data.find(entry => entry.key === 'documentError').value`.
+Closed roots cannot be discovered, entered, or distinguished from
 absent roots through this API. No closed-root interception is installed.
 Shadow actions add the selected `shadowPath` to their result and retain the
 actual target state after dispatch, including disconnection by the action.

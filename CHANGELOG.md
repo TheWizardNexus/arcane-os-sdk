@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.83.0
+
+- Add optional `shadowPath` to native app-control inspection and actions. Follow
+  an explicit ordered path through open shadow hosts, then inspect complete
+  content or operate a selector within that root. Nested host records expose
+  their full paths; omitted or empty paths preserve existing light-DOM calls.
+- Accept a complete inspection JSON object through `arcane app-control inspect
+  --request`, including shadow paths and document generation. Existing selector,
+  action, capture and connection lifecycle behavior remains unchanged.
+- Publish the matching Windows helper with the native host archive. Closed
+  shadow roots and frame documents remain outside this capability. Preserve
+  Core, profiles, full payloads and existing dependencies. Package verification
+  is separate from actual built-application acceptance.
+
 ## 0.82.0
 
 - Add `connectAppControl` from `arcane-os/core/app-control` and the
