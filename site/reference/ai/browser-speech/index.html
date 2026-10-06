@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../../examples/">Hello World</a><a href="../../../guides/">Guides</a><a href="../../sdk-api/">API</a><a href="../../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.76.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../../">Docs</a><span aria-hidden="true">/</span><a href="../../">Reference</a><span aria-hidden="true">/</span><a href="../">Normalized AI</a><span aria-hidden="true">/</span><span aria-current="page">Browser speech providers</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="browser-speech-providers">Browser speech providers</h1><p class="doc-lead">arcane-os/ai/browser-speech supplies caller-selected Whisper transcription, native browser recognition and synthesis, Kokoro text-to-speech, and TWiN Cloud text-to-speech providers. Its local model path provides artifact storage, live module routing, role Workers, provider/2 adapters, bounded parallel TTS synthesis, audio normalization, cancellation, and cleanup.</p><div class="doc-meta"><span>SDK 0.77.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../../overview/">Overview</a><a href="../../sdk-api/">SDK JavaScript API</a><a href="../../cli/">CLI</a><a href="../../event-manager/">EventManager</a><a href="../../availability-and-normalization/">Availability</a><a href="../../protocols/">Protocols</a><a href="../../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../">Normalized AI</a><a href="../twin-cloud/">TWiN Cloud quick start</a><a href="../browser-wasm/">Browser-WASM AI</a><a href="../browser-decisions/">Browser typed decisions</a><a href="./" aria-current="page">Browser speech</a><a href="../../websocket-client/">Shared WebSocket clients</a><a href="../../runtime-modules/">Modules</a><a href="../../runtime-entities/">Entities</a><a href="../../runtime-components/">Components</a><a href="../../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../../core/">Core map</a><a href="../../core-client/">Core browser client</a><a href="../../core-runtime/">Native Core runtime</a><a href="../../core-development/">Development Core services</a><a href="../../core-shared-host/">Shared Core host</a><a href="../../codex-app-server/">Codex App Server</a><a href="../../mcp-stdio/">MCP STDIO server</a><a href="../../local-ai/">Local AI through Core</a><a href="../../native-decisions/">Native typed decisions</a><a href="../../local-image-flux/">FLUX.2 Klein 4B</a><a href="../../local-image-sdxl/">SDXL Base 1.0</a><a href="../../native-speech/">Native speech service</a><a href="../../local-whisper/">Native Whisper</a><a href="../../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../../core-repositories/">Native repository workspaces</a><a href="../../core-native-packaging/">Portable Core packaging</a><a href="../../core/arcane-api/">Arcane API</a><a href="../../core/capabilities/">Capabilities and admission</a><a href="../../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../../core/arcane-events/">Events</a><a href="../../core/arcane-ai-contracts/">AI contracts</a><a href="../../core/arcane-entities/">Entity exports</a><a href="../../core/ollama-module/">Ollama internals (advanced)</a><a href="../../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/ai/browser-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></details><p><code>arcane-os/ai/browser-speech</code> supplies caller-selected Whisper transcription,
@@ -863,7 +863,7 @@ activation interest. Other pending interests retain the shared load; cancelling
 the final interest forwards abort to its provider-owned activation. Actual
 provider cleanup remains observable through that operation&#39;s settlement.</p>
 <h3 id="playback-controls-and-independent-lifetimes">Playback controls and independent lifetimes</h3>
-<p><code>ai.playPreparedTTS(prepared,{signal,onState})</code> returns
+<p><code>ai.playPreparedTTS(prepared,{signal,onState,audioOutput})</code> returns
 <code>{state,error,finished,pause(),resume(),stop()}</code> immediately. It uses the
 existing AI audio-clock scheduler and waits for each earlier segment before scheduling
 later audio. Ready adjacent buffers retain contiguous scheduling. Requested
@@ -875,8 +875,9 @@ states are <code>waiting</code>, <code>waiting-for-gesture</code>, <code>schedul
 <code>stopped</code>, and <code>error</code>. Use <code>waiting-for-gesture</code> to present an audio-unlock
 control. A <code>false</code> result from <code>resume()</code> is not a first-segment-ready signal;
 inspect <code>state</code> and <code>error</code> to distinguish a stopped or unavailable context
-from browser gesture waiting. The ordinary playback path creates its audio
-context immediately, before the first audio segment is ready.</p>
+from browser gesture waiting. With <code>audioOutput</code> omitted or <code>null</code>, playback
+creates its own audio context immediately, before the first segment is ready,
+and closes that context after completion, stop, cancellation, or failure.</p>
 <p><code>finished</code> resolves <code>true</code> after natural playback completion and <code>false</code> after
 stop, playback cancellation, or failure. Real failures also reach the existing
 <code>ai-tts-failure</code> event and complete SDK diagnostics. <code>pause()</code>
@@ -900,6 +901,104 @@ playback completion must not be used as a signal to cancel other background
 preparations. A page that starts several preparations owns and observes every
 <code>ready</code> promise, even when it plays only one handle. Browser autoplay permission
 still applies; neither promise proves that a person heard the audio.</p>
+<h3 id="prepare-a-silent-reusable-webaudio-output">Prepare a silent reusable WebAudio output</h3>
+<p><code>ai.prepareAudioOutput()</code> synchronously returns an AI-owned output handle.
+It creates or reuses that AI&#39;s persistent WebAudio context and observes its
+actual state. Preparation stays silent: it does not resume the context, unmute
+speech, load a model, create an audio source, play a test sound, or install
+gesture listeners. It does not wait for speech preparation or provider readiness.</p>
+<p>The handle exposes <code>kind:&#39;web-audio&#39;</code>, live <code>state</code>, <code>contextState</code>, and <code>error</code>
+getters, <code>subscribe(listener)</code>, <code>resume()</code>, and <code>dispose()</code>. Repeated preparation
+returns the same handle until its output is disposed or its context closes.
+<code>contextState</code> is the platform context&#39;s current state, or <code>null</code> when unavailable;
+<code>error</code> retains the complete actual error, or <code>null</code>.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Output state</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ready</code></td>
+<td>This WebAudio context is currently <code>running</code>.</td>
+</tr>
+<tr>
+<td><code>suspended</code>, <code>interrupted</code>, or another platform state</td>
+<td>The context reports that state; suspension alone does not establish a gesture requirement.</td>
+</tr>
+<tr>
+<td><code>gesture-required</code></td>
+<td>A resume operation actually reported <code>NotAllowedError</code> while the context was not running.</td>
+</tr>
+<tr>
+<td><code>unavailable</code></td>
+<td>Context creation failed; <code>error</code> contains the actual failure.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>An output operation failed; inspect the complete <code>error</code>.</td>
+</tr>
+<tr>
+<td><code>disposing</code>, <code>disposed</code></td>
+<td>Owner disposal is in progress or has completed.</td>
+</tr>
+<tr>
+<td><code>closed</code></td>
+<td>The underlying context has closed outside completed owner disposal.</td>
+</tr></tbody>
+</table>
+</div>
+<p><code>subscribe(listener)</code> immediately replays <code>{kind,state,contextState,error}</code> and
+then delivers state changes through the canonical AI event owner. It returns
+an idempotent unsubscribe function. The named export
+<code>AI_AUDIO_OUTPUT_STATE_EVENT</code> from <code>AI.js</code> is <code>&#39;ai-audio-output-state&#39;</code>; its
+canonical occurrences carry the same snapshot in <code>detail</code> and an output-specific
+<code>operationId</code>. Handle subscriptions select only their own output. Disposal or
+context closure releases those subscriptions after the terminal notification;
+a later handle subscription still receives the current snapshot immediately.</p>
+<p><code>resume()</code> is an explicit asynchronous action for the application&#39;s user-gesture
+flow. It resolves <code>true</code> only when the context is actually running, and <code>false</code>
+when unavailable, disposed, superseded, or held by a paused prepared playback.
+A platform rejection rejects with its actual error and retains that failure in
+the output state. It does not unmute speech or load a model. Output readiness
+does not establish HTML audio readiness, native-speech readiness, future autoplay
+permission, available speech audio, or audible delivery.</p>
+<p>Pass the handle explicitly to borrow that exact output for prepared playback:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">// ai and prepared are the same AI owner and preparation used above.
+const audioOutput = ai.prepareAudioOutput();
+
+function observeNarrationOutput(listener) {
+  return audioOutput.subscribe(listener);
+}
+
+function resumeNarrationOutput() {
+  // Call from the application&#39;s user action and observe the returned promise.
+  return audioOutput.resume();
+}
+
+function playNarration() {
+  return ai.playPreparedTTS(prepared, {audioOutput});
+}
+
+function disposeNarrationOutput() {
+  // Call when this owner no longer needs the output; observe its promise.
+  return audioOutput.dispose();
+}
+</code></pre></div>
+<p>The selected handle must be live and belong to the same AI instance; another
+owner&#39;s, closed, or disposing output throws <code>TypeError</code>. Borrowed playback
+retains the same ordered scheduling, pause/resume, cancellation, and single-lane
+replacement behavior. Completion or stopping playback leaves the output open
+for reuse. Merely preparing an output does not change the omitted-option path.</p>
+<p>The application owns the output lifetime and calls <code>dispose()</code> when finished
+with it. Disposal stops playback bound to that context and any following work
+waiting on its clock, observes cleanup, and awaits the actual context close.
+It preserves detached preparation, saved audio, unrelated contexts, and model
+selection. Concurrent calls share the disposal promise. Actual cleanup or close
+errors reject and remain observable; a failed context close permits a later
+disposal retry. Stop/mute controls retain their existing playback/provider scope
+and do not replace this explicit output disposal.</p>
 <h2 id="stream-chunks-as-they-arrive">Stream chunks as they arrive</h2>
 <p>Use the configured <code>ai</code> created above. Run this snippet from an owned user
 action, such as your Speak button, and catch errors with the earlier
@@ -1732,6 +1831,6 @@ this entrypoint.</li>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#choose-a-speech-provider">Choose a speech provider</a><a href="#native-browser-speech-recognition">Native browser speech recognition</a><a href="#native-browser-text-to-speech-and-voice-previews">Native browser text-to-speech and voice previews</a><a href="#twin-cloud-text-to-speech">TWiN Cloud text-to-speech</a><a href="#quick-start-say-one-sentence">Quick start: say one sentence</a><a href="#browser-npu-and-gpu-setup">Browser NPU and GPU setup</a><a href="#developer-diagnostics">Developer diagnostics</a><a href="#local-synthesis-capacity-and-exact-order-playback">Local synthesis capacity and exact-order playback</a><a href="#play-a-complete-array-with-speechplayback">Play a complete array with SpeechPlayback</a><a href="#queue-complete-passages-and-wait-for-playback">Queue complete passages and wait for playback</a><a href="#prepare-narration-once-and-replay-stored-audio">Prepare narration once and replay stored audio</a><a href="#stream-chunks-as-they-arrive">Stream chunks as they arrive</a><a href="#automatic-speech-input-formatting-cleanup">Automatic speech-input formatting cleanup</a><a href="#choose-a-device-or-reduce-memory-use">Choose a device or reduce memory use</a><a href="#inspect-the-requested-and-selected-device">Inspect the requested and selected device</a><a href="#stop-mute-cancel-and-release">Stop, mute, cancel, and release</a><a href="#advanced-provider-and-artifact-reference">Advanced provider and artifact reference</a><a href="#availability">Availability</a><a href="#public-exports">Public exports</a><a href="#protocol-identifiers">Protocol identifiers</a><a href="#createbrowserspeechartifactgraph">createBrowserSpeechArtifactGraph()</a><a href="#createdbopfsspeechartifactstore">createDbopfsSpeechArtifactStore()</a><a href="#removebrowserspeechmodelcache">removeBrowserSpeechModelCache()</a><a href="#ordinary-module-routing">Ordinary module routing</a><a href="#onnx-runtime-configuration">ONNX runtime configuration</a><a href="#providers">Providers</a><a href="#lifecycle-and-cancellation">Lifecycle and cancellation</a><a href="#errors">Errors</a><a href="#ownership">Ownership</a><a href="#related">Related</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.76.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../../" aria-label="Arcane OS SDK documentation home"><img src="../../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.77.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../../architecture/">Architecture</a><a href="../../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
