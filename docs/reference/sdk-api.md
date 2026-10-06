@@ -55,6 +55,7 @@ runtime layouts.
 | `arcane-os/core/contracts` | Shared Core protocol, frame, method and diagnostic error contracts. |
 | `arcane-os/core/classic-source` | Node generator for the canonical classic-script Core client projection. |
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
+| `arcane-os/core/development` | App-service composition and document-owned Core transport during source development, independently of local AI. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle with explicitly supplied services. |
 | `arcane-os/codex/app-server` | Explicit native Codex App Server session, complete live turns, server requests and recovery. |
@@ -385,6 +386,8 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createCoreFacade()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `installCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
 | `getInstalledCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `subscribeCoreClient()` | function | `arcane-os/core/client` | Core browser client | Browser and native WebView JavaScript hosts |
+| `createDevelopmentCore()` | function | `arcane-os/core/development`, `arcane-os` | Core source development | Node on Windows, Linux and macOS; Android requires host adaptation |
 | `createCodexAppServerSession()` | function | `arcane-os/codex/app-server` | Native Codex sessions | Node with an explicitly selected Codex App Server executable |
 | `openCodexAppServerSession()` | function | `arcane-os/codex/app-server` | Native Codex sessions | Node with an explicitly selected Codex App Server executable |
 | `createMcpStdioServer()` | function | `arcane-os/mcp/stdio` | MCP STDIO | Node streams on Windows, Linux and macOS; Android needs host adaptation |
@@ -4145,6 +4148,11 @@ inspection is distinct from executing them or verifying a browser deployment.
 
 Starts one owned browser development server with exact runtime/app route mappings and a caller-selected bind address.
 
+Source callers may pass `core`, a handle returned by
+[`createDevelopmentCore()`](#createdevelopmentcore). The server delegates the
+Core HTTP routes and closes that owner during shutdown. The existing internal
+`localAI` handle remains accepted; `core` takes precedence when explicitly supplied.
+
 HTTP and HTTPS serving use published `node-http-server` 10.0.0. The SDK
 selects source routes and supplies generated representations; the module owns
 static-file conditional GET/HEAD handling and response delivery. The SDK
@@ -4664,6 +4672,14 @@ async function usedescribeTargets(...arguments_) {
 ### Overview
 
 Starts one owned browser development server for the selected application.
+
+The selected descriptor's `native.services` composes application Core services
+independently of local AI. Programmatic `serviceModules:[{module,options}]`
+replaces that list; `services` adds constructed service definitions and `context`
+supplies app-owned launch fields. The result adds `core` when composed and retains
+`localAI` for selected native local AI. Page rendering and the listener do not
+wait for service readiness. See [source-development Core](core-development.md)
+for explicit `/arcane-core.js` loading, cancellation and current-state replay.
 
 `http`, `https`, `certPath`, `keyPath`, and `tls` follow the
 [`startDevServer()` transport contract](#startdevserver), alongside `host`, `port`, and
@@ -7069,6 +7085,46 @@ const client = getInstalledCoreClient();
 console.log(client ? client.runtime.current() : 'No SDK client is installed.');
 ```
 
+## subscribeCoreClient()
+
+### Overview
+
+Observes the selected global's SDK client installation without creating a
+transport or delaying rendering. Applications can subscribe before independently
+loaded development or native bootstrap code installs the client.
+
+### Signature and result
+
+```text
+subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={})
+```
+
+Import from `arcane-os/core/client`. Returns an idempotent unsubscribe function.
+The listener receives `{client,previousClient,reason,error}` with the exact
+client and error objects. Reasons are `current`, `installed`, `closed` and
+`transport-failed`. Current state replays synchronously unless disabled; an
+already-aborted signal registers nothing. Close or terminal failure releases
+the prior installation before notification. A reentrant replacement is retained.
+
+### Availability and normalization
+
+**Browser and native WebView JavaScript hosts.** Installation is distinct from
+Core, service or model readiness. Read `client.runtime.current()` and subscribe
+to that client's authoritative runtime/service events for those states. This
+observer starts no service and uses the shared event owner, not polling. See
+[Core client](core-client.md) and [source-development Core](core-development.md).
+
+### Example
+
+```javascript
+import {subscribeCoreClient} from 'arcane-os/core/client';
+
+const unsubscribe = subscribeCoreClient(function installationChanged({client}) {
+    console.log(client ? client.runtime.current() : 'Core is not installed.');
+});
+// The application owner calls unsubscribe() when this observer is retired.
+```
+
 ## createCoreClassicSource()
 
 ### Overview
@@ -7151,6 +7207,50 @@ Import from `arcane-os/mcp/stdio`. `new McpProtocolError(code,message,data)`
 represents an explicit JSON-RPC error with complete message and optional data.
 Ordinary domain tool failures use an explicit `CallToolResult` with `isError`.
 See [error outcomes](mcp-stdio.md#mcpprotocolerror).
+
+## createDevelopmentCore()
+
+### Overview
+
+Composes application-selected Core services and the SDK-owned development HTTP
+transport independently of local AI. Import from `arcane-os/core/development`
+or `arcane-os`; ordinary applications normally use `developApplication()` with
+their descriptor's `native.services`.
+
+### Signature and result
+
+`createDevelopmentCore({appRoot=process.cwd(),application,version,services=[],serviceModules=[],context={},getReplayEvents,signal,onEvent}={})`
+returns `{ready,handler,current,close}` synchronously. Module default factories
+receive unchanged `(options,context)`. `ready` reports composed dispatcher
+startup, not readiness of every service. `current()` returns complete
+`{state,error,core}`; `handler(request,response)` owns `/rpc`, `/events` and both
+bootstrap aliases; idempotent `close()` joins accepted service work and output.
+
+### Availability and example
+
+Node on Windows, Linux and macOS. Browser callers use the public Core client.
+Android needs its host adapter. This adds no cross-process host discovery.
+
+```javascript
+import {createDevelopmentCore, startDevServer} from 'arcane-os';
+
+const core = createDevelopmentCore({
+    appRoot: process.cwd(),
+    serviceModules: [{module: 'bridge/moon-cheese.mjs', options: {shelf: 'Lunar cheddar'}}]
+});
+let server;
+try {
+    server = await startDevServer({workspaceRoot: process.cwd(), core});
+    await server.closed;
+} finally {
+    await core.close();
+}
+```
+
+The [complete guide](core-development.md) defines document cancellation,
+service-lifetime drain, diagnostics, optional explicit service snapshots and
+non-blocking page bootstrap. App policy and explicit native process activation
+remain app-owned.
 
 ## createCoreRuntime()
 

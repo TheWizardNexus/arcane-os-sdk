@@ -3,8 +3,19 @@ import {CORE_PROTOCOL,CORE_READY_EVENTS,CoreError,serializeCoreError} from './co
 
 const CORE_CLIENT_KEY=Symbol.for('arcane-os.core.client');
 const CORE_CLIENT_INSTALLATION=Symbol.for('arcane-os.core.client.installation');
+const CORE_CLIENT_OBSERVATION=Symbol.for('arcane-os.core.client.observation');
+const CORE_CLIENT_INSTALLATION_EVENT='core.client.installation';
 const CORE_EVENT='core.rpc.event';
 const LONG_OPERATION_TIMEOUT=50*60*1000;
+
+function publishCoreClientInstallation(global,previousClient,reason,error=null){
+    // A classic document-created installation may precede the ESM event owner.
+    // The live installation already owns replay; retain no retired-client record.
+    global[CORE_CLIENT_OBSERVATION]?.source?.dispatch(
+        CORE_CLIENT_INSTALLATION_EVENT,
+        {client:getInstalledCoreClient(global),previousClient,reason,error}
+    );
+}
 
 /** One RPC client. Native execution and service policy belong to the host. */
 export function createCoreClient({
@@ -644,6 +655,28 @@ export function getInstalledCoreClient(global=globalThis){
     return installation?.global===global&&installation.active?client:null;
 }
 
+/** Observe this global's exact installed client without installing a transport. */
+export function subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={}){
+    if(typeof listener!=='function')throw new TypeError('The Core client installation listener must be a function.');
+    if(signal?.aborted)return function alreadyAborted(){return false;};
+    const observation=global[CORE_CLIENT_OBSERVATION]??={source:null};
+    observation.source??=arcaneEvents.createSource(observation,{
+        source:'core-client-installation',eventTypes:[CORE_CLIENT_INSTALLATION_EVENT]
+    });
+    // Source subscriptions receive the compatibility view, whose shallow detail
+    // preserves these live references; global subscriptions receive snapshots.
+    const unsubscribe=observation.source.on(
+        CORE_CLIENT_INSTALLATION_EVENT,
+        function installedClientChanged(occurrence){listener(occurrence.detail);},
+        {signal}
+    );
+    if(emitCurrent&&!signal?.aborted){
+        try{listener({client:getInstalledCoreClient(global),previousClient:null,reason:'current',error:null});}
+        catch(error){unsubscribe();throw error;}
+    }
+    return unsubscribe;
+}
+
 /** Installs the same synchronous facade used by classic native-host scripts. */
 export function installCoreClient(global=globalThis,options={}){
     if(global[CORE_CLIENT_KEY])return global[CORE_CLIENT_KEY];
@@ -666,6 +699,7 @@ export function installCoreClient(global=globalThis,options={}){
     const failTransport=client.failTransport;
     let installedTransportFailure=null;
     function releaseInstalledClient(){
+        if(!installation.active)return false;
         installation.active=false;
         if(global[CORE_CLIENT_KEY]===client)delete global[CORE_CLIENT_KEY];
         if(global.Arcane===facade){
@@ -680,20 +714,29 @@ export function installCoreClient(global=globalThis,options={}){
             if(previousFailure===undefined)delete global.__arcaneTransportFailed;
             else global.__arcaneTransportFailed=previousFailure;
         }
+        return true;
     }
     client.close=function closeInstalledClient(){
-        installation.active=false;
-        try{return close();}finally{releaseInstalledClient();}
+        const released=releaseInstalledClient();
+        try{return close();}finally{
+            if(released)publishCoreClientInstallation(global,client,'closed');
+        }
     };
     client.failTransport=function failInstalledTransport(error){
         if(installation.active)installedTransportFailure=error instanceof CoreError?error:new CoreError(error);
-        releaseInstalledClient();
-        return failTransport(installedTransportFailure??error);
+        const released=releaseInstalledClient();
+        try{return failTransport(installedTransportFailure??error);}finally{
+            if(released)publishCoreClientInstallation(global,client,'transport-failed',installedTransportFailure);
+        }
     };
     try{client.connect();}catch(error){
         if(error!==installedTransportFailure&&error.code!=='ARCANE_TRANSPORT_UNAVAILABLE'){
             if(options.onError)options.onError(error);
             else global.console?.error('Arcane Core transport initialization failed.',error);
+        }
+    }finally{
+        if(getInstalledCoreClient(global)===client){
+            publishCoreClientInstallation(global,null,'installed');
         }
     }
     return client;

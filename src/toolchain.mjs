@@ -25,6 +25,7 @@ import {withWorkspaceOperationLock} from './workspace-operation-lock.mjs';
 import {refreshAppPackageProjection} from './app-descriptor.mjs';
 import {configureDevelopmentLocalAI} from './local-ai/config.mjs';
 import {createDevelopmentLocalAI} from './local-ai/dev.mjs';
+import {createDevelopmentCore} from './core/development.mjs';
 import {
     discoverApps as discoverPackagerApps,
     inspectApp as inspectPackagedApp,
@@ -626,15 +627,25 @@ export async function developApplication(options = {}) {
         }
     );
     const localAIConfig = prepared.descriptor?.native?.localAI;
-    const localAI = localAIConfig?.runtimes.length ? createDevelopmentLocalAI({
-        config: localAIConfig,
+    const serviceModules = options.serviceModules ?? prepared.descriptor?.native?.services ?? [];
+    const coreOptions = {
         appRoot: prepared.appRoot,
-        directory: path.join(prepared.appRoot, '.arcane', 'local-ai', 'runtimes'),
         application: prepared.descriptor,
         version: prepared.descriptor.version,
         signal: options.signal,
-        onEvent: options.onEvent
+        onEvent: options.onEvent,
+        services: options.services ?? [],
+        serviceModules,
+        context: options.context ?? {}
+    };
+    const localAI = localAIConfig?.runtimes.length ? createDevelopmentLocalAI({
+        ...coreOptions,
+        config: localAIConfig,
+        directory: path.join(prepared.appRoot, '.arcane', 'local-ai', 'runtimes')
     }) : undefined;
+    const core = localAI ?? (serviceModules.length || coreOptions.services.length
+        ? createDevelopmentCore(coreOptions)
+        : undefined);
     let server;
     try {
         server=await startDevServer({
@@ -653,19 +664,19 @@ export async function developApplication(options = {}) {
         tls:options.tls,
         certPath:options.certPath,
         keyPath:options.keyPath,
-        localAI,
+        core,
         signal:options.signal,
         onEvent:options.onEvent
         });
     } catch (error) {
         try {
-            await localAI?.close(error);
+            await core?.close(error);
         } catch (closeError) {
-            throw new AggregateError([error, closeError], 'Development startup and local AI shutdown failed.');
+            throw new AggregateError([error, closeError], 'Development startup and Core shutdown failed.');
         }
         throw error;
     }
-    return {...server,appId:prepared.appId,mode:'source',...(localAI ? {localAI} : {})};
+    return {...server,appId:prepared.appId,mode:'source',...(core ? {core} : {}),...(localAI ? {localAI} : {})};
 }
 
 export async function packageApplication(options={}){

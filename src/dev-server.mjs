@@ -855,6 +855,7 @@ async function startOwnedDevServer({
     certPath,
     keyPath,
     localAI,
+    core = localAI,
     signal,
     sdkRuntimeSourceRoot
 }={},events,releaseSignal){
@@ -1261,7 +1262,7 @@ async function startOwnedDevServer({
                 response.end();
                 return;
             }
-            if (localAI && await localAI.handler(request, response)) return;
+            if (core && await core.handler(request, response)) return;
             if(request.method!=='GET'&&request.method!=='HEAD'){
                 deny(response,405,'Method not allowed.');
                 return;
@@ -1558,7 +1559,7 @@ async function startOwnedDevServer({
         }
         if(!closeInitiated){
             closeInitiated=true;
-            localAIClosing=Promise.resolve().then(function closeLocalAI(){return localAI?.close(error);});
+            localAIClosing=Promise.resolve().then(function closeCore(){return core?.close(error);});
             localAIClosing.catch(function observeLocalAICloseFailure(closeError){operationalError??=closeError;});
             try{
                 closeDevelopmentListeners(fileServer, tlsServer).then(

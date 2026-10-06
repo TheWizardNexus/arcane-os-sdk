@@ -1,8 +1,8 @@
 # Core browser client
 
 `arcane-os/core/client` is the browser-safe `arcane/1` RPC owner. It exports
-`createCoreClient`, `createCoreFacade`, `installCoreClient` and
-`getInstalledCoreClient`.
+`createCoreClient`, `createCoreFacade`, `installCoreClient`,
+`getInstalledCoreClient` and `subscribeCoreClient`.
 `arcane-os/core/contracts` exports `CORE_PROTOCOL`, `CORE_READY_EVENTS`,
 `CORE_FRAME_CONTRACTS`, `CORE_METHOD_CONTRACTS`, `CoreError` and
 `serializeCoreError`. Contracts describe transport and existing method shapes;
@@ -42,6 +42,52 @@ not connect, install a client or replace an existing `Arcane` object. Applicatio
 need not inspect private installation fields. It returns `null` after that
 installation closes or fails. A
 foreign application's `Arcane` object is not evidence of an SDK installation.
+
+### Observe installation and retirement
+
+```js
+import {subscribeCoreClient} from 'arcane-os/core/client';
+
+const lifetime=new AbortController();
+const stop=subscribeCoreClient(function useCurrentClient({client,reason,error}){
+    console.log('Moon-base connection owner:',client,reason);
+    if(error)console.error('Core transport failed:',error);
+},{signal:lifetime.signal});
+// Call stop() or lifetime.abort() when this observer's owner ends its lifetime.
+```
+
+`subscribeCoreClient(listener, {global=globalThis, emitCurrent=true, signal}={})`
+observes the exact SDK-installed client for that global without installing or
+connecting one. By default it synchronously replays
+`{client, previousClient:null, reason:'current', error:null}` after subscribing.
+`client` is the same live object returned by `getInstalledCoreClient`, or `null`.
+Set `emitCurrent:false` to observe only subsequent changes. The returned
+unsubscribe function is idempotent; aborting `signal` removes the subscription.
+A pre-aborted signal registers nothing and emits no replay.
+
+Later notifications use the same fields. `reason:'installed'` follows the
+connection attempt while that installation is still live, with
+`previousClient:null` and `error:null`. Installation does not imply a connected
+transport: a standalone client retains its ordinary disconnected capabilities.
+Repeated installation returns the existing client without another notification.
+`reason:'closed'` and `reason:'transport-failed'` identify the retired client in
+`previousClient`; a transport failure retains its complete actual `CoreError`
+in `error`, while ordinary close uses `null`.
+
+Retirement releases and restores owned globals before notifying, once per
+installation. `client` is read again after cleanup, so a replacement installed
+reentrantly during cleanup or error reporting remains the current client.
+Notifications do not restore or close that replacement. A listener may also
+install a replacement after observing retirement; its installation produces
+the normal next notification.
+
+The existing shared SDK event owner delivers changes without polling or a
+second event bus. Classic host injection may install synchronously before that
+event owner is available. The first ESM subscriber attaches the shared event
+source lazily and reads the exact classic-installed client from the live
+installation. Source-scoped delivery preserves the client and error references;
+it does not use the event owner's global diagnostic snapshots. No historical
+installation record is retained for replay.
 
 The native adapters select WebView2, WebKitGTK or Android WebView. Ordinary
 browsers remain `standalone`; they do not probe a local server. Development

@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 283,
+  "memberCount": 285,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -4151,6 +4151,34 @@
       "availability": "Browser and native WebView JavaScript hosts",
       "protocol": "arcane/1 renderer client ownership",
       "normalization": "Recognizes ESM and classic SDK installation identity; returns null after close or terminal failure and does not treat a foreign Arcane facade as an SDK client"
+    },
+    {
+      "id": "core-client:subscribeCoreClient",
+      "name": "subscribeCoreClient",
+      "displayName": "subscribeCoreClient()",
+      "kind": "function",
+      "signature": "subscribeCoreClient(listener,{global=globalThis,emitCurrent=true,signal}={})",
+      "entrypoints": ["arcane-os/core/client"],
+      "primaryImport": "arcane-os/core/client",
+      "group": "Core browser client",
+      "summary": "Observes exact SDK client installation and retirement with current-state replay without creating a transport.",
+      "availability": "Browser and native WebView JavaScript hosts",
+      "protocol": "Core client installation lifecycle",
+      "normalization": "Preserves client and error identities; reports current, installed, closed and transport-failed with previousClient; returns idempotent unsubscribe and supports AbortSignal. Installation does not imply runtime, service or model readiness"
+    },
+    {
+      "id": "core-development:createDevelopmentCore",
+      "name": "createDevelopmentCore",
+      "displayName": "createDevelopmentCore()",
+      "kind": "function",
+      "signature": "createDevelopmentCore({appRoot=process.cwd(),application,version,services=[],serviceModules=[],context={},getReplayEvents,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/core/development", "arcane-os"],
+      "primaryImport": "arcane-os/core/development",
+      "group": "Core source development",
+      "summary": "Composes application Core services and document-owned HTTP/SSE transport independently of local AI.",
+      "availability": "Node on Windows, Linux and macOS; Android requires host adaptation",
+      "protocol": "arcane/1 over source-development HTTP/SSE",
+      "normalization": "Returns ready, handler, current and close synchronously; preserves factory options and explicit context, current lifecycle replay, correlated responses and chunks, document cancellation, accepted service work and owned drain. Explicit bootstrap does not block rendering or start application processes"
     },
     {
       "id": "core-classic-source:createCoreClassicSource",
