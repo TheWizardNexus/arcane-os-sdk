@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.59.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.60.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="./" aria-current="page">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
@@ -276,6 +276,61 @@ window or prove application behavior. <code>run()</code> launches the executable
 observes complete diagnostics and exit. Cancelling that operation closes its
 input, allowing the window and accepted Core service work to drain without a
 forced process termination.</p>
+<h3 id="application-icon-and-window-colors">Application icon and window colors</h3>
+<p><code>appDescriptor.native.icon</code> selects the application&#39;s existing app-relative
+image. Windows assembly converts PNG images, including a 512-pixel source,
+into a derived <code>runtime/arcane-app.ico</code> with 16, 32, 48 and 256-pixel images.
+Aspect ratio and transparency are preserved. An ICO selection keeps its
+authored image set. The original application asset remains unchanged.</p>
+<p>The provider embeds the selected images in the copied <code>Arcane.exe</code> and records
+<code>manifest.host.icon</code> and <code>manifest.host.executableIcon:true</code>. It replaces the
+executable&#39;s main icon group while preserving other groups, languages, resources
+and file content. Conversion uses Node standard capabilities on every assembly
+platform; it adds no application compiler, image library or Windows-only build
+step. The selected host cache and Core executable remain unchanged.</p>
+<p>JPEG/JPG, WebP and other existing descriptor formats retain ordinary assembly.
+They currently report <code>native.icon.unsupported</code> through the builder&#39;s <code>onEvent</code>
+callback, as does a selected executable whose PE layout cannot accommodate the
+derived icon. The event identifies the app, icon, target, code and complete
+message; <code>manifest.host.executableIcon:false</code> reports that the executable keeps
+its prior icon. <code>host.icon</code> then points to the original selected image. This is
+an explicit unsupported branding result, not a claim that a generic icon was
+replaced. Unreadable files and malformed supported image data report their
+ordinary filesystem or image-parser error.</p>
+<p>The matching Windows launcher reads <code>host.icon</code> and loads it independently of
+Core and page startup. ICO and standard Windows image codecs supply the window
+and taskbar icon; JPEG/JPG can therefore work at runtime even while executable
+embedding is unsupported. WebP is outside the host&#39;s standard image codecs;
+runtime support is not promised. A runtime icon error preserves ordinary startup
+and reaches complete developer diagnostics as <code>ARCANE_WINDOW_ICON_UNAVAILABLE</code>.
+Hosts built before this option was introduced do not read the new icon field.</p>
+<p><code>Arcane.window.setTheme(presentation,{signal}?)</code> changes only the requesting
+native window&#39;s chrome. The shared ThemeBootstrap supplies computed application
+background and text colors without delaying application CSS or rendering.
+Direct callers may supply <code>backgroundColor</code> and <code>textColor</code>, each either
+<code>{red,green,blue,alpha}</code> or <code>null</code> to restore the platform default. RGB channels
+are finite numbers from 0 through 255 and alpha is from 0 through 1. Omitted
+fields remain unchanged. The complete presentation follows the existing Core
+request transport; the window host handles <code>window.setTheme</code> before forwarding
+other methods to Core. No system appearance setting changes.</p>
+<p>Windows 11 build 22000 and later support titlebar background and text colors
+through DWM. The normal titlebar and window controls remain in place. DWM accepts
+opaque colors, so alpha values other than exactly 1 report that field as
+unsupported. RGB values round to the nearest integer, with midpoint values
+rounded upward. Older Windows versions report the requested fields unsupported.</p>
+<p>The result is <code>{platform:&#39;windows&#39;,supported,applied,unsupported}</code>. <code>applied</code>
+contains only fields accepted during that call, including rounded channels or
+<code>null</code> for a successful default reset. <code>supported</code> is true when at least one
+field applied; <code>unsupported</code> lists requested fields the platform could not
+apply. These results report platform acceptance rather than measured pixels.
+An invalid argument uses <code>INVALID_ARGUMENT</code>; a platform API failure uses
+<code>ARCANE_WINDOW_THEME_FAILED</code>, preserving complete native details and any
+earlier changes in <code>error.details.applied</code> and <code>error.details.unsupported</code>.
+The call is not atomic across fields. Existing request cancellation and document
+lifetime semantics remain in effect; an already accepted native color change
+is not rolled back by later cancellation. See <a href="../core-client/">the Core client</a>
+for the facade and browser behavior.</p>
+<h3 id="launch-configuration">Launch configuration</h3>
 <p>For explicit user-selected workspace/state locations, launch:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>sh</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-sh">Arcane.exe --arcane-launch-config path/to/launch.json
 </code></pre></div>
@@ -298,8 +353,8 @@ exit. It does not kill the child on an ordinary close.</p>
 <p><code>ArcaneHost.cs</code> composes that process with a WebView2 window through
 <code>ArcaneHost.Run(options,onDiagnostic,onError)</code> or <code>ArcaneHostForm</code>. Options
 select the app root/start path, stable virtual HTTPS origin, profile directory,
-title, canonical classic-client source and Core process inputs. The form exposes
-<code>Ready</code>, <code>Completion</code> and <code>CloseAsync()</code>. Page navigation, transport connection,
+title, optional <code>IconPath</code>, canonical classic-client source and Core process
+inputs. The form exposes <code>Ready</code>, <code>Completion</code> and <code>CloseAsync()</code>. Page navigation, transport connection,
 Core readiness and service readiness are separate states. Accepted work drains
 before the window closes; complete engineering errors go to the supplied
 diagnostic/error callbacks. Callbacks must not synchronously wait for the
@@ -407,6 +462,6 @@ them and claims no Mac build or execution result.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.59.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.60.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

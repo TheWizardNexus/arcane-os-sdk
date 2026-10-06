@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.59.1",
+    "sdk": "0.60.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 39,
+    "markdownPages": 41,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 136,
+    "htmlPages": 138,
     "inventories": 4
   },
   "pages": [
@@ -221,9 +221,21 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/local-image-editing.md",
+      "output": "site/reference/local-image-editing/index.html",
+      "route": "reference/local-image-editing/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/mail.md",
       "output": "site/reference/mail/index.html",
       "route": "reference/mail/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/model-assets.md",
+      "output": "site/reference/model-assets/index.html",
+      "route": "reference/model-assets/",
       "kind": "markdown"
     },
     {

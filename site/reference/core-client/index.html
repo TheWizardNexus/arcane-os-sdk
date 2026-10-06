@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.59.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient and getInstalledCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.60.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="./" aria-current="page">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-theme">Current-window theme</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
 <code>createCoreClient</code>, <code>createCoreFacade</code>, <code>installCoreClient</code> and
 <code>getInstalledCoreClient</code>.
 <code>arcane-os/core/contracts</code> exports <code>CORE_PROTOCOL</code>, <code>CORE_READY_EVENTS</code>,
@@ -95,6 +95,61 @@ same request lifetime and retains its 180,000 ms timeout and complete request.
 pre-aborted signal sends no transcription request; an in-flight abort sends
 <code>request.cancel</code> and suppresses late responses. The registered transcription
 service owns interruption and release of its actual engine operation.</p>
+<h2 id="current-window-theme">Current-window theme</h2>
+<p><code>Arcane.window.setTheme(presentation, {signal}?)</code> changes only the window
+hosting the calling document. It uses the existing <code>window.setTheme</code> request
+and response correlation; it neither calls <code>appearance.apply</code> nor changes the
+operating-system user&#39;s appearance. The complete presentation object reaches
+the host unchanged.</p>
+<p>Each optional <code>backgroundColor</code> and <code>textColor</code> is either <code>null</code> to restore the
+platform default or <code>{red, green, blue, alpha}</code>. All four channels are numbers:
+finite sRGB red/green/blue from 0 through 255 and alpha from 0 through 1.
+Omitting a field leaves its current value unchanged. There is no scheme field.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const host=globalThis.Arcane;
+if(host?.runtime?.current().native&amp;&amp;host.window?.setTheme){
+    host.window.setTheme(
+        {
+            backgroundColor:{red:29,green:22,blue:19,alpha:1},
+            textColor:{red:248,green:239,blue:229,alpha:1}
+        }
+    ).then(
+        function reportWindowColors(result){
+            console.log(&#39;Moon observatory window colors:&#39;,result);
+        }
+    ).catch(
+        function reportWindowFailure(error){
+            console.error(&#39;Window color update failed.&#39;,error);
+        }
+    );
+}
+// Page rendering continues independently of the host request.
+</code></pre></div>
+<p>The result is <code>{platform, supported, applied, unsupported}</code>. <code>applied</code> contains
+only requested fields the platform accepted in this call, including <code>null</code>
+for an accepted default reset. <code>unsupported</code> lists requested fields the adapter
+cannot apply. <code>supported</code> is true when at least one field was applied. These
+are accepted settings, not measured pixels, and the operation is not atomic.
+Malformed arguments reject with <code>INVALID_ARGUMENT</code>; native API failures reject
+with <code>ARCANE_WINDOW_THEME_FAILED</code>, preserving the native error and
+<code>details.applied</code>/<code>details.unsupported</code> for earlier results in this call.</p>
+<p>The Windows host maps background/text to DWM caption/text attributes supported
+on Windows 11 build 22000 and later, retaining normal system window controls.
+It rounds RGB channels to the nearest integer, with midpoint values rounded
+up, and returns those actual accepted values. Translucent colors remain
+unsupported without changing the existing field. Older Windows reports those
+fields unsupported. This contract makes no promise about caption-button colors.
+The current macOS and Linux hosts have no implementation of this method;
+their ordinary unavailable-method response remains observable. A new facade
+alone does not add the operation to an older native executable. Use the
+matching published host artifact for the selected SDK version.</p>
+<p>Cancellation uses the normal request lifetime and suppresses late responses;
+it does not roll back a setting the host already accepted. Window settings
+survive document navigation until a subsequent document changes them or the
+window closes. Responses belong to their originating document.</p>
+<p>The shared <a href="../runtime-modules/#themebootstrapjs">ThemeBootstrap</a> automatically
+forwards the app&#39;s computed <code>--background</code> and <code>--text-color</code> in native hosts.
+Applications using that owner need no duplicate theme listener. Ordinary
+browsers keep their CSS presentation without making a native request.</p>
 <h2 id="events-and-request-lifetime">Events and request lifetime</h2>
 <p><code>events.on(name, listener)</code>, <code>once(name, listener)</code> and
 <code>when(name, listener)</code> return unsubscribe functions. Named listeners receive
@@ -254,9 +309,9 @@ Core runtime and selected app services without a native-provider checkout.
 It does not distribute a Core executable or change OS callers. Executable
 platform hosts and their cutover remain separately owned work.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-theme">Current-window theme</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.59.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.60.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="The selected 0.60.0 package contains the model-assets helpers as internal preparation. The public imports and Core registration shown below belong to the pending local-image integration and are unavailable through 0.60.0. These examples document that integration&#39;s intended public contract.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/model-assets/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native working files from stored model assets · Arcane OS SDK"><meta property="og:description" content="The selected 0.60.0 package contains the model-assets helpers as internal preparation. The public imports and Core registration shown below belong to the pending local-image integration and are unavailable through 0.60.0. These examples document that integration&#39;s intended public contract."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/model-assets/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native working files from stored model assets · Arcane OS SDK"><meta name="twitter:description" content="The selected 0.60.0 package contains the model-assets helpers as internal preparation. The public imports and Core registration shown below belong to the pending local-image integration and are unavailable through 0.60.0. These examples document that integration&#39;s intended public contract."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native working files from stored model assets | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native working files from stored model assets</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-working-files-from-stored-model-assets">Native working files from stored model assets</h1><p class="doc-lead">The selected 0.60.0 package contains the model-assets helpers as internal preparation. The public imports and Core registration shown below belong to the pending local-image integration and are unavailable through 0.60.0. These examples document that integration&#39;s intended public contract.</p><div class="doc-meta"><span>SDK 0.60.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../local-ai/">Local AI through Core</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/model-assets.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#core-transport-operations">Core transport operations</a></nav></details><p>The selected <code>0.60.0</code> package contains the model-assets helpers as internal
+preparation. The public imports and Core registration shown below belong to
+the pending local-image integration and are unavailable through <code>0.60.0</code>.
+These examples document that integration&#39;s intended public contract.</p>
+<p><code>prepareCoreModelAssets()</code> streams complete browser <code>File</code> or <code>Blob</code> members
+through the existing Core connection into native working files. DBOPFS keeps
+the authoritative originals. The helper performs no model download and changes
+neither stored content nor the model format.</p>
+<p>Use complete members returned by <code>createDbopfsModelStore().ensure()</code> or files
+read from the application&#39;s existing DBOPFS owner. The browser model store
+already assembles persisted Range parts into one logical Blob per upstream
+member. Preserve that member order and the original relative filenames,
+including companion files required by a model.</p>
+<h2 id="browser-preparation">Browser preparation</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {prepareCoreModelAssets} from &#39;arcane-os/ai/core-model-assets&#39;;
+import {createCoreImageRuntime} from &#39;arcane-os/ai/core-image&#39;;
+
+const stored = await modelStore.ensure(selectedSource, {signal});
+const projection = await prepareCoreModelAssets({
+    client,
+    workingDirectory: selectedWorkingDirectory,
+    members: [{path: &#39;sd-v1-4.ckpt&#39;, file: stored.files[0]}],
+    signal,
+    onProgress: renderPreparationProgress
+});
+const image = createCoreImageRuntime({client});
+try {
+    await image.load({
+        model: &#39;sd14&#39;,
+        assetProjectionId: projection.id,
+        resourcePaths: {model: &#39;sd-v1-4.ckpt&#39;},
+        signal
+    });
+} finally {
+    // Native loading takes its own retain handle before using these files.
+    await projection.release();
+}
+try {
+    const result = await image.generate({
+        model: &#39;sd14&#39;,
+        prompt: &#39;A dignified raccoon who has been put in charge of the moon.&#39;,
+        signal
+    });
+    // Display or save the complete returned image through the application owner.
+} finally {
+    await image.unload();
+}
+</code></pre></div>
+<p>This example assumes that the application selected the <code>sd14</code> model and its
+complete checkpoint source. Model choice, download approval, prompts, output
+storage and the selected working directory remain application-owned.</p>
+<p><code>prepareCoreModelAssets({client,workingDirectory,members,signal,onProgress})</code>
+requires an available Core connection exposing the model-assets service.
+<code>client</code> defaults to the installed Core client. Every member is
+<code>{path,file}</code>, where <code>path</code> is its relative filename or companion-file path and
+<code>file</code> is the complete stored Blob or File. Relative working-directory paths
+resolve from the native service&#39;s <code>appRoot</code>; an application may explicitly
+select an absolute working directory.</p>
+<p>The result contains <code>id</code>, <code>directory</code>, ordered
+<code>members: [{path,nativePath}]</code>, and an idempotent asynchronous <code>release()</code>.
+The operation creates a unique child directory under the selected working
+directory. Member paths identify files inside that child directory. Original
+DBOPFS files remain untouched.</p>
+<p>Each incoming Blob stream chunk is encoded only for the existing JSON Core
+transport. The helper waits for the corresponding native write before reading
+the next chunk of that member. Independent members transfer concurrently;
+the complete member set is returned only after every write and file close
+finishes. There is no complete-model transport buffer or application content
+limit. Progress reports actual preparation phases and member paths.</p>
+<p>Cancellation stops active readers and requests. Failure joins the participating
+transfers and requests native cleanup; that cleanup joins actual file writes
+before removing the projection. Cleanup uses its own uncancelled operation so
+an already-aborted preparation signal cannot skip it. Original failures and
+cleanup failures remain observable.</p>
+<h2 id="native-ownership">Native ownership</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createModelAssetService} from &#39;arcane-os/core/model-assets&#39;;
+
+const modelAssets = createModelAssetService({appRoot});
+// Register this same service with Core and pass it to the native engine owner.
+const use = modelAssets.retain(projectionId);
+try {
+    // Load and use the complete files from use.members.
+    await ownNativeModelLifetime(use.members);
+} finally {
+    // ownNativeModelLifetime must join actual model release before returning.
+    await use.release();
+}
+</code></pre></div>
+<p><code>createModelAssetService({appRoot})</code> returns a Core service with <code>current()</code>,
+<code>retain(id)</code> and <code>dispose()</code>. <code>retain()</code> accepts only a completed projection
+and returns <code>{id,directory,members,release}</code>. A native engine takes this handle
+before loading and releases it after actual unload, failed-load cleanup or
+worker exit. A rejected inference/load promise alone does not establish native
+release. Multiple contexts can retain one prepared set, and repeated inference
+on a retained context reuses its files.</p>
+<p>The browser&#39;s <code>projection.release()</code> relinquishes preparation ownership. It
+does not delete files retained by a native engine. Deletion follows the final
+native release and removes only that operation&#39;s working directory. Core closes
+independent services concurrently, so the model-assets service waits for all
+native retain handles during disposal instead of assuming service order.
+Owners must release their handles after joining their actual engine lifetime.</p>
+<p>Closing a browser accessor does not by itself establish native unload.
+Explicitly release unused prepared projections. Core disposal also releases
+preparation ownership and cleans up after retained engine uses end.</p>
+<p><code>current()</code> returns <code>{closing,projections}</code>. Each projection reports its <code>id</code>,
+<code>directory</code>, <code>state</code>, ordered <code>members</code>, <code>preparationOwned</code>, number of native
+<code>uses</code>, and <code>error</code>. Core emits <code>modelAssets.state</code> for lifecycle changes.</p>
+<h2 id="core-transport-operations">Core transport operations</h2>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>modelAssets.open</code></td>
+<td><code>{id,workingDirectory,members:[{path}]}</code></td>
+<td>Preparing projection and native member paths</td>
+</tr>
+<tr>
+<td><code>modelAssets.write</code></td>
+<td><code>{id,memberIndex,contentBase64}</code></td>
+<td><code>{id,memberIndex,written:true}</code> after the native write</td>
+</tr>
+<tr>
+<td><code>modelAssets.complete</code></td>
+<td><code>{id}</code></td>
+<td>Ready projection after all files close</td>
+</tr>
+<tr>
+<td><code>modelAssets.release</code></td>
+<td><code>{id}</code></td>
+<td>Released preparation ownership; native uses may retain the files</td>
+</tr>
+<tr>
+<td><code>modelAssets.status</code></td>
+<td><code>{}</code></td>
+<td>Current projection lifecycle records</td>
+</tr></tbody>
+</table>
+</div>
+<p>The browser helper owns this transport sequence. Correlation IDs identify
+operations; they are unrelated to content identity. Original model files remain
+separate and complete. A retry creates a new working projection from the stored
+assets; it does not redownload them or replace the authoritative DBOPFS record.</p>
+<p>The implementation uses browser streams, the existing portable Core JSON
+transport and Node filesystem operations. Native paths and cleanup follow the
+host&#39;s Windows, Linux or macOS filesystem behavior. Android requires its host&#39;s
+Core/filesystem adaptation. These are source-level platform contracts, not a
+claim of execution on every target.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#core-transport-operations">Core transport operations</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.60.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

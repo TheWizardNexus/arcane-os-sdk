@@ -3898,7 +3898,7 @@
       "summary": "Projects a Core client into the established application-facing Arcane namespace.",
       "availability": "Browser and native WebView JavaScript hosts with a Core client",
       "protocol": "arcane/1 compatibility facade",
-      "normalization": "Routes existing namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation"
+      "normalization": "Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance"
     },
     {
       "id": "core-client:installCoreClient",
@@ -4052,7 +4052,7 @@
       "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
       "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
       "protocol": "arcane-native-builder/1 windows-x64 provider",
-      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; run cancellation closes stdin and waits for host-owned graceful shutdown"
+      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; run cancellation closes stdin and waits for host-owned graceful shutdown"
     },
     {
       "id": "native-windows-provider:arcaneNativeBuilderProvider",

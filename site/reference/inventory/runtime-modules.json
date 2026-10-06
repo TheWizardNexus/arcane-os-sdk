@@ -1364,7 +1364,7 @@
       "availability": "Browser/native hybrid",
       "protocol": "ThemeManager + host Arcane.events projected once through the per-realm globalThis.arcaneEvents authority",
       "normalization": "Theme state normalized; storage/native errors mixed.",
-      "surface": "`bootstrapArcaneTheme()`, `disposeArcaneThemeBootstrap()`, `arcaneThemeReady`, and default ready promise. Shared bootstrap replays an already-ready User and disposes both appearance and user-ready subscriptions; presentation cache is nonauthoritative. Its module graph does not guarantee restoration before first paint; use the classic ThemePresentation entry after app-id and before CSS."
+      "surface": "`bootstrapArcaneTheme()`, `disposeArcaneThemeBootstrap()`, `arcaneThemeReady`, and default ready promise. Shared bootstrap replays an already-ready User. In native hosts it independently forwards computed --background/--text-color through Arcane.window.setTheme, observing shared theme events, root/body presentation attributes, stylesheets, device scheme and page restoration; browser CSS resolution retains alpha and converts modern colors to sRGB. Disposal releases appearance/user/theme subscriptions, native sampling observers and listeners, and pending window requests. Ordinary browsers remain silent. Presentation cache is nonauthoritative; use classic ThemePresentation after app-id and before CSS for early restoration."
     },
     {
       "file": "runtime/arcane/modules/ThemeManager.js",

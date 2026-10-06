@@ -6936,6 +6936,19 @@ no engine. The native routes of `AI.fetchTTS(payload, signal)` and
 `AI.fetchSTT(audio, signal)` forward their signals through these calls and
 normalize cancellation to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
 
+`facade.window.setTheme(presentation, {signal}?)` forwards the complete
+presentation to the current native window, independently of OS-user appearance.
+Optional `backgroundColor` and `textColor` accept `{red,green,blue,alpha}` or
+`null` for a platform-default reset; omitted fields remain unchanged. The
+result is `{platform,supported,applied,unsupported}` with actual per-field
+acceptance, rather than a measured-pixel or atomic-update claim. Cancellation
+uses the existing request lifetime and does not undo settings already accepted.
+Shared ThemeBootstrap forwards the app's computed semantic colors without
+blocking rendering; applications using it need no duplicate listener. See the
+[current-window contract](core-client.md#current-window-theme) for channel
+values, errors, navigation, disposal and current host support. The facade does
+not add this operation to an older executable or an unsupported host.
+
 ### Availability and normalization
 
 **Browser and native WebView JavaScript hosts with a Core client.** Creating the
@@ -7401,6 +7414,25 @@ diagnostics and exit. Cancellation closes input and waits for host-owned drain,
 including accepted service work, without a forced termination deadline. Missing
 prerequisites, download/extraction failures and host failures remain observable
 through the operation's error/event boundary.
+
+During assembly, `appDescriptor.native.icon` selects the app's existing image.
+PNG and ICO inputs produce a derived `runtime/arcane-app.ico` and update only
+the copied application's executable icon. Source assets, the selected host
+cache, other executable resources and the Core executable remain unchanged.
+`manifest.host.icon` identifies the selected runtime icon, while
+`manifest.host.executableIcon` records whether embedding succeeded.
+
+The builder's `onEvent` receives `native.icon.completed` after successful
+embedding or `native.icon.unsupported` when the selected format or executable
+layout cannot provide it. Both carry `target`, `appId`, `icon` and `executable`;
+the unsupported event also carries the original `code` and complete `message`.
+Unsupported embedding preserves ordinary assembly and the original icon path.
+Unreadable files or malformed supported image data retain their ordinary errors.
+The matching host loads the window/taskbar icon independently of page and Core
+startup. PNG/ICO embedding and runtime codec support are separate boundaries;
+see [application icon and window colors](core-native-packaging.md#application-icon-and-window-colors)
+for formats, per-window colors, errors and platform limits. npm publication
+alone does not establish delivery or execution of the matching native archive.
 
 ### Example
 
