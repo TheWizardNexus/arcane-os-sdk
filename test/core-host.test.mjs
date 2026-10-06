@@ -4,8 +4,9 @@ import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {PassThrough, Writable} from 'node:stream';
 import {fileURLToPath} from 'node:url';
+import {homedir} from 'node:os';
 import test from '../src/testing.mjs';
-import {readCoreLaunchContext, startCoreHost} from '../src/core/host.mjs';
+import {readCoreLaunchContext, resolveNativeLaunchContext, startCoreHost} from '../src/core/host.mjs';
 import {createCoreFrameDecoder, encodeCoreFrame} from '../src/core/stdio.mjs';
 import {CORE_PROTOCOL} from '../browser-runtime/core/contracts.mjs';
 
@@ -90,6 +91,87 @@ test('Core launch context reports a missing host state argument', async function
             name: 'TypeError', message: '--arcane-host-state-root requires a directory.'
         });
     }
+});
+
+test('native launch resolver shares the selected app state and preserves explicit context', function nativeLaunchLocations() {
+    const appId = 'moon-cheese-post';
+    const stateRoot = path.join(launchFixtureDirectory, 'uncreated state 🧀');
+    const authored = {
+        stateRoot, workspaceRoot: '../authored workspace 🦑', sharedHost: {},
+        message: '  Every line.\r\n最後の行  ',
+        nested: {values: [null, false, 0, '', 'Moon cheese']},
+        ['__proto__']: {label: 'An ordinary authored field.'}
+    };
+    const original = structuredClone(authored);
+    const resolved = resolveNativeLaunchContext({appId, context: authored});
+    assert.equal(resolved.stateRoot, stateRoot);
+    assert.equal(resolved.workspaceRoot, authored.workspaceRoot);
+    assert.equal(resolved.sharedHost.logFile, path.join(stateRoot, 'Core.log'));
+    assert.equal(resolved.sharedHost.endpoint, process.platform === 'win32'
+        ? '\\\\.\\pipe\\Arcane-' + encodeURIComponent(stateRoot) : path.join(stateRoot, 'core.sock'));
+    assert.equal(resolved.nested, authored.nested);
+    assert.equal(resolved.message, authored.message);
+    assert.deepEqual(resolved.__proto__, authored.__proto__);
+    assert.deepEqual(authored, original);
+    assert.deepEqual(resolveNativeLaunchContext({appId, context: resolved}), resolved);
+    const omitted = resolveNativeLaunchContext({appId, context: {stateRoot}});
+    assert.equal(omitted.workspaceRoot, path.join(stateRoot, 'Workspace'));
+    assert.equal(Object.hasOwn(omitted, 'sharedHost'), false);
+    const selected = {endpoint: 'app-owned-endpoint', logFile: '../app-owned-log', extra: {complete: true}};
+    assert.deepEqual(resolveNativeLaunchContext({appId, context: {stateRoot, sharedHost: selected}}).sharedHost, selected);
+    for (const workspaceRoot of ['', null, false, '../explicit']) {
+        assert.equal(resolveNativeLaunchContext({appId, context: {stateRoot, workspaceRoot}}).workspaceRoot, workspaceRoot);
+    }
+    const otherState = resolveNativeLaunchContext({appId, context: {stateRoot: stateRoot + '-other', sharedHost: {}}});
+    assert.notEqual(otherState.sharedHost.endpoint, resolved.sharedHost.endpoint);
+});
+
+test('native launch resolver uses the desktop host defaults only when selected', function nativeHostDefaults() {
+    const appId = 'moon-cheese-post';
+    const home = homedir();
+    const roots = {
+        win32: path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Arcane', appId),
+        darwin: path.join(home, 'Library', 'Application Support', 'Arcane', appId),
+        linux: path.join(process.env.XDG_DATA_HOME && path.isAbsolute(process.env.XDG_DATA_HOME)
+            ? process.env.XDG_DATA_HOME : path.join(home, '.local', 'share'), 'Arcane', appId)
+    };
+    if (roots[process.platform]) {
+        assert.equal(resolveNativeLaunchContext({appId}).stateRoot, roots[process.platform]);
+        assert.equal(resolveNativeLaunchContext({appId, context: {stateRoot: undefined}}).stateRoot, roots[process.platform]);
+    } else {
+        assert.throws(function hostNeedsRoot() { resolveNativeLaunchContext({appId}); }, {name: 'TypeError'});
+    }
+    for (const context of [null, [], false, {stateRoot: null}, {stateRoot: ''}, {sharedHost: null}]) {
+        assert.throws(function malformedNativeContext() { resolveNativeLaunchContext({appId, context}); }, {name: 'TypeError'});
+    }
+    assert.throws(function missingAppId() { resolveNativeLaunchContext(); }, {name: 'TypeError'});
+});
+
+test('packaged native defaults precede host state and complete explicit launch fields', async function packagedLaunchPrecedence(t) {
+    const root = await createLaunchFixture(t);
+    const filename = path.join(root, 'selected launch.json');
+    const appId = 'moon-cheese-post';
+    const defaults = {stateRoot: path.join(root, 'packaged'), sharedHost: {}, options: {complete: '  🧀\r\n  '}};
+    const hostRoot = path.join(root, 'actual-host');
+    const ordinary = await readCoreLaunchContext({argv: [], defaults});
+    assert.deepEqual(ordinary, defaults);
+    const automatic = await readCoreLaunchContext({argv: [], appId, defaults});
+    assert.deepEqual(automatic, resolveNativeLaunchContext({appId, context: defaults}));
+    const hosted = await readCoreLaunchContext({argv: ['--arcane-host-state-root', hostRoot], appId, defaults});
+    assert.deepEqual(hosted, resolveNativeLaunchContext({appId, context: {...defaults, stateRoot: hostRoot}}));
+    const explicit = {
+        stateRoot: path.join(root, 'explicit'), workspaceRoot: '../selected work',
+        sharedHost: {endpoint: 'complete-selected-endpoint'}, options: {replaced: [null, false, '  Every line.\r\n  ']}
+    };
+    const content = JSON.stringify(explicit, null, 4) + '\r\n';
+    await writeFile(filename, content);
+    const result = await readCoreLaunchContext({
+        argv: ['--arcane-host-state-root', hostRoot, '--arcane-launch-config', filename], appId, defaults
+    });
+    assert.deepEqual(result, resolveNativeLaunchContext({appId, context: {...defaults, ...explicit}}));
+    assert.deepEqual(result.options, explicit.options);
+    assert.equal(await readFile(filename, 'utf8'), content);
+    assert.deepEqual(defaults.options, {complete: '  🧀\r\n  '});
 });
 
 function deferred() {

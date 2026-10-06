@@ -57,13 +57,33 @@ namespace Arcane.Core.Hosts.Windows
                 Dictionary<string, object> host = manifest.TryGetValue("host", out hostValue) ? hostValue as Dictionary<string, object> : null;
                 string icon = host != null && host.TryGetValue("icon", out iconValue) ? iconValue as string : null;
 
-                // Core rereads this exact selected file. Do not normalize,
-                // rewrite, filter or copy the application's launch record.
-                Dictionary<string, object> launchContext = launchFilename == null ? null : ReadRecord(launchFilename);
+                // Native UI and generated Core use the same packaged defaults.
+                // Core rereads the explicit file; every explicit field wins.
+                Dictionary<string, object> launchContext = manifest.ContainsKey("launchContext")
+                    ? new Dictionary<string, object>(RequiredRecord(manifest, "launchContext"))
+                    : new Dictionary<string, object>();
+                if (launchFilename != null)
+                {
+                    foreach (KeyValuePair<string, object> field in ReadRecord(launchFilename))
+                        launchContext[field.Key] = field.Value;
+                }
+                string defaultStateBase = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (manifest.ContainsKey("launchContext"))
+                {
+                    // Match the public Node resolver for this opt-in contract,
+                    // including an explicitly selected process environment.
+                    defaultStateBase = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+                    if (String.IsNullOrEmpty(defaultStateBase))
+                    {
+                        string home = Environment.GetEnvironmentVariable("USERPROFILE");
+                        if (String.IsNullOrEmpty(home)) home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                        defaultStateBase = Path.Combine(home, "AppData", "Local");
+                    }
+                }
                 object stateRoot;
-                string profileParent = launchContext != null && launchContext.TryGetValue("stateRoot", out stateRoot) && stateRoot is string
+                string profileParent = launchContext.TryGetValue("stateRoot", out stateRoot) && stateRoot is string
                     ? Path.GetFullPath((string)stateRoot)
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Arcane", appId);
+                    : Path.Combine(defaultStateBase, "Arcane", appId);
                 OpenDiagnostics(Path.Combine(profileParent, "Diagnostics"));
                 ArcaneHostOptions options = new ArcaneHostOptions
                 {

@@ -210,6 +210,64 @@ details and [the client contract](core-client.md) for native bridge integration.
 
 ## Launch-time locations
 
+An application can select defaults for ordinary double-click launch in its
+descriptor, without a replacement launcher or a required command-line file:
+
+```json
+{
+  "native": {
+    "launchContext": {
+      "sharedHost": {},
+      "dispatch": {"destination": "Moon Cheese Receiving Dock"}
+    }
+  }
+}
+```
+
+This is the `native` fragment of the application's complete descriptor. The
+optional `native.launchContext` object is copied intact to the portable
+manifest and generated Core entry. Its presence explicitly selects native
+location defaults. `sharedHost:{}` opts into the shared Core endpoint and log;
+omitting `sharedHost` retains stdio-owned Core lifetime. Omitting
+`native.launchContext` retains the previous generated-entry behavior entirely.
+Windows and macOS launchers use the same packaged defaults for native state
+selection, so an ordinary executable launch and external MCP can select the
+same app-owned Core.
+
+`resolveNativeLaunchContext({appId,context={}})` from `arcane-os/core/host` is
+the public, synchronous location owner for native applications and external MCP.
+It returns a new complete context and fills only omitted fields:
+
+| Field | SDK default |
+|---|---|
+| `stateRoot` on Windows | `%LOCALAPPDATA%/Arcane/<appId>`; standard home `AppData/Local` fallback when the environment value is absent |
+| `stateRoot` on macOS | `~/Library/Application Support/Arcane/<appId>` |
+| `stateRoot` on Linux | Absolute `$XDG_DATA_HOME/Arcane/<appId>`, otherwise `~/.local/share/Arcane/<appId>` |
+| `workspaceRoot` | `<resolved stateRoot>/Workspace` |
+| `sharedHost.endpoint`, only when `sharedHost` is selected | Windows named pipe `\\.\pipe\Arcane-` followed by the URL-encoded complete resolved state path; Linux/macOS socket `<resolved stateRoot>/core.sock` |
+| `sharedHost.logFile`, only when `sharedHost` is selected | `<resolved stateRoot>/Core.log` |
+
+Windows/macOS roots retain the existing native host locations. Linux is the
+portable Node host convention; an external composing host supplies its actual
+state root when it selects another location. Android and other host adaptations
+must supply `stateRoot` explicitly and own native IPC/process adaptation.
+The resolver never reads saved preferences, creates directories, changes the
+environment, starts services, or migrates existing data. The generated opted-in
+shared entry creates its selected state directory because its socket/log need
+that parent; application services continue to own workspace I/O. Custom
+endpoint/log parent directories retain the existing shared-host requirements.
+
+Explicit `stateRoot`, `workspaceRoot`, endpoint, log filename and additional
+fields remain authored values; the resolver derives omitted paths from the
+absolute selected state location. Relative explicit paths retain the caller's
+working-directory meaning, so UI and MCP callers must select the same location.
+No hashing, app-local OS path composition, directory scanning, or new repository
+location rule is involved. `resolveArcaneDataPaths()` continues to own its
+separate `ArcaneData/Repos` contract. A selected native context needs a nonempty
+string `appId` and state directory; a selected `sharedHost` must be an object.
+Malformed resolver inputs report `TypeError`; ordinary OS endpoint requirements
+remain at the IPC operation.
+
 For one app-owned Core shared by the native window and a separate MCP process,
 the launch context may explicitly select `sharedHost:{endpoint,logFile}`. The
 generated native child then connects through a stdio bridge, starting an
@@ -224,27 +282,36 @@ or `null`; the shared host replays that current listener to a newly attached
 macOS bridge, without restarting the server or retaining historical events.
 
 The generated Core entry accepts `--arcane-launch-config <path>`. The public
-`readCoreLaunchContext({argv=process.argv.slice(2)}={})` function in
-`arcane-os/core/host` reads that explicitly selected JSON object. A native host
+`readCoreLaunchContext({argv=process.argv.slice(2),defaults={},appId}={})`
+function in `arcane-os/core/host` reads that explicitly selected JSON object.
+Precedence is packaged `defaults`, then the native host's actual state-root
+argument, then every complete top-level field from the explicit JSON object.
+Nested records replace their default field as a whole; they are not deep-merged.
+An `appId` explicitly opts the result into `resolveNativeLaunchContext`; the
+generated entry supplies it only when `native.launchContext` is present.
+A native host
 can separately supply `--arcane-host-state-root <directory>` for the reader's
 `stateRoot` default. Every field in the explicit JSON object takes precedence
 unchanged, including an explicitly present `stateRoot` with a relative, null or
-other application-owned value. With neither argument the reader returns `{}`.
+other application-owned value on the ordinary non-resolving reader. With neither
+argument nor defaults/appId the reader still returns `{}`.
 Missing files, missing argument values and malformed JSON report their actual
 errors; the reader does not search for configuration, resolve or validate the
-state directory, rewrite the file or change the process environment.
+state directory, rewrite the file or change the process environment. The
+explicitly opted-in resolver supplies its documented defaults after this merge.
 
 The generated entry supplies an artifact-derived `appRoot` and then applies the
 complete explicit launch context. Every service factory receives that same
 object as its second argument, preserving its authored first argument. A
 launcher can supply the user's selected `workspaceRoot` and writable
 `stateRoot` at launch instead of embedding this machine's paths in an app
-package. The host owns those selections; the SDK does not choose a product's
-workspace, namespace, saved preferences or models. JSON values and additional
+package. Explicit product selections take precedence over the opted-in SDK
+location defaults. The SDK chooses no saved preference filename or model. JSON values and additional
 application-owned fields remain unchanged, including an app-selected
 `preferencesFile`. The state directory supplies no preference filename and
 triggers no stored-data discovery or migration. Linux and other composing hosts
-may pass the same separate argument; the reader chooses no platform directory.
+may pass the same separate argument; the ordinary reader chooses no platform
+directory until native resolution is explicitly selected.
 
 ## Selected local-AI runtimes
 

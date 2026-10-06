@@ -111,6 +111,8 @@ test('macOS provider prepares both SDK-owned architectures without downloading o
 
 test('macOS bundles preserve the complete portable payload and selected executable host assets', async function composeApplication(t) {
     const fixture = await createFixture(t);
+    const launchContext = {sharedHost: {}, stateRoot: '../app-selected state', payload: '  Complete 🧀\r\n  '};
+    fixture.request.appDescriptor.native.launchContext = launchContext;
     const provider = createMacOSNativeProvider({hostDirectory: fixture.hostDirectory});
     const dependencyRoot = path.join(fixture.root, 'selected-dependency');
     const dependencyContents = new Map([['index.html', Buffer.from('<p>Every cheese satellite is included. 🧀</p>')]]);
@@ -139,6 +141,8 @@ test('macOS bundles preserve the complete portable payload and selected executab
         assert.equal(artifact.manifest.client.webKitDocumentLifecycle, true);
         assert.equal(artifact.manifest.client.replayRuntimeState, true);
         assert.deepEqual(artifact.manifest.core.services, fixture.services);
+        assert.deepEqual(artifact.manifest.launchContext, launchContext);
+        assert.deepEqual(artifact.manifest.app.native.launchContext, launchContext);
         await assertContents(path.join(root, 'app'), fixture.contents);
         await assertContents(path.join(root, 'dependencies', '0'), dependencyContents);
         for (const [relative, content] of fixture.assets) {

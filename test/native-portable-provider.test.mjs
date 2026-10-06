@@ -106,6 +106,23 @@ test('portable provider is package-owned and describes a payload rather than an 
     await assert.rejects(provider.run({artifact: {target: {rootDir: fixture.outputRoot}}}), {code: ERROR_CODES.nativeRunUnsupported});
 });
 
+test('portable assembly carries complete optional native launch defaults', async function nativeLaunchManifest(t) {
+    const fixture = await createFixture(t);
+    const launchContext = {sharedHost: {}, content: '  Café é 🦑\r\n最後の行  ', options: {values: [null, false, 0]}};
+    const appDescriptor = {...application, native: {launchContext}};
+    const artifact = await createPortableNativeProvider().build({...fixture.request, appDescriptor});
+    const saved = JSON.parse(await readFile(path.join(artifact.target.rootDir, 'arcane-native.json'), 'utf8'));
+    assert.deepEqual(saved.launchContext, launchContext);
+    assert.deepEqual(saved.app.native.launchContext, launchContext);
+    const entry = await readFile(path.join(artifact.target.rootDir, 'runtime/arcane-core.mjs'), 'utf8');
+    assert.ok(entry.includes(`...await readCoreLaunchContext({appId: ${JSON.stringify(application.id)}, defaults: JSON.parse(${JSON.stringify(JSON.stringify(launchContext))})})`));
+    assert.ok(entry.includes('if (context.sharedHost !== undefined) await mkdir(context.stateRoot, {recursive: true});'));
+    assert.ok(entry.includes('if (context.sharedHost === undefined) {'));
+    const ordinary = coreEntrySource(application, '1.2.3', []);
+    assert.ok(ordinary.includes('...await readCoreLaunchContext()'));
+    assert.equal(ordinary.includes('await mkdir(context.stateRoot'), false);
+});
+
 test('portable assembly carries the optional native window configuration unchanged', async function nativeWindowManifest(t) {
     const fixture = await createFixture(t);
     const window = {width: 1280, height: 800, resizable: true};

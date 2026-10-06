@@ -151,6 +151,7 @@ export async function copyCoreRuntime(root, files, signal, {
 }
 
 export function coreEntrySource(application, version, services, {localAI, runtimes = [], packagedWeb = false} = {}) {
+    const launchDefaults = application.native?.launchContext;
     const imageSelected = localAI?.runtimes?.some(function selectedImage(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
     }) ?? false;
@@ -199,6 +200,7 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         "import {fileURLToPath} from 'node:url';",
         "import path from 'node:path';",
         "import {isSea} from 'node:sea';",
+        ...(launchDefaults === undefined ? [] : ["import {mkdir} from 'node:fs/promises';"]),
         "import {readCoreLaunchContext, startCoreHost, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';",
         '',
         ...(localAI === undefined ? [] : [
@@ -241,9 +243,15 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             '        return resolved;',
             '    }),'
         ]),
-        '    ...await readCoreLaunchContext()',
+        launchDefaults === undefined ? '    ...await readCoreLaunchContext()'
+            : `    ...await readCoreLaunchContext({appId: ${JSON.stringify(application.id)}, defaults: JSON.parse(${JSON.stringify(JSON.stringify(launchDefaults))})})`,
         '};',
         '',
+        ...(launchDefaults === undefined ? [] : [
+            '// The shared endpoint and diagnostic log require their selected state directory.',
+            'if (context.sharedHost !== undefined) await mkdir(context.stateRoot, {recursive: true});',
+            ''
+        ]),
         ...(packagedWeb ? ['let packagedWeb;', ''] : []),
         'async function createServices(register) {',
         `    const [${imports.map(function binding(selection) { return selection.binding; }).join(', ')}] = await Promise.all([`,

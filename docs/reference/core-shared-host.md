@@ -146,8 +146,46 @@ events may change; applications own those domain methods and state.
 
 ## Native launch and platforms
 
-The generated portable Core entry keeps ordinary stdio behavior unless the
-explicit launch context contains:
+The generated portable Core entry keeps ordinary stdio behavior unless its
+selected launch context contains `sharedHost`. An application can opt in for
+ordinary packaged executable launch with `native.launchContext:{sharedHost:{}}`
+in its complete descriptor. The SDK supplies the app's platform state root,
+workspace, endpoint and diagnostic log through `resolveNativeLaunchContext`.
+The same public owner is available to external MCP:
+
+```js
+import {readCoreLaunchContext, connectSharedCoreHost} from 'arcane-os/core/host';
+
+const context = await readCoreLaunchContext({
+    appId: appDescriptor.id,
+    defaults: appDescriptor.native.launchContext
+});
+const connection = await connectSharedCoreHost({
+    endpoint: context.sharedHost.endpoint
+});
+// Invoke the application's actual services through connection.client.
+// Disconnect this MCP client without shutting down the application's host.
+await connection.close();
+```
+
+This example connects to a running native/headless host. The existing `start`
+option can start the packaged Core entry explicitly when independent MCP-first
+startup is needed; the entry applies those same packaged defaults. Pass the
+same explicit `--arcane-launch-config` file to both entries for user-selected
+locations. A caller that already owns a complete context can use the pure
+`resolveNativeLaunchContext({appId,context})` directly instead of reading argv.
+For MCP-first startup, prepare the returned `context.stateRoot` with Node's
+`mkdir(context.stateRoot,{recursive:true})` before selecting `start`, because
+the parent's startup diagnostic log opens before the headless child runs.
+This uses the resolved directory directly, without duplicating platform path
+rules. Pass `context.sharedHost.logFile` to that existing `start` record and
+the same launch file to the packaged Core command. Custom endpoint/log parent
+directories remain caller-selected.
+See [launch-time locations](core-native-packaging.md#launch-time-locations) for
+the exact platform defaults, precedence, location override and directory rules.
+No app must reconstruct OS directory rules.
+
+An explicit launch file can also select the existing full endpoint contract:
 
 ```json
 {
@@ -163,8 +201,9 @@ option, the native Core child is a stdio-to-shared-Core bridge. It connects or
 launches the same entry with `--arcane-core-headless`; the headless entry claims
 the endpoint before importing services. Closing the native window ends its
 bridge, while the independent Core host remains available. Service options and
-the complete launch context retain their existing values. There is no implicit
-shared mode or new application descriptor field.
+the complete launch context retain their existing values. Shared mode remains
+explicit: the new descriptor option selects defaults only for that application,
+and the existing no-option stdio path is unchanged.
 
 `startSharedCoreBridge({endpoint,start,input=process.stdin,
 output=process.stdout,signal,onError})` is also public. It returns

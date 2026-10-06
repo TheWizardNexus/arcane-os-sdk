@@ -52,6 +52,24 @@ test('native service selection preserves complete options without loading app mo
     assert.equal(Object.hasOwn(validateAppDescriptor(descriptor()).native,'services'),false);
 });
 
+test('native launch defaults retain complete authored records and remain opt-in',function nativeLaunchDefaults(){
+    const launchContext={
+        sharedHost:{},workspaceRoot:'../selected workspace',
+        content:'  Every line.\r\n月 🧀  ',unknown:{values:[null,false,0,'']},
+        ['__proto__']:{content:'An ordinary authored field.'}
+    };
+    const authored=descriptor();
+    authored.native.launchContext=launchContext;
+    assert.deepEqual(validateAppDescriptor(authored).native.launchContext,launchContext);
+    assert.deepEqual(projectNativeDescriptor(authored).launchContext,launchContext);
+    assert.equal(Object.hasOwn(projectPackageManifest(authored),'launchContext'),false);
+    assert.equal(Object.hasOwn(validateAppDescriptor(descriptor()).native,'launchContext'),false);
+    for(const value of [null,[],false,'launch.json']){
+        authored.native.launchContext=value;
+        assert.throws(function malformedLaunchDefaults(){validateAppDescriptor(authored);},{code:'ARCANE_APP_DESCRIPTOR_INVALID'});
+    }
+});
+
 test('native window configuration preserves explicit choices and omitted defaults',function nativeWindowChoices(){
     for(const window of [undefined,{}, {width:1280,height:800,resizable:true}, {width:640}, {resizable:false}]){
         const authored=descriptor();
@@ -82,6 +100,7 @@ test('native window selection survives registry descriptor synthesis',async func
     await mkdir(appRoot,{recursive:true});
     const authored=descriptor();
     authored.native.window={width:1280,height:800,resizable:true};
+    authored.native.launchContext={sharedHost:{},options:{complete:'  Moon cheese 🧀\r\n  '}};
     const registryRoot=path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle');
     await mkdir(registryRoot,{recursive:true});
     await writeFile(path.join(registryRoot,'arcane-apps.json'),JSON.stringify({
@@ -92,6 +111,7 @@ test('native window selection survives registry descriptor synthesis',async func
     });
     assert.equal(loaded.source,'registry-projection');
     assert.deepEqual(loaded.descriptor.native.window,authored.native.window);
+    assert.deepEqual(loaded.descriptor.native.launchContext,authored.native.launchContext);
 });
 
 test('canonical descriptor projects exact browser and native compatibility inputs',()=>{

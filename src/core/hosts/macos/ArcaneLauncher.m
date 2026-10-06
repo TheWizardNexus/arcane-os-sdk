@@ -231,14 +231,25 @@ typedef NS_ENUM(NSUInteger, ArcaneDiagnosticStream) {
     NSString *appID = ArcaneRequiredString(app, @"id", error);
     if (!appID) return NO;
     _title = [app[@"displayName"] isKindOfClass:NSString.class] ? app[@"displayName"] : appID;
-    if (_launchFilename) {
-        _launchContext = ArcaneReadRecord([NSURL fileURLWithPath:_launchFilename], error);
-        if (!_launchContext) return NO;
+    id defaults = manifest[@"launchContext"];
+    if (defaults && ![defaults isKindOfClass:NSDictionary.class]) {
+        *error = ArcaneLauncherError(@"CORE_LAUNCH_MANIFEST_INVALID", @"The native launchContext must be an object.", defaults);
+        return NO;
     }
+    NSMutableDictionary *launchContext = defaults ? [defaults mutableCopy] : [NSMutableDictionary dictionary];
+    if (_launchFilename) {
+        NSDictionary *explicitContext = ArcaneReadRecord([NSURL fileURLWithPath:_launchFilename], error);
+        if (!explicitContext) return NO;
+        [launchContext addEntriesFromDictionary:explicitContext];
+    }
+    _launchContext = launchContext;
+    // The opted-in Node resolver uses HOME when supplied; retain the previous
+    // native default unchanged for applications without launchContext.
+    NSString *nativeHome = defaults ? (NSProcessInfo.processInfo.environment[@"HOME"] ?: NSHomeDirectory()) : NSHomeDirectory();
     id selectedState = _launchContext[@"stateRoot"];
     _stateRoot = [selectedState isKindOfClass:NSString.class]
         ? ArcaneAbsolutePath(selectedState, _workingDirectory)
-        : [[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Arcane"] stringByAppendingPathComponent:appID];
+        : [[nativeHome stringByAppendingPathComponent:@"Library/Application Support/Arcane"] stringByAppendingPathComponent:appID];
     [self scheduleDiagnostics];
     NSString *clientPath = ArcaneRequiredString(client, @"source", error);
     if (!clientPath) return NO;

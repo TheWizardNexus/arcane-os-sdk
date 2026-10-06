@@ -132,6 +132,10 @@
           }
         },
         "localAI": { "$ref": "#/$defs/localAI" },
+        "launchContext": {
+          "type": "object",
+          "description": "Optional complete native launch defaults. Presence opts into SDK per-app native locations; sharedHost:{} explicitly selects the shared endpoint. Explicit launch JSON fields take precedence unchanged."
+        },
         "window": {
           "type": "object",
           "additionalProperties": false,

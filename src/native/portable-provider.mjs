@@ -197,6 +197,7 @@ export function createPortableNativeProvider({services, packagedWeb = false, web
                     webRoot: 'app',
                     start: release.manifest?.app?.start ?? './index.html',
                     ...(appDescriptor.native?.window === undefined ? {} : {window: {...appDescriptor.native.window}}),
+                    ...(appDescriptor.native?.launchContext === undefined ? {} : {launchContext: appDescriptor.native.launchContext}),
                     core: {
                         entry: 'runtime/arcane-core.mjs', transport: 'stdio', protocol: 'arcane/1', services: selectedServices,
                         ...(localAI === undefined ? {} : {localAIRuntimes: bundled.runtimes})

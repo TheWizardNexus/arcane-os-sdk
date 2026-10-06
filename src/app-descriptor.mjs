@@ -254,7 +254,7 @@ function validateNativeWindow(value){
 }
 
 function validateNative(value,appId){
-    assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog','localAI','services','window']),'descriptor.native');
+    assertOnlyKeys(value,new Set(['type','icon','order','bundledApps','documentCatalog','localAI','services','window','launchContext']),'descriptor.native');
     if(!NATIVE_TYPES.has(value.type))fail('descriptor.native.type is unsupported.');
     const icon=value.icon===null?null:normalizeRelativePath(value.icon,'descriptor.native.icon');
     if(!is.integer(value.order)||value.order<0){
@@ -265,6 +265,9 @@ function validateNative(value,appId){
     });
     const documentCatalog=validateDocumentCatalog(value.documentCatalog);
     const window=validateNativeWindow(value.window);
+    if(value.launchContext!==undefined&&!isObject(value.launchContext)){
+        fail('descriptor.native.launchContext must be an object.');
+    }
     let services;
     if(value.services!==undefined){
         if(!is.array(value.services))fail('descriptor.native.services must be an array.');
@@ -279,6 +282,7 @@ function validateNative(value,appId){
         order:value.order,
         bundledApps,
         ...(window===undefined?{}:{window}),
+        ...(value.launchContext===undefined?{}:{launchContext:value.launchContext}),
         ...(services===undefined?{}:{services}),
         ...(value.localAI===undefined?{}:{localAI:normalizeLocalAIConfig(value.localAI)}),
         ...(documentCatalog?{documentCatalog}:{})
@@ -416,6 +420,7 @@ export function projectNativeDescriptor(descriptor,{source}={}){
         ...(value.native.documentCatalog?{documentCatalog:value.native.documentCatalog}:{}),
         ...(value.native.services===undefined?{}:{services:value.native.services}),
         ...(value.native.window===undefined?{}:{window:value.native.window}),
+        ...(value.native.launchContext===undefined?{}:{launchContext:value.native.launchContext}),
         ...(value.native.localAI===undefined?{}:{localAI:value.native.localAI}),
         include:[...value.package.include]
     };
@@ -462,6 +467,7 @@ function synthesizedDescriptor(packageManifest,nativeDescriptor){
             bundledApps:[...(native.bundledApps??[])],
             ...(native.services===undefined?{}:{services:native.services}),
             ...(native.window===undefined?{}:{window:native.window}),
+            ...(native.launchContext===undefined?{}:{launchContext:native.launchContext}),
             ...((packageManifest.localAI??native.localAI)===undefined?{}:{localAI:packageManifest.localAI??native.localAI}),
             ...(native.documentCatalog?{documentCatalog:native.documentCatalog}:{})
         },
