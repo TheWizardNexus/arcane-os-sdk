@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.67.0
+
+- Add native Laya FP32 typed decisions through `arcane-os/local-ai/decisions`
+  and `arcane-os/core/decisions`, using the existing native ONNX and model-assets
+  owners plus the approved `@huggingface/tokenizers@0.2.0` Worker dependency.
+  Explicit activation preserves complete rows, graph outputs, ordered results,
+  current-state replay, cancellation and actual worker-exit file lifetime.
+- Compose selected native services through one Core owner, prepare complete
+  model files through the existing asset owner, and expose actual GPU-provider
+  attempts with CPU fallback. Accepted configuration does not prove GPU execution.
+- Follow late Core client installation and retirement in default AI accessors.
+  Keep explicit clients fixed, model observation non-loading and disposal tied
+  to actual retained ownership. Preserve recoverable native inference errors
+  without retiring a healthy session or cancelling sibling work; terminal
+  stopping revokes readiness while resources remain retained until actual exit.
+- Add repository `configuration()` observations and captured `target:{remote,ref}`
+  options for ordinary fast-forward pull, non-force push and write. Preserve
+  complete configuration values, payloads and failures without switching branches,
+  rewriting Git configuration or changing omitted-target behavior.
+- Keep theme controls, shared same-app host discovery and optional NPU asset
+  transport follow-through separate. No app data migration or automatic model
+  activation is introduced; applications own their selections and orchestration.
+
 ## 0.66.0
 
 - Add `readGitIdentity` from `arcane-os/core/repositories` for separate global,
