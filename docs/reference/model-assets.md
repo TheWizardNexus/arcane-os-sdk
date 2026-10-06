@@ -1,9 +1,9 @@
 # Native working files from stored model assets
 
-The selected `0.60.0` package contains the model-assets helpers as internal
-preparation. The public imports and Core registration shown below belong to
-the pending local-image integration and are unavailable through `0.60.0`.
-These examples document that integration's intended public contract.
+These public APIs were first published in `arcane-os@0.61.0`. Browser
+preparation is exported by `arcane-os/ai/core-model-assets`, and the native
+service by `arcane-os/core/model-assets`. The image example below uses
+`arcane-os/ai/core-image`, published in the same release.
 
 `prepareCoreModelAssets()` streams complete browser `File` or `Blob` members
 through the existing Core connection into native working files. DBOPFS keeps
