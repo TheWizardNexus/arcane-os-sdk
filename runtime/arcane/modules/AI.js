@@ -5018,6 +5018,7 @@ class AI {
         model,
         structuredOutput=false,
         localOnly=false,
+        speech=true,
         onChunk=function ignoreStreamChunk(){},
         toolText,
         onToolText,
@@ -5061,6 +5062,9 @@ class AI {
         );
         if(localOnly!==true&&localOnly!==false){
             throw new TypeError('AI localOnly must be a boolean.');
+        }
+        if(speech!==true&&speech!==false){
+            throw new TypeError('AI speech must be a boolean.');
         }
         if(localOnly&&!this.#hasLocalRoute('llm',this.llmService)){
             const error=new Error(
@@ -5163,7 +5167,7 @@ class AI {
                 if(signal?.aborted){
                     throw normalizeAIRequestAbort();
                 }
-                this.#finishStreamingSpeech();
+                if(speech)this.#finishStreamingSpeech();
                 return result;
             }catch(error){
                 if(handle){
@@ -5171,7 +5175,7 @@ class AI {
                         function retainProviderStreamCleanupFailure() {}
                     );
                 }
-                this.stopAudio();
+                if(speech)this.stopAudio();
                 throw isAIRequestAbort(error,signal)
                     ?normalizeAIRequestAbort(error)
                     :error;
@@ -5223,10 +5227,10 @@ class AI {
             if(signal?.aborted){
                 throw normalizeAIRequestAbort();
             }
-            this.#finishStreamingSpeech();
+            if(speech)this.#finishStreamingSpeech();
             return result;
         }catch(error){
-            this.stopAudio();
+            if(speech)this.stopAudio();
             throw isAIRequestAbort(error,signal)
                 ?normalizeAIRequestAbort(error)
                 :error;
@@ -6026,7 +6030,8 @@ class AI {
             }
             throw error;
         }finally{
-            if(!speechTurnCompleted){
+            // Provider transports leave speech lifecycle to their public caller.
+            if(finishSpeech&&!speechTurnCompleted){
                 this.stopAudio();
             }
         }

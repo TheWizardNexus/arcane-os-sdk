@@ -1116,6 +1116,17 @@ prepared playback without invoking `finishTTS()` or `streamTTS()`. Unmuted
 completion keeps its ordinary speech flush. Explicit calls to either public
 speech method retain their existing behavior.
 
+For a text-only request, pass `speech:false` to the object-form
+`ai.streamRequest({messages, speech:false, onChunk, signal})`. Its completion,
+failure, and cancellation leave buffered speech, prepared playback, and native
+playback alone. The option controls only the request's automatic speech
+finalization and stopping; it is not sent to the language provider and does not
+mute or unload TTS. Explicit speech calls made by your callbacks still run with
+their ordinary behavior. Omitted `speech` or `speech:true` preserves the
+automatic lifecycle above, and positional `streamMessage(...)` is unchanged.
+Explicit `streamTTS()`, `finishTTS()`, and global `stopAudio()` keep their existing
+scope.
+
 ## Automatic speech-input formatting cleanup
 
 The shared streaming, audio-file, and `SpeechPlayback` paths remove repeated

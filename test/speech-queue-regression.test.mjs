@@ -27,7 +27,7 @@ test(
         // results and a simulated Web Audio clock. It does not generate speech,
         // decode a real recording, or establish audible behavior in a consumer.
         const previousGlobals=new Map(
-            ['window','document','localStorage','user'].map(function readGlobal(key){
+            ['window','document','localStorage','user','fetch'].map(function readGlobal(key){
                 return [key,Object.getOwnPropertyDescriptor(globalThis,key)];
             })
         );
@@ -373,6 +373,214 @@ test(
                 assert.equal(requests.length,dispatchedBeforeStop);
                 assert.equal(ai.speechJobs.length,0);
                 assert.equal(ai.audioMessageChunks,'');
+            }
+        );
+
+        await t.test(
+            'Explicit text-only streams preserve sibling audio on completion, failure and cancellation',
+            async function testTextOnlySpeechLifecycle(){
+                const runtime=ai.providerRuntime;
+                const selectionMethod=runtime.selection;
+                const requestMethod=runtime.request;
+                const finishMethod=ai.finishTTS;
+                const stopMethod=ai.stopAudio;
+                const streamSpeechMethod=ai.streamTTS;
+                const languageSelection={
+                    providerId:'text-only-fixture',
+                    modelId:'cosmic-teacup',
+                    localOnly:true
+                };
+                const chunk={choices:[{index:0,delta:{
+                    reasoning_content:'Count the teacups privately.',
+                    content:'Every cosmic teacup returned.'
+                }}]};
+                const completion={choices:[{index:0,message:{
+                    role:'assistant',
+                    reasoning_content:'Count the teacups privately.',
+                    content:'Every cosmic teacup returned.'
+                },finish_reason:'stop'}]};
+                const messages=[{role:'user',content:'  Return every cosmic teacup.\n'}];
+                const failure=new Error('Synthetic language stream failure.');
+                const transmitted=[];
+                const explicitSpeech=[];
+                let route='builtin';
+                let scenario='complete';
+                let finishes=0;
+                let stops=0;
+                let nativeStops=0;
+                let readerReleases=0;
+                let providerCancellations=0;
+                ai.llmService='TWIN';
+                ai.model=languageSelection.modelId;
+                ai.license='synthetic-test-credential';
+                runtime.selection=function selectLanguageFixture(role,options){
+                    return role==='llm'
+                        ?route==='provider'?languageSelection:null
+                        :selectionMethod.call(this,role,options);
+                };
+                runtime.request=async function requestLanguageFixture(role,request){
+                    assert.equal(role,'llm');
+                    assert.equal(request.operation,'stream');
+                    transmitted.push(request.payload);
+                    let emitted=false;
+                    return {
+                        result:Promise.resolve(completion),
+                        async next(){
+                            if(scenario==='stream-error')throw failure;
+                            if(emitted)return {done:true};
+                            emitted=true;
+                            return {done:false,value:chunk};
+                        },
+                        async return(){return {done:true};},
+                        async cancel(){providerCancellations+=1;return true;},
+                        [Symbol.asyncIterator](){return this;}
+                    };
+                };
+                globalThis.fetch=async function fetchLanguageFixture(url,options){
+                    transmitted.push(JSON.parse(options.body));
+                    let emitted=false;
+                    return {ok:true,body:{getReader(){return {
+                        async read(){
+                            if(scenario==='stream-error')throw failure;
+                            if(emitted)return {done:true};
+                            emitted=true;
+                            return {done:false,value:new TextEncoder().encode(
+                                `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`
+                            )};
+                        },
+                        async cancel(){},
+                        releaseLock(){readerReleases+=1;}
+                    };}}};
+                };
+                ai.finishTTS=function observeAutomaticSpeechFinish(){
+                    finishes+=1;
+                    return Promise.resolve(true);
+                };
+                ai.stopAudio=function observeGlobalAudioStop(){
+                    stops+=1;
+                    return stopMethod.call(this);
+                };
+                ai.streamTTS=function observeExplicitCallbackSpeech(text){
+                    explicitSpeech.push(text);
+                    return Promise.resolve(true);
+                };
+                try{
+                    for(route of ['builtin','provider']){
+                        for(const muted of [true,false]){
+                            for(scenario of ['complete','stream-error','callback-error','cancel','pre-cancel']){
+                                const controller=new AbortController();
+                                const sibling={
+                                    generation:ai.speechGeneration,
+                                    state:'queued',
+                                    abortController:new AbortController(),
+                                    nativeControl:{stop(){nativeStops+=1;}}
+                                };
+                                const generation=ai.speechGeneration;
+                                const visible=[];
+                                const reasoning=[];
+                                const responses=[];
+                                const stopsBefore=stops;
+                                const finishesBefore=finishes;
+                                const nativeStopsBefore=nativeStops;
+                                const readerReleasesBefore=readerReleases;
+                                const providerCancellationsBefore=providerCancellations;
+                                const transmissionsBefore=transmitted.length;
+                                ai.muted=muted;
+                                ai.audioMessageChunks='Preserve the unrelated narrated tail.';
+                                ai.speechJobs.push(sibling);
+                                if(scenario==='pre-cancel')controller.abort('Cancel before dispatch.');
+                                const result=ai.streamRequest({
+                                    messages,
+                                    speech:false,
+                                    seeThinking:true,
+                                    signal:controller.signal,
+                                    onChunk(text,id,thinking){
+                                        if(thinking){reasoning.push(text);return;}
+                                        visible.push(text);
+                                        if(scenario==='cancel')controller.abort('Retire only the text request.');
+                                    },
+                                    onDataResult(value){responses.push(value);},
+                                    onComplete(){if(scenario==='callback-error')throw failure;}
+                                });
+                                if(scenario==='complete'){
+                                    assert.equal(await result,completion.choices[0].message.content);
+                                    assert.deepEqual(visible,[completion.choices[0].message.content]);
+                                    assert.ok(reasoning.includes(completion.choices[0].message.reasoning_content));
+                                    assert.equal(responses[0].choices[0].message.content,completion.choices[0].message.content);
+                                    assert.equal(responses[0].choices[0].message.reasoning_content,completion.choices[0].message.reasoning_content);
+                                }else{
+                                    await assert.rejects(result,function preserveLanguageFailure(error){
+                                        if(['cancel','pre-cancel'].includes(scenario))assert.equal(error.code,'ARCANE_AI_REQUEST_ABORTED');
+                                        else assert.equal(error,failure);
+                                        return true;
+                                    });
+                                }
+                                assert.equal(finishes,finishesBefore);
+                                assert.equal(stops,stopsBefore);
+                                assert.equal(nativeStops,nativeStopsBefore);
+                                assert.equal(ai.speechGeneration,generation);
+                                assert.equal(ai.audioMessageChunks,'Preserve the unrelated narrated tail.');
+                                assert.equal(ai.speechJobs.includes(sibling),true);
+                                assert.equal(sibling.abortController.signal.aborted,false);
+                                assert.equal(sibling.state,'queued');
+                                if(route==='builtin'){
+                                    assert.equal(readerReleases,readerReleasesBefore+(scenario==='pre-cancel'?0:1));
+                                }
+                                if(route==='provider'&&!['complete','pre-cancel'].includes(scenario)){
+                                    assert.equal(providerCancellations,providerCancellationsBefore+1);
+                                }
+                                if(scenario==='pre-cancel'){
+                                    assert.equal(transmitted.length,transmissionsBefore);
+                                }else{
+                                    assert.deepEqual(transmitted.at(-1).messages,messages);
+                                    assert.equal(Object.hasOwn(transmitted.at(-1),'speech'),false);
+                                }
+                                ai.speechJobs.splice(ai.speechJobs.indexOf(sibling),1);
+                                ai.audioMessageChunks='';
+                            }
+                        }
+                        ai.muted=false;
+                        scenario='complete';
+                        for(const options of [{},{speech:true}]){
+                            const before=finishes;
+                            await ai.streamRequest({messages,...options});
+                            assert.equal(finishes,before+1);
+                        }
+                        let before=finishes;
+                        await ai.streamMessage(messages);
+                        assert.equal(finishes,before+1);
+                        await ai.streamRequest({
+                            messages,speech:false,
+                            onChunk(text,id,thinking){if(!thinking)return ai.streamTTS(text);}
+                        });
+                        assert.equal(explicitSpeech.at(-1),completion.choices[0].message.content);
+                        assert.equal(finishes,before+1);
+                        scenario='stream-error';
+                        for(const options of [{},{speech:true}]){
+                            before=stops;
+                            await assert.rejects(ai.streamRequest({messages,...options}),function exactFailure(error){return error===failure;});
+                            assert.equal(stops,before+1);
+                        }
+                        before=stops;
+                        await assert.rejects(ai.streamMessage(messages),function exactPositionalFailure(error){return error===failure;});
+                        assert.equal(stops,before+1);
+                    }
+                    const transmissionsBefore=transmitted.length;
+                    const stopsBefore=stops;
+                    await assert.rejects(ai.streamRequest({messages,speech:null}),{
+                        name:'TypeError',message:'AI speech must be a boolean.'
+                    });
+                    assert.equal(transmitted.length,transmissionsBefore);
+                    assert.equal(stops,stopsBefore);
+                }finally{
+                    runtime.selection=selectionMethod;
+                    runtime.request=requestMethod;
+                    ai.finishTTS=finishMethod;
+                    ai.stopAudio=stopMethod;
+                    ai.streamTTS=streamSpeechMethod;
+                    ai.muted=false;
+                    stopMethod.call(ai);
+                }
             }
         );
     }
