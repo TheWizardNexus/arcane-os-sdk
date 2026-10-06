@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native application control</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-application-control">Native application control</h1><p class="doc-lead">connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.</p><div class="doc-meta"><span>SDK 0.82.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native application control</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-application-control">Native application control</h1><p class="doc-lead">connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.</p><div class="doc-meta"><span>SDK 0.83.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="./" aria-current="page">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/native-app-control.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#cli">CLI</a></nav></details><p><code>connectAppControl</code> from <code>arcane-os/core/app-control</code> connects to one explicitly
@@ -91,7 +91,7 @@ connection or other business result.</p>
 </tr>
 <tr>
 <td><code>inspect(parameters={}, options?)</code></td>
-<td>Optional CSS <code>selector</code> selects zero or more roots; omission selects the document. Optional <code>documentGeneration</code> selects the expected document. Returns complete HTML/text, live control state and DOM-derived role/name hints.</td>
+<td>Optional <code>shadowPath</code> selects an open shadow root. Optional CSS <code>selector</code> selects zero or more elements within the selected root; omission selects the whole root. Optional <code>documentGeneration</code> selects the expected document. Returns complete HTML/text, live control state and DOM-derived role/name hints.</td>
 </tr>
 <tr>
 <td><code>capture(parameters={}, options?)</code></td>
@@ -99,7 +99,7 @@ connection or other business result.</p>
 </tr>
 <tr>
 <td><code>act(parameters, options?)</code></td>
-<td>Requires <code>documentGeneration</code>, one unambiguous CSS <code>selector</code>, and the action fields below.</td>
+<td>Requires <code>documentGeneration</code>, one unambiguous CSS <code>selector</code> within the root selected by optional <code>shadowPath</code>, and the action fields below.</td>
 </tr>
 <tr>
 <td><code>close()</code></td>
@@ -122,18 +122,65 @@ script or capture has been dispatched, cancellation cannot reverse its effects;
 the host still observes its completion. A disconnected caller&#39;s completed result
 is retained in the host diagnostics instead of being represented as delivered.</p>
 <h2 id="document-operations">Document operations</h2>
-<p>Inspection covers the top-level light DOM. Its result contains <code>scope</code>, <code>title</code>,
+<p>Inspection defaults to the top-level light DOM. Its result contains <code>scope</code>, <code>title</code>,
 <code>readyState</code>, <code>doctype</code>, <code>roots</code>, <code>controls</code>, <code>frames</code>, <code>shadowHosts</code>,
 <code>activeElement</code>, <code>scrollingElement</code>, <code>selection</code>, <code>documentGeneration</code>, and
 <code>url</code>. Each root retains its complete <code>html</code> and <code>text</code>; controls retain their
 attributes and current form, selection, disabled, scrolling and related state.
 Generated CSS selectors are useful for the inspected document; a later DOM edit
 can change their meaning. Application-authored stable selectors are preferable
-when available.</p>
+when available. Component replacement or mutation can make a selector stale
+without changing the native document generation.</p>
+<h3 id="open-shadow-roots">Open shadow roots</h3>
+<p><code>inspect</code> and <code>act</code> accept <code>shadowPath</code>, an ordered array of CSS host selectors.
+The first selector resolves inside the top-level document; each later selector
+resolves inside the preceding host&#39;s open shadow root. Every host selector must
+match exactly one element. The operation&#39;s <code>selector</code> then resolves only inside
+the final root. An omitted or empty <code>shadowPath</code> retains the ordinary light-DOM
+scope. Selecting a root never recursively enters its nested shadow roots.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const shadowPath = [&#39;#appearance-panel&#39;, &#39;theme-switcher&#39;];
+const panel = await app.inspect({shadowPath});
+await app.act({
+    documentGeneration: panel.documentGeneration,
+    shadowPath,
+    selector: &#39;button[data-theme=&quot;dark&quot;]&#39;,
+    action: &#39;click&#39;
+});
+</code></pre></div>
+<p>Shadow inspection returns <code>scope:&#39;open-shadow-root&#39;</code> and the selected
+<code>shadowPath</code>. Its element selectors are local to that root. With no <code>selector</code>,
+<code>roots</code> contains one complete root record with <code>selector:null</code>, its full
+<code>innerHTML</code> as <code>html</code>, its full <code>textContent</code> as <code>text</code>, and <code>state:null</code>; a
+ShadowRoot itself is not an element or an action target. With a selector, roots
+retain their element HTML and state. Controls, frames and open-shadow hosts are
+described within this selected tree. Each <code>shadowHosts</code> descriptor retains its
+local <code>selector</code> and <code>mode</code>, and adds the full <code>shadowPath</code> needed to inspect
+that host&#39;s shadow root, including nested hosts. Pass that path to the next
+inspection; pair selectors from its result with that same path for actions.</p>
+<p><code>activeElement</code> comes from the selected root. <code>scrollingElement</code> is <code>null</code> for a
+shadow-root scope because the root has no document scrolling element; scroll
+actions still target elements. <code>selection.text</code>, <code>title</code>, <code>readyState</code>, <code>doctype</code>
+and native URL/generation remain document-level information. Role/name label
+references resolve within the element&#39;s own tree. Inspection follows the DOM
+tree, not the composed rendering tree: slot-assigned light-DOM nodes remain in
+their own containing DOM tree and are not duplicated inside the selected shadow
+root.</p>
+<p>A missing or ambiguous host produces document error <code>ARCANE_APP_CONTROL_TARGET_COUNT</code>
+with the complete path, zero-based <code>index</code>, <code>selector</code> and match count. Invalid
+path or CSS input reports its actual error before any action. A host without an
+accessible open root produces document error <code>ARCANE_APP_CONTROL_UNSUPPORTED</code>
+with the path and failing step. The Windows client rejects these document failures
+with top-level <code>error.code === &#39;ARCANE_APP_CONTROL_FAILED&#39;</code>; the original document
+error, including its <code>code</code> and <code>details</code>, is available at
+<code>error.data.find(entry =&gt; entry.key === &#39;documentError&#39;).value</code>.
+Closed roots cannot be discovered, entered, or distinguished from
+absent roots through this API. No closed-root interception is installed.
+Shadow actions add the selected <code>shadowPath</code> to their result and retain the
+actual target state after dispatch, including disconnection by the action.</p>
 <p>Role/name hints are derived from DOM attributes and labels, not a native
-accessibility-tree computation. Frame documents and shadow-root contents are
-outside this selector scope. Frame elements and open-shadow hosts are described;
-closed shadow roots cannot be discovered. Capture is the current rendered
+accessibility-tree computation. Frame documents and unselected shadow-root
+contents are outside the selected scope. Frame elements and open-shadow hosts
+are described; closed shadow roots cannot be discovered. Capture is the current rendered
 viewport, not an offscreen full-document rendering. Covered and minimized-window
 capture behavior requires execution evidence in the selected environment.</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
@@ -174,12 +221,17 @@ markers are transient document lifecycle state and are not written to saved data
 <h2 id="cli">CLI</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>powershell</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-powershell">arcane app-control status --endpoint &#39;\\.\pipe\arcane-pm-control&#39;
 arcane app-control inspect --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --selector &#39;#pm-content&#39;
+arcane app-control inspect --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\inspection.json&#39;
 arcane app-control capture --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --output &#39;.arcane\view.png&#39;
 arcane app-control act --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\action.json&#39;
 </code></pre></div>
 <p>The action file is the complete action parameter object, including the actual
-<code>documentGeneration</code> returned by the preceding status or inspection. The CLI
-reads that file completely. Paths are relative to the current directory. Capture
+<code>documentGeneration</code> returned by the preceding status or inspection. Inspection
+also accepts <code>--request</code> for a complete parameter object, such as
+<code>{&quot;shadowPath&quot;:[&quot;#appearance-panel&quot;,&quot;theme-switcher&quot;]}</code> or the same object with
+<code>selector</code> and <code>documentGeneration</code>. Inspection&#39;s <code>--request</code> and <code>--selector</code>
+options are mutually exclusive. The CLI reads the selected file completely.
+Paths are relative to the current directory. Capture
 writes the PNG to the explicitly selected file and prints its metadata. The other
 operations print complete JSON. <code>app-control --help</code> describes this command&#39;s
 options; other Arcane commands retain their existing global output-format option.</p>
@@ -191,6 +243,6 @@ independent controller process running.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#cli">CLI</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.82.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.83.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
