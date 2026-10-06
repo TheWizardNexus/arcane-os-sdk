@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.58.0
+
+- Add native ONNX sessions through `arcane-os/local-ai/onnx` and browser Core
+  access through `arcane-os/ai/core-onnx`. Explicit runtime selection uses the
+  upstream Node runtime distribution, retained per-session workers, complete
+  tensor transport, authoritative loaded state and owned cancellation/exit.
+  Apps select their graphs, feeds and processing; no model is chosen or fetched.
+- Add native Nemotron diarization runtime preparation, helper build and Core
+  integration. Preserve complete framed input/output, independent streams,
+  cancellation and process drain. Runtime/model selection remains explicit.
+- Add the reusable Core preferences service and Git text snapshots, preserving
+  complete caller data and existing application-owned storage and repository
+  choices. Extend raw process I/O without changing existing UTF-8 defaults.
+- Add shared WebKit document lifecycle and macOS native host composition source,
+  portable target contracts, and explicit packaged HTTP serving through the
+  existing HTTP server. Default HTTPS and ordinary browser behavior remain.
+  macOS executable build and platform acceptance remain separately pending.
+- No automatic runtime/model installation, application default switch or saved
+  data migration is introduced. Native host archive delivery is separate from
+  npm publication; this release does not claim an available Windows/Mac archive.
+
 ## 0.57.0
 
 - Add local model chat through explicit llama.cpp/Ollama runtime requirements,
