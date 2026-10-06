@@ -130,7 +130,7 @@ prepared descriptor returned by `ensureLocalAIRuntimes`; alternatively,
 
 | Member | Contract |
 | --- | --- |
-| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, active `requestId` or null, requested/observed backend, evidence and any error. |
+| `current()` | Returns `providerId`, selected `modelId`, lifecycle `state`, `loaded`, `busy`, correlated `requestId` or null, requested/observed backend, evidence and any error. |
 | `subscribe(listener, {replay = true, signal} = {})` | Immediately replays current state by default and returns an unsubscribe function. |
 | `load({modelId, signal} = {})` | Prepares the runtime if necessary, then waits for actual native model readiness. With no selected model it remains unloaded. |
 | `transcribe(request, {signal, onProgress, requestId} = {})` | Consumes the complete `audioBase64` recording. Optional `language` defaults to native automatic detection; `translate: true` selects Whisper's translation operation. `model` must match the loaded model. Optional `requestId` carries the caller's existing operation identity through lifecycle snapshots as separate control information; it does not alter the recording or request payload. |
@@ -149,6 +149,10 @@ seconds and are native segment timestamps, not invented word timestamps.
 Full process diagnostics stay with `onEvent` and native process failures.
 Applications should use their selected inspection surface for those details
 and keep ordinary user status concise.
+An error snapshot retains the failed operation's `requestId` after `busy`
+becomes false, allowing the caller to correlate its actual pending response.
+A new request or model load supersedes that identity; unload and close clear
+it. No recording or request payload is retained by this correlation field.
 Progress callbacks may cancel through the supplied controller and return;
 they must not await the same transcription or its shutdown from inside its
 own output callback. Await those operations in the initiating owner instead.

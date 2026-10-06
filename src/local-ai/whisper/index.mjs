@@ -23,6 +23,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
     let loading = null;
     let loadController = null;
     let active = null;
+    let requestId = null;
     let unloading = null;
     let closing = null;
     let disposed = false;
@@ -32,7 +33,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         return {
             providerId: 'whisper.cpp', modelId: selected, state,
             loaded: state === 'ready', busy: active !== null,
-            requestId: active?.requestId ?? null,
+            requestId,
             requestedBackend: helper?.variant.backend ?? runtime?.backend ?? 'auto',
             observedBackend: helper?.metadata?.observedBackend ?? null,
             backendEvidence: helper?.metadata?.backendEvidence ?? null,
@@ -199,6 +200,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         }
         if (active) return Promise.reject(whisperError('WHISPER_BUSY', 'The selected model belongs to an active transcription.'));
         selected = requested;
+        requestId = null;
         error = null;
         state = 'loading';
         loadController = new AbortController();
@@ -266,14 +268,15 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         return runtime.variants.find(function preparedCPU(variant) { return variant.backend === 'cpu'; }) ?? null;
     }
 
-    function transcribe(request, {signal, onProgress, requestId} = {}) {
+    function transcribe(request, {signal, onProgress, requestId: suppliedRequestId} = {}) {
         signal?.throwIfAborted();
         if (closing || disposed || unloading) return Promise.reject(whisperError('WHISPER_CLOSING', 'Whisper is closing.'));
         if (active) return Promise.reject(whisperError('WHISPER_BUSY', 'The selected Whisper model is transcribing another recording.'));
         if (!is.string(request?.audioBase64)) throw new TypeError('Transcription requires the complete audioBase64 recording.');
         const controller = new AbortController();
         const operationSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-        const operation = {controller, signal: operationSignal, requestId, session: null, canRecover: false, task: null};
+        const operation = {controller, signal: operationSignal, session: null, canRecover: false, task: null};
+        requestId = suppliedRequestId ?? null;
         active = operation;
         operation.task = Promise.resolve().then(async function transcribeRecording() {
             operationSignal.throwIfAborted();
@@ -366,6 +369,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
             throw failure;
         }).finally(function transcriptionSettled() {
             active = null;
+            if (state !== 'error') requestId = null;
             publish();
         });
         operation.task.catch(function observeTranscription() {});
@@ -409,6 +413,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
         if (unloading) return unloading;
         if (disposed) return Promise.resolve(current());
         state = 'unloading';
+        requestId = null;
         unloading = Promise.resolve().then(async function unloadModel() {
             await Promise.allSettled([loading, active?.task].filter(Boolean));
             const session = helper;
@@ -430,6 +435,7 @@ export function createWhisperRuntime({runtime, prepare, modelId, temporaryDirect
 
     function close() {
         if (closing) return closing;
+        requestId = null;
         closing = Promise.resolve().then(async function closeWhisper() {
             try { await unload(); }
             finally {
