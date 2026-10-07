@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.88.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.89.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -3511,7 +3511,7 @@ applications using <a href="../protocols/#installed-package-browser-routes">inst
 read directly from their installed dependency and do not need to call it or
 create <code>arcane.lock.json</code> before serving, refreshing app import maps, or packaging.</p>
 <h4 id="signature-and-result-22">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,browserDecisions=false,workspaceOperationLease,signal,onEvent}={})
 </code></pre></div>
 <p>Import it through the exact dependency key declared by the workspace: normally
 <code>arcane-os</code>, or the alias name such as <code>arcane-sdk</code> when the declaration is
@@ -3520,6 +3520,15 @@ workspace-operation lock and replaces the complete projection by staged
 whole-tree replacement. The mutable result includes the installed-package
 location, materialized workspace runtime paths, and <code>workspaceLock</code> path and
 document. It does not install dependencies or merge application source.</p>
+<p>Explicit <code>browserDecisions: true</code> also acquires the bundled Transformers.js
+4.3.0 entry and matching ONNX Runtime 1.31.0-dev.20260914-8d85527a0 asyncify
+module/WASM and license files from their upstream distributions into
+<code>arcane/sdk/ai/decisions-runtime/</code>. It returns their <code>directory</code>,
+<code>transformersVersion</code>, <code>onnxRuntimeVersion</code> and <code>files</code> under
+<code>workspaceRuntime.browserDecisions</code>. The default <code>false</code> performs no optional
+acquisition. Select this option on each refresh that should retain those files.
+The <a href="../ai/browser-decisions/#extension-local-executables-manifest-v3">extension-local decision guide</a>
+describes <code>runtime.local: true</code>, complete resource ownership and MV3 usage.</p>
 <p>Ordinary acquisition automatically recovers a workspace-operation lock when
 the recorded owner process is confirmed absent, without waiting solely for its
 six-hour expiry. Retry this public operation normally; <code>workspaceOperationLease</code>
@@ -3550,11 +3559,21 @@ const result=await materializeInstalledSdkRuntime({workspaceRoot});
 from selected source roots. It does not resolve a package declaration or write
 the installed-package lock document owned by <code>materializeInstalledSdkRuntime()</code>.</p>
 <h4 id="signature-and-result-23">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), &#39;runtime&#39;),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),signal,onEvent}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), &#39;runtime&#39;),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),sdkVersion=SDK_VERSION,browserDecisions=false,signal,onEvent}={})
 </code></pre></div>
 <p>The operation stages the complete projection, replaces the prior tree at the
 commit boundary, restores it if commit fails, and removes paths absent from the
 selected sources.</p>
+<p><code>browserDecisions: true</code> acquires the same upstream executable closure described
+by <code>materializeInstalledSdkRuntime()</code> before replacement. Its result is at
+<code>result.browserDecisions</code> because this lower-level operation returns the
+workspace runtime directly. Full downloaded content remains unchanged; model
+and tokenizer data are not materialized. <code>workspace.decisions.started</code> and
+<code>workspace.decisions.progress</code> report completed files and the fixed total.
+Cancellation, HTTP failures and throwing/rejecting observers abort and join
+pending acquisitions before returning; the prior runtime remains in place.
+An HTTP failure retains its complete response in <code>error.response</code>, or in the
+corresponding member of <code>AggregateError.errors</code> when several operations fail.</p>
 <h4 id="availability-and-normalization-38">Availability and normalization</h4>
 <p><strong>Node.</strong> Complete workspace runtime content and a mutable materialization result. Deep protocol: <a href="../protocols/#installed-sdk-runtime-materialization">Installed SDK runtime materialization</a>.</p>
 <h4 id="example-38">Example</h4>
@@ -6957,6 +6976,20 @@ interruption belongs to the registered service and engine; this facade supplies
 no engine. The native routes of <code>AI.fetchTTS(payload, signal)</code> and
 <code>AI.fetchSTT(audio, signal)</code> forward their signals through these calls and
 normalize cancellation to <code>AbortError</code> with <code>ARCANE_AI_REQUEST_ABORTED</code>.</p>
+<p><code>facade.window.state({signal}?)</code> reads the calling document&#39;s native window;
+<code>facade.window.setState({state}, {signal}?)</code> selects <code>normal</code>, <code>maximized</code> or
+<code>fullscreen</code> for that same window. The matching Windows host returns
+<code>{platform:&#39;windows&#39;, supported:true, state}</code>, with observed <code>state</code> also able
+to be <code>minimized</code>. Fullscreen removes the frame and fills the selected monitor;
+leaving it restores the preceding normal bounds and frame controls before any
+requested maximization. Visible state transitions prevent activation/focus
+assignment to the requesting window without changing TopMost, Core, origin or
+profile. Optional <code>native.window.state</code> selects startup state after initial
+sizing; omission preserves host behavior. Saved Settings remain application-owned.
+Cancellation does not undo an already-applied change. Other hosts retain their
+actual unavailable-method/transport errors; the facade provides no fallback.
+See <a href="../core-client/#current-window-state">current-window state</a> for complete
+native errors, partial-state evidence, navigation and cleanup ownership.</p>
 <p><code>facade.window.setTheme(presentation, {signal}?)</code> forwards the complete
 presentation to the current native window, independently of OS-user appearance.
 Optional <code>backgroundColor</code> and <code>textColor</code> accept <code>{red,green,blue,alpha}</code> or
@@ -7443,17 +7476,29 @@ reports <code>ARCANE_NATIVE_RUN_UNSUPPORTED</code>.</p>
 published SDK/runtime dependencies and the canonical Core entry/client into a
 fresh output directory. Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.</p>
+<p>The generated <code>runtime/arcane-core.mjs</code> also accepts
+<code>--arcane-app-entry &lt;app-relative-module&gt;</code> through the host&#39;s supported Node
+executable; the portable provider supplies no executable. Include that module
+and its complete source closure through <code>package.nativeResources</code>. The flag
+imports it from the packaged <code>app/</code> directory, preserves complete <code>process.argv</code>,
+and runs its top-level work rather than invoking an export or making it
+<code>import.meta.main</code>. The entry owns explicit launch-context reads, services,
+signals and shutdown; ordinary Core startup is skipped only in this mode.
+See <a href="../core-native-packaging/#app-owned-runtime-entry">app-owned runtime entry</a>
+and <a href="../mcp-stdio/#launch-from-a-native-package">packaged MCP commands and lifetime</a>.</p>
 <p>Explicit <code>native.launchContext.coreListener:{endpoint}</code> also composes one passive
 model observation service after <code>startCoreHost()</code> and before listener binding,
 using that runtime and existing services exposing <code>localai.status</code>, <code>image.status</code>
 and <code>decisions.status</code>. Missing owners remain <code>null</code>; renderer attachment stays
 application-owned. Ordinary stdio and shared/headless branches gain no model
 startup or readiness barrier. See <a href="../core-native-packaging/#launch-time-locations">native observation composition</a>.</p>
-<p>An optional <code>appDescriptor.native.window</code> record carries <code>width</code>, <code>height</code> and
-<code>resizable</code> into <code>manifest.window</code>. Dimensions are positive integral logical
-client units; <code>resizable</code> is an optional boolean. Omitted fields remain omitted.
-The portable payload records the selection; the selected platform host owns
-its window behavior. See <a href="../core-native-packaging/#initial-native-window-size">initial native window size</a>.</p>
+<p>An optional <code>appDescriptor.native.window</code> record carries <code>width</code>, <code>height</code>,
+<code>resizable</code> and <code>state</code> into <code>manifest.window</code>. Dimensions are positive integral
+logical client units; <code>resizable</code> is an optional boolean, and <code>state</code> selects
+<code>normal</code>, <code>maximized</code> or <code>fullscreen</code>. Omitted fields remain omitted. The portable
+payload records the selection; the matching Windows host applies it, while
+current other-platform hosts retain their existing window behavior. See
+<a href="../core-native-packaging/#initial-native-window-size">initial native window size and state</a>.</p>
 <h4 id="availability-and-normalization-190">Availability and normalization</h4>
 <p><strong>Node; produces a portable payload rather than an executable host.</strong> Existing
 outputs remain untouched, cancellation removes only the incomplete new output,
@@ -7533,11 +7578,24 @@ application builds. The build machine needs its normal Node/npm toolchain and
 <code>manifest.window</code>. Optional <code>width</code> and <code>height</code> select initial client dimensions
 in 96-DPI logical units; the host scales them for its actual DPI and fits the
 outer window within the current screen&#39;s usable area. Optional <code>resizable:false</code>
-selects a fixed-size border and disables maximizing. Omitted fields preserve
-the existing host defaults. Initial sizing preserves a window already restored
-to a non-normal state and does not add saved-bounds storage. The initial-fit
-logic is not reapplied during later user resizing. See <a href="../core-native-packaging/#initial-native-window-size">initial native window size</a>
-for a complete descriptor example and the other-platform boundary.</p>
+selects a fixed-size border and disables the maximize control. Optional <code>state</code>
+selects <code>normal</code>, <code>maximized</code> or <code>fullscreen</code>; the host applies an explicit state
+after its initial sizing pass and before the composing launcher&#39;s <code>Load</code> handler.
+Initial sizing runs only for a Normal window. Omitted fields preserve existing
+host choices, including the current state when <code>state</code> is omitted. Fullscreen
+retains normal bounds and frame controls for restoration. No saved-bounds store
+is added, and initial-fit logic is not reapplied during later user resizing.
+See <a href="../core-native-packaging/#initial-native-window-size">initial native window size and state</a>
+for the complete descriptor and unchanged other-platform behavior.</p>
+<p>The packaged <code>runtime/ArcaneCore.exe</code> also accepts
+<code>--arcane-app-entry &lt;app-relative-module&gt;</code> directly, without a script argument
+or the GUI launcher. Include the entry and complete source closure through
+<code>package.nativeResources</code>. It imports the selected packaged <code>app/</code> module with
+complete <code>process.argv</code> unchanged, running top-level work without invoking an
+export or making it <code>import.meta.main</code>. The entry owns explicit launch-context
+reads, services, signals and shutdown; this mode skips ordinary Core startup,
+while omission retains it. See <a href="../core-native-packaging/#app-owned-runtime-entry">app-owned runtime entry</a>
+and <a href="../mcp-stdio/#launch-from-a-native-package">packaged MCP commands and lifetime</a>.</p>
 <p>The returned <code>arcane-native-builder/1</code> provider exposes <code>describe</code>, <code>doctor</code>,
 <code>prepare</code>, <code>build</code>, <code>verify</code> and <code>run</code>. Build returns <code>{app,target,manifest}</code>
 with the actual directory at <code>target.rootDir</code>. Verification reads the artifact;
@@ -7815,7 +7873,7 @@ const {repositoriesRoot} = resolveArcaneDataPaths();
 <p>Owns one native connected working checkout under <code>ArcaneData/Repos/&lt;name&gt;</code> or an
 explicit existing path. The application owns the remote, branch and Core API.</p>
 <h4 id="signature-and-result-121">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run=runProcess}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
 </code></pre></div>
 <p>Returns <code>{directory,open,status,configuration,pull,push,write,close,drain,dispose}</code>. Construction does
 no I/O. Preparing operations accept <code>{signal}</code>; a missing or empty destination clones once,
@@ -7831,6 +7889,15 @@ configuration. Existing repositories and non-Windows clone commands remain
 unchanged; no global setting or data migration is performed. Git&#39;s ordinary
 configuration precedence, hooks and single-clone lifecycle remain in effect.
 See <a href="../core-repositories/#windows-long-paths-for-a-new-checkout">Windows long paths</a>.</p>
+<p>Optional <code>cloneIdentity:{name?,email?}</code> captures exact author strings and saves
+only supplied fields in a newly created checkout through Git&#39;s <code>clone --config</code>
+before its first checkout, on every supported platform. Empty strings are
+explicit values; omitted or <code>undefined</code> fields preserve inherited and template
+configuration. Existing repositories are never reconfigured. Unrepresentable
+process arguments fail without changing the supplied text. This option changes
+no global configuration, credentials, remote or branch, and does not identify
+the authenticated account. Command-local <code>gitIdentity</code> remains independent.
+See <a href="../core-repositories/#clone-local-author-selection">clone-local author selection</a>.</p>
 <p>Optional <code>gitIdentity:{name?,email?,username?}</code> captures explicit non-secret
 settings for child Git operations without writing global/local configuration.
 Selected author fields override inherited child author/committer fields;
@@ -7904,14 +7971,15 @@ per-process selection example</a>.</p>
 <p>Creates a browser-safe llama.cpp LLM provider through an existing Core client.
 Construction selects no model and installs no runtime or transport.</p>
 <h4 id="signature-and-result-123">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createCoreLocalAIProvider({client,id=&#39;llama.cpp&#39;}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createCoreLocalAIProvider({client,id=&#39;llama.cpp&#39;,prepareModel}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/ai/core-local</code>. The provider implements
 <code>arcane-ai-provider/2</code> and exposes <code>catalog</code>, <code>status</code>, <code>inspect</code>, <code>load</code>,
 <code>request</code>, <code>unload</code> and <code>dispose</code>. Register it with the shared AI provider runtime,
 select the exact provider/model with <code>localOnly:true</code>, and load that selection.
-Requests wait for the requested model&#39;s actual readiness, preserve complete
-payloads and parsed streaming chunks, and cancel on observed readiness loss.
+<code>load()</code> waits for the selected model&#39;s actual readiness; inference requests
+require that load to have completed successfully. Requests preserve complete
+payloads and parsed streaming chunks and cancel on observed readiness loss.
 Missing Core reports unavailability; it does not choose a browser or cloud route.
 Dispose/unregister at the caller&#39;s owning lifecycle boundary.</p>
 <p>Omitted <code>client</code> follows late installation, replacement and retirement through
@@ -7923,6 +7991,16 @@ Disposal releases only an actually retained selection through its captured
 client, so never-loaded and already-unloaded providers send no native unload.
 The provider/2 runtime reconciles status at its operation boundaries; this
 does not add an idle role-state subscription.</p>
+<p>Optional <code>prepareModel({selection,signal,progress})</code> runs at actual load and
+returns <code>{assetProjectionId,resourcePaths,executionTarget,release?}</code>. Direct
+<code>load</code> fields with those names override preparation when defined; an explicit
+<code>executionTarget:null</code> requests the runtime default. Preparation release is
+awaited after native load settles, including failure, cancellation and late
+preparation results. The current successfully completed load owns readiness
+and inference; a failed replacement cannot reuse an older model&#39;s ready state.
+Native cleanup owns the last dispatched selection, while preparation alone
+creates no native unload obligation. <code>status().execution</code> forwards native
+execution diagnostics, including configured and observed targets separately.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createCoreLocalAIProvider} from &#39;arcane-os/ai/core-local&#39;;
 import {getAIProviderRuntime} from &#39;arcane-os/ai-provider-runtime&#39;;
 
@@ -7937,7 +8015,7 @@ selection, streaming, cancellation and primary-model reload behavior.</p>
 service. Runtime installation, process availability and model readiness remain
 separate states; prompts, models and application policy remain caller-owned.</p>
 <h4 id="signature-and-result-124">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/core/local-ai</code>. <code>configuration</code> is the authored local-AI
 record; <code>appRoot</code> resolves its relative model paths and <code>runtimes</code> supplies
@@ -7965,6 +8043,18 @@ Explicit load retains startup and exact catalog-membership checks.
 <code>llama.chunk</code> and <code>ollama.chunk</code>
 carry original parsed chunks with <code>streamId</code>; terminal responses remain complete.
 There is no background health polling or implicit model choice.</p>
+<p>For managed llama.cpp loading, <code>llama.load</code> also accepts <code>assetProjectionId</code>,
+<code>resourcePaths:{model}</code> and <code>executionTarget</code>. The existing model-assets owner
+retains the exact projected GGUF through actual server exit. An omitted target
+retains the same model&#39;s selection or configured default; <code>null</code> requests the
+runtime default. <code>{deviceId}</code> uses this computer&#39;s execution-device catalog.
+Windows NVIDIA selection resolves that physical device to its CUDA identity;
+unsupported or unavailable targets report their actual failure. Runtime
+<code>execution</code> reports requested, resolved and configured targets with
+<code>observedTarget:null</code>; configuration does not establish physical execution.
+An optional <code>executionDevices</code> catalog is borrowed by ONNX and llama.cpp; its
+supplying owner retains disposal responsibility. Existing external listeners
+retain their own model/device selection and reject managed reconfiguration.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createLocalAIService} from &#39;arcane-os/core/local-ai&#39;;
 
 const service = createLocalAIService(application.native.localAI, {appRoot, runtimes});
@@ -8335,7 +8425,7 @@ lifecycle:</p>
 </code></pre></div>
 <h3 id="ensurelocalairuntimes">ensureLocalAIRuntimes()</h3>
 <h4 id="overview-207">Overview</h4>
-<p>Reuses matching managed runtimes or installs complete selected official
+<p>Reuses matching managed runtimes or installs complete selected
 llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly supplied directory.</p>
 <h4 id="signature-and-result-125">Signature and result</h4>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">async ensureLocalAIRuntimes({runtimes=[],directory,platform=process.platform,architecture=process.arch,signal,onEvent}={})
@@ -8344,14 +8434,22 @@ llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly sup
 <code>{id,version?,url?}</code> records. The result is an array of absolute
 <code>{id,version,platform,architecture,root}</code> records, with <code>executable</code> for servers,
 <code>modulePath</code> for ONNX, image <code>libraryPath</code>/<code>bindingModulePath</code>/<code>variants</code>/<code>models</code>,
-or NeMo library directories. Image requirements also accept <code>backend</code> and
+or NeMo library directories. The SDK-selected Windows x64 ONNX <code>1.30.0</code>
+distribution also returns <code>nativeDistributionRevision: &#39;1.30.0-directml-reshape-1&#39;</code>.
+With no explicit <code>url</code>, an omitted ONNX version or explicit <code>1.30.0</code> selects
+the corrected native archive from the installed SDK&#39;s numeric release.
+Other ONNX versions, platforms/architectures and explicit URLs retain their
+upstream package path. Reuse requires the selected revision; older installation
+trees remain intact while a fresh installation is prepared. See
+<a href="../local-ai/#development">ONNX runtime preparation</a>.
+Image requirements also accept <code>backend</code> and
 <code>models</code>; their pinned default runtime, CPU/Metal selection and separate model
 preparation are described in <a href="../local-image-generation/">local image generation</a>.
 Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
 Installation changes no global PATH or system service and loads no model.
-Supported assets belong to the selected upstream distribution; see
+Supported assets belong to the selected distribution; see
 <a href="../local-ai/#native-bundling">platform and archive requirements</a>.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {ensureLocalAIRuntimes} from &#39;arcane-os/local-ai&#39;;
 
@@ -8375,6 +8473,10 @@ runtime paths are artifact-relative under <code>runtime/local-ai/&lt;id&gt;</cod
 contains the complete emitted inventory. Existing runtime destinations are
 preserved and reported as a conflict. Copying settles all started work and
 reports failures/cancellation without executing app services or models.</p>
+<p>The corrected Windows x64 ONNX selection retains its
+<code>nativeDistributionRevision</code> and complete native libraries. Its <code>modulePath</code>
+is relocated with the other runtime paths; bundling introduces no separate
+runtime selection. See <a href="../local-ai/#development">ONNX runtime preparation</a>.</p>
 <p>Image records relocate the complete library, binding and variant paths. Model
 URL descriptors retain their original acquisition metadata for preparation
 after launch. Runtime-contained native model paths become artifact-relative;
@@ -8530,7 +8632,8 @@ existing Core child, origin, profile and application lifetime. The client uses
 portable Node local IPC; other native host adapters do not yet implement these
 document operations. No application is launched, no desktop window is activated,
 and no automatic reconnect or action retry occurs.</p>
-<p><code>status(options)</code> reports current app/window/document readiness.
+<p><code>status(options)</code> reports current app/window/document readiness, including
+observed window state <code>Normal</code>, <code>Maximized</code>, <code>Minimized</code> or <code>Fullscreen</code>.
 <code>inspect(parameters={},options)</code> returns complete selected DOM HTML/text
 and live control state. Inspection and actions accept optional <code>shadowPath</code>, an
 ordered array of unique CSS host selectors through open shadow roots; their
@@ -8544,7 +8647,8 @@ of the rendered viewport. <code>act(parameters,options)</code> requires a return
 <code>documentGeneration</code>, one CSS selector, and <code>click</code>, <code>fill</code>, <code>select</code> or <code>scroll</code>
 fields.</p>
 <p><code>key(parameters,options)</code> requires the observed <code>documentGeneration</code> and
-<code>key:&#39;Tab&#39;</code>, <code>&#39;Enter&#39;</code> or <code>&#39;Space&#39;</code>; <code>shiftKey:true</code> is supported only for Tab.
+<code>key:&#39;Tab&#39;</code>, <code>&#39;Enter&#39;</code>, <code>&#39;Space&#39;</code> or <code>&#39;Escape&#39;</code>; <code>shiftKey:true</code> is supported only
+for Tab.
 It sends a fixed ordered press/release pair to the selected WebView&#39;s current
 focus, without selecting an element or activating the desktop window. Accepted
 pairs share one keyboard owner. Once a press is attempted, its matching release
@@ -8555,9 +8659,9 @@ bracket native input rather than atomically binding it to a document, so focus
 or navigation can change between phases.</p>
 <p><code>resize(parameters,options)</code> accepts positive integral native client <code>width</code>
 and <code>height</code> supported by WinForms, plus optional <code>documentGeneration</code>. It changes
-only <code>ClientSize</code> while the actual window is <code>Normal</code>; maximized or minimized
-windows fail before size mutation. Results retain immediate <code>previous</code>/<code>actual</code>
-native dimensions, requested dimensions, attempted/completed flags and a later
+only <code>ClientSize</code> while the actual window is <code>Normal</code>; maximized, minimized or
+fullscreen windows fail before size mutation. Results retain immediate
+<code>previous</code>/<code>actual</code> native dimensions, requested dimensions, attempted/completed flags and a later
 observed CSS <code>viewport</code>. Platform constraints can change actual dimensions;
 native and CSS observations are not an atomic snapshot. Restore explicitly with
 the same operation&#39;s <code>previous.width</code> and <code>previous.height</code>, not CSS dimensions
@@ -9172,9 +9276,19 @@ selections report its failure without precision fallback. For Laya FP32, pass
 <code>dtype: &#39;fp32&#39;</code>.
 Cancellation terminates that client&#39;s Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.</p>
+<p>For explicitly selected extension-local execution, supply <code>runtime: {local: true}</code> after materializing with <code>browserDecisions: true</code>. The SDK directly
+imports its deployment-local <code>decisions-runtime/transformers.min.js</code> and
+matched asyncify module/WASM. Explicit <code>runtime.moduleUrl</code> and
+<code>runtime.wasmPaths: {mjs, wasm}</code> may select other compatible files in that same
+deployment; a directory string is also accepted for <code>wasmPaths</code>. This mode
+disables executable Blob preparation and upstream WASM cache/proxy creation,
+selects one WASM thread, and preserves the caller&#39;s model, precision and
+inference backend. With <code>store</code>, only the exact selected executable URLs bypass
+it; model, tokenizer, configuration and external-data resources retain that
+store. Local mode is opt-in; default browser behavior remains unchanged.</p>
 <p>Optional <code>store</code> is an existing SDK DBOPFS model or speech store exposing
 <code>fetchResource(input, options)</code>. It remains outside cloned Worker configuration.
-Explicit activation first stores the complete selected <code>runtime.moduleUrl</code>
+Without <code>runtime.local</code>, explicit activation first stores the complete selected <code>runtime.moduleUrl</code>
 entry and materializes it as a JavaScript object URL without rewriting source.
 The configured original URL remains the resource selection for later loads.
 The selected loader also routes its actual model/configuration/tokenizer
@@ -10470,6 +10584,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.88.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.89.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

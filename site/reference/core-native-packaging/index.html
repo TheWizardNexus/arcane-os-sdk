@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.88.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Portable Core packaging</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="portable-core-packaging">Portable Core packaging</h1><p class="doc-lead">arcane-os/native/portable-provider owns the portable native payload in the SDK package. It does not load Arcane OS source, choose models or compile an executable. An application&#39;s explicit native.localAI selection can include its selected upstream runtimes through the SDK local-AI installer. Without that selection, assembly does no local-AI runtime preparation. Windows, Linux and macOS hosts may compose this Node-based payload; Android needs its separate native host adaptation. The current CLI&#39;s portable platform selections include Windows, Linux and macOS. A portable artifact is not a Windows executable, Linux package or Android application.</p><div class="doc-meta"><span>SDK 0.89.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="./" aria-current="page">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-native-packaging.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#app-owned-runtime-entry">App-owned runtime entry</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></details><p><code>arcane-os/native/portable-provider</code> owns the portable native payload in the SDK
 package. It does not load Arcane OS source, choose models or compile an
 executable. An application&#39;s explicit <code>native.localAI</code> selection can include
 its selected upstream runtimes through the SDK local-AI installer. Without that
@@ -148,6 +148,32 @@ The classic client imports that
 same owner with an origin-root URL, including on nested pages. It does not create
 a second event implementation. A plain file-URL launch without this host mapping
 is not the native serving contract. No host is launched during packaging.</p>
+<h2 id="app-owned-runtime-entry">App-owned runtime entry</h2>
+<p>The generated <code>runtime/arcane-core.mjs</code> also accepts
+<code>--arcane-app-entry &lt;app-relative-module&gt;</code>. This explicit mode imports the
+selected file from the artifact&#39;s <code>app/</code> directory before ordinary launch-context
+or service initialization. It preserves the complete original <code>process.argv</code>
+and converts the native path to a file URL without treating filename characters
+as URL query or fragment syntax. Missing/empty selections and actual import
+failures propagate; there is no fallback to ordinary Core.</p>
+<p>Use the existing Windows <code>runtime/ArcaneCore.exe</code> with that flag and module path
+directly. On macOS, use bundled <code>runtime/node</code> with <code>runtime/arcane-core.mjs</code>
+followed by the flag and module path. Portable payloads use the host&#39;s supported
+Node executable with that same generated entry. The macOS artifact root is its
+<code>.app/Contents/Resources</code> directory. This mode needs no new executable, SEA
+loader, GUI launcher, or copied runtime.</p>
+<p>The app includes the module and its complete source closure through
+<a href="#native-only-application-resources"><code>package.nativeResources</code></a>. The imported
+entry starts its own top-level work, not an <code>import.meta.main</code>-guarded entry or
+an automatically invoked export. It owns any explicit launch-context read,
+application services, MCP tools, signals and shutdown. No ordinary Core host,
+shared-host bridge, manifest services, model startup or Core pipe framing is
+started by this branch. Static SDK definition imports remain available; the
+ordinary parallel service imports and host lifetime stay unchanged when the
+flag is absent.</p>
+<p>For complete client command arrays, optional <code>--arcane-launch-config</code> handling,
+and MCP STDIO lifetime ownership, see
+<a href="../mcp-stdio/#launch-from-a-native-package">launch from a native package</a>.</p>
 <h2 id="explicit-application-services">Explicit application services</h2>
 <p>For the ordinary SDK build command, select native service modules in the
 application&#39;s authored descriptor. Include their source closure through
@@ -365,6 +391,11 @@ Applications without that selection have no generated local-AI import
 or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.</p>
 <p>Selected <code>onnx</code> bundles its complete managed <code>onnxruntime-node</code> dependency tree.
+For the SDK-selected Windows x64 ONNX <code>1.30.0</code> distribution, that tree includes
+the corrected native libraries and its runtime record retains
+<code>nativeDistributionRevision: &#39;1.30.0-directml-reshape-1&#39;</code>. See
+<a href="../local-ai/#development">ONNX runtime preparation</a> for selection,
+release-asset acquisition and existing-installation behavior.
 Its <code>modulePath</code> resolves against the artifact root just as a server runtime&#39;s
 <code>executable</code> does. Library/module records need no executable. The generated Core
 service exposes retained worker sessions through <code>onnx.load/run/unload/status</code>;
@@ -466,7 +497,7 @@ observes complete diagnostics and exit. Cancelling that operation closes its
 input, allowing the window and accepted Core service work to drain without a
 forced process termination.</p>
 <h3 id="initial-native-window-size">Initial native window size</h3>
-<p>An application can select its initial client area and resizing behavior in
+<p>An application can select its initial client area, resizing behavior and state in
 <code>arcane-app.json</code>, independently of its page layout:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
   &quot;native&quot;: {
@@ -474,14 +505,16 @@ forced process termination.</p>
     &quot;icon&quot;: &quot;img/icon.png&quot;,
     &quot;order&quot;: 100,
     &quot;bundledApps&quot;: [],
-    &quot;window&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 800, &quot;resizable&quot;: true}
+    &quot;window&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 800, &quot;resizable&quot;: true, &quot;state&quot;: &quot;normal&quot;}
   }
 }
 </code></pre></div>
 <p>This is the <code>native</code> portion of the existing app descriptor. Each <code>window</code>
 member is optional. <code>width</code> and <code>height</code> are positive integral client dimensions
-in logical pixels at 96 DPI; <code>resizable</code> is a boolean. Omitting a member retains
-the host&#39;s existing choice, and omitting <code>window</code> preserves existing startup.
+in logical pixels at 96 DPI; <code>resizable</code> is a boolean. Optional <code>state</code> is
+<code>normal</code>, <code>maximized</code>, or <code>fullscreen</code>. These example dimensions are an explicit
+application choice, not SDK-wide defaults. Omitting a member retains the host&#39;s
+existing choice, and omitting <code>window</code> preserves existing startup.
 The native registry projection preserves the record; the browser package
 projection gains no window controls. Portable and Windows assembly copy the
 record to <code>arcane-native.json</code> as <code>window</code>, without changing page or service
@@ -490,15 +523,28 @@ content.</p>
 the display DPI and fitting the outer window within the selected monitor&#39;s
 usable work area. This fit does not impose a persistent maximum size. Explicit
 <code>resizable:false</code> uses a fixed frame and disables the maximize control; <code>true</code>
-permits ordinary resizing and maximizing. Later app/user resizing remains
-untouched. A composing launcher&#39;s <code>Load</code> handler runs after this initial sizing
-and can restore its own saved window state. The SDK adds no saved-bounds store.</p>
+permits ordinary resizing and maximizing. The selected initial state is applied
+after this normal-window sizing, so those normal bounds remain available when
+returning from maximized or fullscreen. Fullscreen uses a borderless window at
+the selected monitor&#39;s full bounds, including the taskbar area, without setting
+TopMost or requesting activation. Returning to normal restores the retained
+normal bounds and original frame, minimize/maximize and control-box settings.
+Selecting maximized from fullscreen restores them before maximizing.</p>
+<p>Later app/user resizing remains untouched. A composing launcher&#39;s <code>Load</code> handler
+runs after the initial sizing and optional state selection. Applications can
+read or change their own window through
+<a href="../core-client/#current-window-state"><code>Arcane.window.state()</code> and <code>setState({state})</code></a>.
+The application&#39;s saved Settings and their application remain application-owned;
+the SDK adds no saved-state or saved-bounds store and does not delay rendering
+for those settings. The window&#39;s profile, origin and Core lifetime are unchanged.</p>
 <p>Direct Windows host composition uses nullable <code>ArcaneHostOptions</code> members
-<code>InitialClientWidth</code>, <code>InitialClientHeight</code>, and <code>Resizable</code> with the same
-semantics. Older precompiled Windows hosts do not read these options; use the
+<code>InitialClientWidth</code>, <code>InitialClientHeight</code>, <code>Resizable</code>, and optional string
+<code>InitialWindowState</code> with the same semantics. Older precompiled Windows hosts
+do not read these options; use the
 matching SDK host archive when rebuilding an application. The portable record
 is available to platform adapters; this addition implements its Windows host
-behavior and leaves window sizing on other platforms unchanged.</p>
+behavior and leaves window sizing/state on other platforms unchanged. The current
+other-platform hosts do not implement this state selection.</p>
 <h3 id="application-icon-and-window-colors">Application icon and window colors</h3>
 <p><code>appDescriptor.native.icon</code> selects the application&#39;s existing app-relative
 image. Windows assembly converts PNG images, including a 512-pixel source,
@@ -695,9 +741,9 @@ must agree. Compiler/runtime execution and redistribution belong to the
 separately authorized selected host output. This source increment runs none of
 them and claims no Mac build or execution result.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#provider-and-selected-input">Provider and selected input</a><a href="#native-only-application-resources">Native-only application resources</a><a href="#output-and-host-contract">Output and host contract</a><a href="#app-owned-runtime-entry">App-owned runtime entry</a><a href="#explicit-application-services">Explicit application services</a><a href="#launch-time-locations">Launch-time locations</a><a href="#selected-local-ai-runtimes">Selected local-AI runtimes</a><a href="#windows-executable">Windows executable</a><a href="#windows-host-source-and-selected-output">Windows host source and selected output</a><a href="#macos-process-source">macOS process source</a><a href="#macos-application-composition">macOS application composition</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.88.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.89.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">MCP STDIO server</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mcp-stdio-server">MCP STDIO server</h1><p class="doc-lead">Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime.</p><div class="doc-meta"><span>SDK 0.88.1</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">MCP STDIO server</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="mcp-stdio-server">MCP STDIO server</h1><p class="doc-lead">Expose application-owned tools and static resources to an MCP client with arcane-os/mcp/stdio. This optional Node entrypoint owns one JSON-RPC session, UTF-8 newline framing, discovery, request correlation, cooperative cancellation, and graceful drain. The application owns its launch command, tool definitions, resource contents, business behavior, and underlying service lifetime.</p><div class="doc-meta"><span>SDK 0.89.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="./" aria-current="page">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/mcp-stdio.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#evidence-boundary">Evidence boundary</a></nav></details><p>Expose application-owned tools and static resources to an MCP client with
+      <article class="prose reference-prose" data-reference-source="docs/reference/mcp-stdio.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#launch-from-a-native-package">Launch from a native package</a><a href="#evidence-boundary">Evidence boundary</a></nav></details><p>Expose application-owned tools and static resources to an MCP client with
 <code>arcane-os/mcp/stdio</code>. This optional Node entrypoint owns one JSON-RPC session,
 UTF-8 newline framing, discovery, request correlation, cooperative cancellation,
 and graceful drain. The application owns its launch command, tool definitions,
@@ -86,7 +86,8 @@ try {
 command as <code>node</code> with that application&#39;s script path. Client configuration
 file formats and process launch policy remain client-owned. Change <code>menu</code> to
 change the complete result; no model, repository, or native host is needed for
-this example.</p>
+this example. A native package can instead use its
+<a href="#launch-from-a-native-package">existing bundled runtime</a>.</p>
 <p>The application explicitly converts its domain record into an MCP result.
 The SDK does not guess from <code>content</code>, <code>message</code>, or other domain field names.
 The serialized text in this example is an application-selected representation;
@@ -254,15 +255,94 @@ exposes <code>name</code>, <code>code</code>, <code>message</code>, and optional
 <code>-32601</code> for unknown methods, <code>-32602</code> for malformed params or unknown tools,
 <code>-32603</code> for internal failures, and <code>-32002</code> for a missing resource. Its
 <code>-32000</code> lifecycle error requests initialization before ordinary operations.</p>
+<h2 id="launch-from-a-native-package">Launch from a native package</h2>
+<p>The generated <code>runtime/arcane-core.mjs</code> accepts
+<code>--arcane-app-entry &lt;app-relative-module&gt;</code> to import an application-owned entry
+instead of starting ordinary Core. Include the entry and its complete local
+source closure in the application&#39;s <code>package.nativeResources</code>, for example:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+  &quot;package&quot;: {
+    &quot;nativeResources&quot;: {
+      &quot;include&quot;: [&quot;native&quot;, &quot;src&quot;, &quot;package.json&quot;]
+    }
+  }
+}
+</code></pre></div>
+<p>Save the complete example above as <code>native/moon-mcp.mjs</code>. Native packaging copies
+the selected files beneath the artifact&#39;s <code>app/</code> directory. It does not discover
+entry dependencies from this runtime argument or execute the entry during
+packaging. Public imports such as <code>arcane-os/mcp/stdio</code> use the artifact&#39;s
+existing SDK package and Node&#39;s ordinary package resolution.</p>
+<p>Configure the MCP client&#39;s command and argument array for the selected artifact:</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Command</th>
+<th>Arguments</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>&lt;artifact-root&gt;/runtime/ArcaneCore.exe</code></td>
+<td><code>[&quot;--arcane-app-entry&quot;, &quot;native/moon-mcp.mjs&quot;]</code></td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>&lt;artifact-root&gt;/runtime/node</code></td>
+<td><code>[&quot;&lt;artifact-root&gt;/runtime/arcane-core.mjs&quot;, &quot;--arcane-app-entry&quot;, &quot;native/moon-mcp.mjs&quot;]</code></td>
+</tr>
+<tr>
+<td>Portable</td>
+<td>The host&#39;s supported Node executable</td>
+<td><code>[&quot;&lt;artifact-root&gt;/runtime/arcane-core.mjs&quot;, &quot;--arcane-app-entry&quot;, &quot;native/moon-mcp.mjs&quot;]</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>These are placeholders for the actual native paths. For macOS, <code>artifact-root</code>
+is <code>&lt;app-id&gt;.app/Contents/Resources</code>. The portable provider supplies no Node
+executable. Windows uses its existing SEA executable and filesystem loader;
+do not pass <code>arcane-core.mjs</code> as a script argument to that executable. These
+commands select the runtime directly, not the GUI launcher, and create no
+window or second Core host.</p>
+<p>The module path resolves from the artifact&#39;s <code>app/</code>, independently of the
+client&#39;s working directory. Native path separators, spaces, Unicode, <code>#</code> and
+<code>%</code> retain their filesystem meaning through file-URL conversion. The original
+<code>process.argv</code> remains complete and unchanged, including this flag, its path,
+and every app argument. The flag is read from user arguments starting at index
+2 for both normal Node and SEA. A missing or empty value throws <code>TypeError</code>;
+module-loading failures remain actual errors and never start ordinary Core.</p>
+<p>This is a dynamic import: the entry runs its top-level code and observes its
+own session lifetime, as the example&#39;s <code>server.start()</code> and <code>await server.closed</code>
+do. Do not put its only startup behind <code>if (import.meta.main)</code>; the imported
+module is not Node&#39;s main entry. The SDK calls no default export or factory.</p>
+<p>App-entry mode skips ordinary Core launch-context loading, manifest service
+composition, state-directory creation, local-AI startup, shared-host startup,
+and Core signal handlers. If the application wants the existing explicit launch
+JSON or host state-root arguments, append them to the same argument array and
+read them deliberately in its entry:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {readCoreLaunchContext} from &#39;arcane-os/core/host&#39;;
+
+const context = await readCoreLaunchContext();
+</code></pre></div>
+<p>For example, append <code>&quot;--arcane-launch-config&quot;, &quot;&lt;selected-launch.json&gt;&quot;</code>.
+Relative launch JSON paths retain their caller-working-directory meaning. The
+application chooses defaults, services and any connection to an existing Core;
+the entry selector neither reads nor applies the manifest&#39;s launch defaults.</p>
+<p>The application owns process signals, graceful MCP drain, and its underlying
+service shutdown. Keep stdout exclusively for MCP JSON-RPC and diagnostics on
+stderr; the ordinary Core <code>arcane/1</code> transport must not share those MCP pipes.
+When the flag is absent, ordinary Core startup and service lifecycle are
+unchanged. See <a href="../core-native-packaging/#app-owned-runtime-entry">native entry composition</a>.</p>
 <h2 id="evidence-boundary">Evidence boundary</h2>
 <p><code>test/mcp-stdio-server.test.mjs</code> contains focused in-memory stream fixtures for
 these contracts. Authored fixtures and source review do not establish an
 executed client integration or platform run. Run local tests only under the
 applicable explicit testing or selected-output authority.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#evidence-boundary">Evidence boundary</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#createmcpstdioserver">createMcpStdioServer</a><a href="#start">start</a><a href="#cancel">cancel</a><a href="#drain">drain</a><a href="#close">close</a><a href="#closed">closed</a><a href="#mcpprotocolversion">MCPPROTOCOLVERSION</a><a href="#mcpprotocolerror">McpProtocolError</a><a href="#launch-from-a-native-package">Launch from a native package</a><a href="#evidence-boundary">Evidence boundary</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.88.1, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.89.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
