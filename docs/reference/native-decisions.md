@@ -179,10 +179,25 @@ create a fresh projection from the stored originals before loading again.
 ## Existing upstream preparation
 
 `model` selects the upstream Hugging Face repository and `revision` its
-revision. Native preparation performs normal upstream fetches only during
-explicit `load()`. It streams complete members through the existing working
-file owner; it neither vendors the weights nor creates a second persistent
-model store. The approved `@huggingface/tokenizers@0.2.0` dependency reads the
+revision. On explicit `load()`, the existing model-assets owner reuses complete
+native acquisitions under the selected `workingDirectory/model-assets/`, or
+fetches the complete selected members concurrently when absent. Complete
+acquisitions survive unload, disposal and application restart. Reuse matches
+the entire ordered original path/URL selection; it never substitutes another
+model, revision, precision or device. Supplied projections and caller-owned
+`paths` retain their existing precedence and lifecycle.
+
+Ordinary preparation reuses the selected URLs without checking whether mutable
+upstream content changed. Explicit reacquisition is available through native
+[`modelAssets.prepare({refresh:true,...})`](model-assets.md#native-ownership),
+whose ready projection can be supplied through the existing
+`assetProjectionId`/`resourcePaths` contract. It preserves earlier complete
+acquisitions and active native retains. Incomplete attempts are not reused or
+resumed; separate processes may perform duplicate acquisitions in disjoint
+directories. The shared model-assets owner handles storage without an
+application-local cache copy or a second model store.
+
+The approved `@huggingface/tokenizers@0.2.0` dependency reads the
 selected tokenizer files in its Worker. No Transformers or second ONNX runtime
 is loaded by this API.
 

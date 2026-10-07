@@ -9012,14 +9012,22 @@ directory and complete member files.
 
 `current()` returns `{closing,projections}`. `retain(id)` accepts a completed
 projection and returns `{id,directory,members,release}` for a native owner.
-Native `prepare({id,workingDirectory,members,signal,onProgress})` accepts
-ordered `{path,url}` members and returns their ready projection. Explicit calls
-stream complete upstream responses through the same file owner; startup
-downloads nothing. Independent members transfer concurrently and progress
-reports phases and completed files. `release(id)` relinquishes preparation
-ownership; cancellation, release and disposal join fetches and writes before
-cleanup. Native retain handles keep completed files alive until actual engine
-release. See [native preparation](model-assets.md#native-ownership).
+Native `prepare({id,workingDirectory,members,signal,onProgress,refresh=false})`
+accepts ordered `{path,url}` members and returns their ready projection.
+Complete native acquisitions persist beneath `workingDirectory/model-assets/`
+through unload, disposal and restart; ordinary calls reuse the exact complete
+ordered source selection without a network freshness check. Explicit
+`refresh:true` acquires a separate complete set without replacing active files.
+Independent members transfer concurrently and progress reports phases and
+completed files. Matching same-process preparations share acquisition with
+independent callbacks and cancellation; the last interested cancellation joins
+unfinished I/O and removes only that attempt. Separate processes may acquire
+the same selection independently. Startup downloads nothing.
+`release(id)` relinquishes live preparation ownership. Native retains continue
+through actual engine release; completed native acquisitions remain stored.
+Browser `open/write/complete` projections retain their temporary lifetime and
+are removed only after all native uses end. See
+[native preparation](model-assets.md#native-ownership).
 `dispose()` releases preparation ownership and joins file writes, closes and
 all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model

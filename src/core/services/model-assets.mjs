@@ -1,16 +1,231 @@
-import {mkdir, mkdtemp, open, rm} from 'node:fs/promises';
+import {mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat, writeFile} from 'node:fs/promises';
 import {Buffer} from 'node:buffer';
 import path from 'node:path';
 import Is from 'strong-type';
 import {CoreError, serializeCoreError} from '../../../browser-runtime/core/contracts.mjs';
 
 const is = new Is(false);
+const nativeAcquisitions = new Map();
+let nativeAcquisitionOrder = 0;
 
 function failure(code, message) {
     return new CoreError({code, message});
 }
 
-/** Working files for native engines. Caller-selected source assets stay authoritative. */
+function memberLocation(directory, member) {
+    const nativePath = path.resolve(directory, member.path);
+    const relative = path.relative(directory, nativePath);
+    if (path.isAbsolute(member.path) || !relative || relative === '..'
+        || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new TypeError('Model asset member paths must be relative files within their projection.');
+    }
+    return {path: member.path, nativePath};
+}
+
+function sameMembers(left, right) {
+    return is.array(left) && left.length === right.length
+        && left.every(function sameMember(member, index) {
+            return member.path === right[index].path && member.url === right[index].url;
+        });
+}
+
+async function storedAcquisition(directory, members, signal) {
+    let latest;
+    for (const entry of await readdir(directory, {withFileTypes: true})) {
+        signal.throwIfAborted();
+        if (!entry.isDirectory() || !entry.name.startsWith('acquisition-')) continue;
+        const root = path.join(directory, entry.name);
+        let selected;
+        try { selected = JSON.parse(await readFile(path.join(root, 'acquisition.json'), {encoding: 'utf8', signal})); }
+        catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+        if (!sameMembers(selected.members, members)) continue;
+        nativeAcquisitionOrder = Math.max(nativeAcquisitionOrder, selected.order);
+        const files = path.join(root, 'files');
+        const locations = members.map(function originalLocation(member) { return memberLocation(files, member); });
+        let available = true;
+        for (const member of locations) {
+            signal.throwIfAborted();
+            try { if (!(await stat(member.nativePath)).isFile()) available = false; }
+            catch (error) { if (error.code !== 'ENOENT') throw error; available = false; }
+        }
+        if (available && (!latest || selected.order > latest.order
+            || (selected.order === latest.order && entry.name > latest.name))) {
+            latest = {name: entry.name, order: selected.order, directory: files, members: locations};
+        }
+    }
+    return latest ? {directory: latest.directory, members: latest.members} : null;
+}
+
+async function acquireNativeMembers(entry) {
+    const {directory, members, controller} = entry;
+    const {signal} = controller;
+    let attempt;
+    let completed = 0;
+    let committed = false;
+    let firstFailure;
+    function progress(phase, memberIndex) {
+        entry.publish({phase, completed, total: members.length, unit: 'files',
+            ...(memberIndex === undefined ? {} : {memberIndex, path: members[memberIndex].path})});
+    }
+    try {
+        signal.throwIfAborted();
+        const stored = await storedAcquisition(directory, members, signal);
+        if (stored && !entry.refresh) {
+            entry.location = stored;
+            completed = members.length;
+            progress('reuse');
+            progress('ready');
+            return stored;
+        }
+        signal.throwIfAborted();
+        attempt = await mkdtemp(path.join(directory, 'acquisition-'));
+        const files = path.join(attempt, 'files');
+        await mkdir(files);
+        entry.location = {directory: files, members: members.map(function selectedMember(member) { return memberLocation(files, member); })};
+        progress('open');
+        const results = await Promise.allSettled(members.map(async function downloadMember(member, memberIndex) {
+            let handle;
+            let response;
+            let downloadError;
+            const failures = [];
+            let bodyOwned = false;
+            try {
+                signal.throwIfAborted();
+                const nativePath = entry.location.members[memberIndex].nativePath;
+                await mkdir(path.dirname(nativePath), {recursive: true});
+                handle = await open(nativePath, 'wx');
+                signal.throwIfAborted();
+                progress('download', memberIndex);
+                response = await fetch(member.url, {signal});
+                if (!response.ok) {
+                    const error = failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset request failed: ${response.status} ${response.statusText}`);
+                    error.url = member.url;
+                    error.status = response.status;
+                    error.response = await response.text();
+                    throw error;
+                }
+                if (!response.body) throw failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset response has no content stream: ${member.url}`);
+                bodyOwned = true;
+                for await (const content of response.body) {
+                    signal.throwIfAborted();
+                    await handle.appendFile(content);
+                    progress('download', memberIndex);
+                }
+                signal.throwIfAborted();
+            } catch (error) {
+                downloadError = error;
+                failures.push(error);
+                firstFailure ??= error;
+                controller.abort(error);
+            }
+            if (response?.body && !bodyOwned && !response.bodyUsed && !response.body.locked) {
+                try { await response.body.cancel(downloadError); } catch (error) { if (error !== downloadError) failures.push(error); }
+            }
+            if (handle) {
+                try { await handle.close(); } catch (error) { failures.push(error); }
+            }
+            if (failures.length) {
+                const error = failures.length === 1 ? failures[0] : new AggregateError(failures, 'Downloading a model member and closing its resources failed.');
+                firstFailure ??= error;
+                controller.abort(error);
+                throw error;
+            }
+            completed += 1;
+            progress('download', memberIndex);
+        }));
+        const failures = results.filter(function rejected(result) { return result.status === 'rejected'; })
+            .map(function reason(result) { return result.reason; });
+        if (failures.length > 1) throw new AggregateError(failures, 'Downloading model asset members failed.', {cause: firstFailure});
+        if (failures.length) throw failures[0];
+        signal.throwIfAborted();
+        progress('complete');
+        // The record describes a completed acquisition, not content identity.
+        // Publish it after every stream and file close, leaving older entries alone.
+        const pending = path.join(attempt, 'acquisition.pending.json');
+        await writeFile(pending, JSON.stringify({members, order: ++nativeAcquisitionOrder}), {encoding: 'utf8', flag: 'wx', signal});
+        signal.throwIfAborted();
+        await rename(pending, path.join(attempt, 'acquisition.json'));
+        committed = true;
+        progress('ready');
+        return entry.location;
+    } catch (error) {
+        if (attempt && !committed) {
+            try { await rm(attempt, {recursive: true}); }
+            catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Preparing native model assets failed and cleanup failed.'); }
+        }
+        throw error;
+    }
+}
+
+function shareNativeAcquisition({directory, members, refresh, signal, onProgress}) {
+    signal.throwIfAborted();
+    const key = JSON.stringify([directory, members, refresh]);
+    let entry = nativeAcquisitions.get(key);
+    if (entry?.controller.signal.aborted) {
+        return entry.task.catch(function observeRetiringAcquisition() {}).then(function acquireAfterDrain() {
+            return shareNativeAcquisition({directory, members, refresh, signal, onProgress});
+        });
+    }
+    if (!entry) {
+        entry = {directory, members, refresh, controller: new AbortController(), consumers: new Set(), task: null, location: null, progress: null};
+        nativeAcquisitions.set(key, entry);
+        entry.publish = function publishProgress(progress) {
+            entry.progress = progress;
+            for (const consumer of entry.consumers) consumer.progress(progress);
+        };
+    }
+    const acquisition = entry;
+    return new Promise(function observeAcquisition(resolve, reject) {
+        let settled = false;
+        let cancelled;
+        let observer = Promise.resolve();
+        const consumer = {progress};
+        function finish(failed, error, location) {
+            if (settled) return;
+            settled = true;
+            signal.removeEventListener('abort', abort);
+            acquisition.consumers.delete(consumer);
+            if (consumer.cancelled && failed && error !== cancelled) {
+                reject(new AggregateError([cancelled, error], 'Native model acquisition cancellation and cleanup failed.', {cause: cancelled}));
+            } else if (consumer.cancelled) reject(cancelled);
+            else if (failed) reject(error);
+            else resolve(location);
+        }
+        function cancel(error) {
+            if (settled || consumer.cancelled) return;
+            cancelled = error;
+            consumer.cancelled = true;
+            const others = [...acquisition.consumers].some(function interested(other) { return other !== consumer && !other.cancelled; });
+            if (others) observer.then(function cancelledObserverSettled() { finish(true, error); });
+            else acquisition.controller.abort(error);
+        }
+        function abort() { cancel(signal.reason); }
+        function progress(value) {
+            const notification = {...value};
+            // Each subscriber owns its ordered observers. A slow or failing
+            // observer never holds another subscriber's transfer or result.
+            observer = observer.then(async function observeProgress() {
+                if (!consumer.cancelled && !settled) await onProgress?.(notification, acquisition.location);
+            }).catch(cancel);
+        }
+        acquisition.consumers.add(consumer);
+        signal.addEventListener('abort', abort, {once: true});
+        if (acquisition.progress) progress(acquisition.progress);
+        if (signal.aborted) abort();
+        if (!acquisition.task) {
+            acquisition.task = Promise.resolve().then(function acquireSelectedMembers() { return acquireNativeMembers(acquisition); });
+            function releaseAcquisition() { if (nativeAcquisitions.get(key) === acquisition) nativeAcquisitions.delete(key); }
+            acquisition.task.then(releaseAcquisition, releaseAcquisition);
+        }
+        acquisition.task.then(function completed(location) {
+            observer.then(function observersCompleted() { finish(false, null, location); });
+        }, function failed(error) {
+            observer.then(function observersCompleted() { finish(true, error); });
+        });
+    });
+}
+
+/** Temporary browser projections and persistent selected native acquisitions. */
 export function createModelAssetService({appRoot = process.cwd()} = {}) {
     const projections = new Map();
     let context;
@@ -66,7 +281,7 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
             try { await record.downloading; } catch (error) { record.error ??= error; }
             try { await record.finishing; } catch (error) { record.error ??= error; }
             try { await closeMembers(record); filesClosed = true; } catch (error) { errors.push(error); }
-            if (record.directory && filesClosed) {
+            if (record.directory && filesClosed && !record.persistent) {
                 try { await rm(record.directory, {recursive: true}); }
                 catch (error) { if (error.code !== 'ENOENT') errors.push(error); }
             }
@@ -107,8 +322,8 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
         throw error;
     }
 
-    async function openProjection({id, workingDirectory, members}, request) {
-        request.signal.throwIfAborted();
+    function beginProjection({id, workingDirectory, members}, signal) {
+        signal.throwIfAborted();
         if (closing) throw failure('MODEL_ASSETS_CLOSING', 'Model asset preparation is closing.');
         if (!is.string(id) || !id) throw new TypeError('A model asset projection needs an operation id.');
         if (!is.string(workingDirectory) || !workingDirectory) {
@@ -126,21 +341,20 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
         });
         record.released.catch(function observeReleaseFailure() {});
         projections.set(id, record);
+        return record;
+    }
+
+    async function openProjection({id, workingDirectory, members}, request) {
+        const record = beginProjection({id, workingDirectory, members}, request.signal);
         record.opening = Promise.resolve().then(async function createWorkingFiles() {
             const selectedDirectory = path.resolve(appRoot, workingDirectory);
             await mkdir(selectedDirectory, {recursive: true});
             request.signal.throwIfAborted();
             record.directory = await mkdtemp(path.join(selectedDirectory, 'arcane-model-'));
             record.members = members.map(function memberRecord(member) {
-                const nativePath = path.resolve(record.directory, member.path);
-                const relative = path.relative(record.directory, nativePath);
                 // A projection consists of files under its one owned directory.
                 // Absolute or escaping members cannot participate in that lifetime.
-                if (path.isAbsolute(member.path) || !relative || relative === '..'
-                    || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-                    throw new TypeError('Model asset member paths must be relative files within their projection.');
-                }
-                return {path: member.path, nativePath, handle: null, tail: Promise.resolve()};
+                return {...memberLocation(record.directory, member), handle: null, tail: Promise.resolve()};
             });
             const results = await Promise.allSettled(record.members.map(async function createMember(member) {
                 request.signal.throwIfAborted();
@@ -189,78 +403,44 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
         return task;
     }
 
-    async function prepare({id, workingDirectory, members, signal, onProgress} = {}) {
+    async function prepare({id, workingDirectory, members, signal, onProgress, refresh = false} = {}) {
         const controller = new AbortController();
         const operationSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-        const request = {signal: operationSignal};
-        let record;
-        let completed = 0;
-        let firstFailure;
-
-        async function progress(phase, memberIndex) {
+        const record = beginProjection({id, workingDirectory, members}, operationSignal);
+        let selectedMembers;
+        try { selectedMembers = members.map(function selectedMember(member) { return {path: member.path, url: member.url}; }); }
+        catch (error) { return failedOperation(record, error); }
+        record.persistent = true;
+        record.downloadController = controller;
+        // This task owns only acquisition. Failure cleanup may join it without
+        // recursively waiting for the preparation promise that requests cleanup.
+        record.downloading = Promise.resolve().then(async function prepareNativeFiles() {
             operationSignal.throwIfAborted();
-            await onProgress?.({
-                phase, completed, total: members.length, unit: 'files',
-                ...(memberIndex === undefined ? {} : {memberIndex, path: members[memberIndex].path})
-            });
+            const selectedDirectory = path.join(path.resolve(appRoot, workingDirectory), 'model-assets');
+            await mkdir(selectedDirectory, {recursive: true});
+            const directory = await realpath(selectedDirectory);
             operationSignal.throwIfAborted();
-        }
-
-        async function downloadMember(member, memberIndex) {
-            try {
-                await progress('download', memberIndex);
-                const response = await fetch(member.url, {signal: operationSignal});
-                if (!response.ok) {
-                    const error = failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset request failed: ${response.status} ${response.statusText}`);
-                    error.url = member.url;
-                    error.status = response.status;
-                    error.response = await response.text();
-                    throw error;
-                }
-                if (!response.body) throw failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset response has no content stream: ${member.url}`);
-                for await (const content of response.body) {
-                    operationSignal.throwIfAborted();
-                    await appendMemberContent(record, record.members[memberIndex], content, operationSignal);
-                    await progress('download', memberIndex);
-                }
-                completed += 1;
-                await progress('download', memberIndex);
-            } catch (error) {
-                firstFailure ??= error;
-                controller.abort(error);
-                throw error;
-            }
-        }
-
+            return shareNativeAcquisition({directory, members: selectedMembers, refresh: refresh === true, signal: operationSignal,
+                async onProgress(value, location) {
+                    if (location) {
+                        record.directory = location.directory;
+                        record.members = location.members;
+                    }
+                    await onProgress?.(value);
+                }});
+        });
+        publish(record);
         try {
-            await openProjection({id, workingDirectory, members}, request);
-            record = requireProjection(id);
+            const location = await record.downloading;
             operationSignal.throwIfAborted();
-            if (!record.preparationOwned || closing) {
-                throw failure('MODEL_ASSET_PROJECTION_RELEASED', 'Model asset preparation was released.');
-            }
-            record.downloadController = controller;
-            // Cleanup joins this transfer-only task. Its rejection handler below
-            // may release preparation without waiting on itself.
-            record.downloading = Promise.resolve().then(async function downloadMembers() {
-                await progress('open');
-                const results = await Promise.allSettled(members.map(downloadMember));
-                const errors = results.filter(function rejected(result) { return result.status === 'rejected'; })
-                    .map(function reason(result) { return result.reason; });
-                if (errors.length > 1) {
-                    throw new AggregateError(errors, 'Downloading model asset members failed.', {cause: firstFailure});
-                }
-                if (errors.length) throw errors[0];
-            });
-            await record.downloading;
-            await progress('complete');
-            const projection = await completeProjection({id}, request);
-            await progress('ready');
-            return projection;
+            record.directory = location.directory;
+            record.members = location.members;
+            record.state = 'ready';
+            publish(record);
+            return snapshot(record);
         } catch (error) {
             controller.abort(error);
-            if (record) return failedOperation(record, error);
-            throw error;
+            return failedOperation(record, error);
         }
     }
 

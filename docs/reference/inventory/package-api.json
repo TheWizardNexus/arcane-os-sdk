@@ -441,10 +441,10 @@
       "entrypoints": ["arcane-os/core/model-assets"],
       "primaryImport": "arcane-os/core/model-assets",
       "group": "Core model assets",
-      "summary": "Owns selected native working-file projections and engine retain handles while original stored model files remain unchanged.",
+      "summary": "Owns persistent native model acquisitions, temporary browser projections and actual engine retain lifetimes.",
       "availability": "Node Core with an application-selected working directory",
       "protocol": "arcane/1 modelAssets.open/write/complete/release/status and modelAssets.state",
-      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress}) streams complete upstream members through the existing file owner and reports file/phase progress. release(id) relinquishes preparation ownership; cancellation and cleanup join fetches/writes. Native retains survive until actual engine release before deleting only the owned working projection. Startup downloads nothing."
+      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress,refresh=false}) reuses complete exact ordered source selections stored beneath workingDirectory/model-assets or streams every selected upstream member concurrently. Complete acquisitions survive release, disposal and restart. refresh:true acquires a separate complete set without overwriting retained originals; ordinary reuse makes no network freshness claim. Matching same-process callers share acquisition with independent callbacks/cancellation, and the final interested cancellation joins unfinished I/O before removing only that attempt. Separate processes may fetch independently. release(id) relinquishes live preparation ownership; actual native retain lifetimes remain. Browser open/write/complete projections retain temporary cleanup after final native use. Startup downloads nothing; no migration, eviction or partial-transfer resumption."
     },
     {
       "id": "core-model-assets-service:default",

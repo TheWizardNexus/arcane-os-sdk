@@ -1,4 +1,4 @@
-# Native working files from model assets
+# Native model acquisitions and working projections
 
 Browser preparation and native retain/release ownership were first published in `arcane-os@0.61.0`. Browser
 preparation is exported by `arcane-os/ai/core-model-assets`, and the native
@@ -110,29 +110,65 @@ try {
 }
 ```
 
-`prepare({id,workingDirectory,members,signal,onProgress})` performs standard
-fetches only when explicitly called. Every member has its original relative
-`path` and selected `url`; the caller supplies the complete companion-file set.
-Independent members download concurrently. Each complete response stream is
-written directly through the existing ordered native file owner, without a
-whole-model buffer or base64 conversion. No model or runtime is selected or
-downloaded by service startup. The result is the ready projection snapshot with
-ordered `members: [{path,nativePath}]`.
+`prepare({id,workingDirectory,members,signal,onProgress,refresh=false})` reuses
+a complete native acquisition or fetches the explicitly selected members.
+Every member has its original relative `path` and selected `url`; the caller
+supplies the complete companion-file set. Independent members download
+concurrently. Each complete response stream is written directly to its native
+file, without a whole-model buffer or base64 conversion. No model or runtime
+is selected or downloaded by service startup. The result remains the ready
+projection snapshot with ordered `members: [{path,nativePath}]`.
 
-Progress uses `open`, `download`, `complete` and `ready` phases, with
+Complete acquisitions persist under `workingDirectory/model-assets/` across
+release, native unload, service disposal and process restart. Relative working
+directories resolve from `appRoot`. Reuse matches the entire ordered
+`[{path,url}]` selection in that actual store; the operation `id` is a separate
+live lifetime, not the stored selection. Different URLs, relative paths, member
+order or stores select separate acquisitions. Original member names and content
+stay unchanged, and native engines use those files directly. Model, revision,
+precision and device choices remain with their existing owners.
+
+Ordinary preparation performs no network freshness check for a completed
+selection. To acquire a mutable source again, explicitly pass `refresh:true` to
+this native `prepare` method. Refresh fetches a new complete set in its own
+directory and keeps earlier complete acquisitions and retained engine uses
+untouched. Later ordinary preparations reuse the newer completed selection.
+A failed refresh leaves the earlier completed acquisition available. Refresh
+does not change the selected URLs or imply upstream revision discovery.
+
+Progress uses `open`, `download`, `complete`, `reuse` and `ready` phases, with
 `completed`, `total` and `unit:'files'`; member progress additionally includes
 `memberIndex` and `path`. Progress callbacks may return a promise, which the
-preparation observes. They must not await cleanup of the preparation currently
-calling them. Callback failures remain preparation failures. HTTP failures
+preparation observes in order. Each caller owns its callbacks; a slow or failed
+callback does not hold another caller's transfer or result. Callbacks must not
+await cleanup of the preparation currently calling them. Callback failures
+reject that caller's preparation. HTTP failures
 retain `url`, `status` and the complete response text in `response`.
 
 `release(id)` relinquishes preparation ownership without a request signal.
-For active native downloads, release or disposal aborts their fetches and joins
-the transfer tasks and native writes before deleting only their owned child
-directory. Preparation cancellation and failure follow that same cleanup path;
-the original failures and cleanup failures remain observable. A native retain
-handle continues to protect completed files through actual engine release.
-Native preparation leaves browser DBOPFS originals and unrelated files alone.
+Same-process callers sharing the actual store, complete source selection and
+refresh mode share an acquisition, including across service instances. They
+keep independent operation IDs, retain handles, cancellation and callbacks.
+Cancelling, releasing or disposing one interested caller leaves the others
+running. The final interested caller aborts the acquisition and joins its
+streams, writes and closes before removing only its unfinished attempt. Original
+failures and cleanup failures remain observable. A completed acquisition stays
+available even if a caller cancels or its callback fails after completion.
+
+The service records completion only after every selected response and file
+close finishes. That record is ordinary cache state describing the selected
+sources and completed acquisition. A missing original member requires another
+complete acquisition. Failed attempts are removed after their owned I/O drains;
+there is no partial-transfer resumption. An abruptly interrupted process can
+leave an unfinished directory, which later calls ignore without sweeping it.
+There is no automatic migration, eviction or removal of completed acquisitions.
+
+Independent processes use disjoint attempt directories and may fetch the same
+selection concurrently. They do not overwrite each other's files or coordinate
+a cross-process acquisition lock. Concurrent completions can produce multiple
+reusable sets; either complete result may be selected when their completion
+order ties. Applications may retain their existing shared Core owner without
+introducing an additional host or application-local cache copy.
 
 ```javascript
 import {createModelAssetService} from 'arcane-os/core/model-assets';
@@ -158,15 +194,18 @@ release. Multiple contexts can retain one prepared set, and repeated inference
 on a retained context reuses its files.
 
 The browser's `projection.release()` relinquishes preparation ownership. It
-does not delete files retained by a native engine. Deletion follows the final
-native release and removes only that operation's working directory. Core closes
-independent services concurrently, so the model-assets service waits for all
-native retain handles during disposal instead of assuming service order.
-Owners must release their handles after joining their actual engine lifetime.
+does not delete files retained by a native engine. For browser `open`/`write`/
+`complete` projections, deletion follows the final native release and removes
+only that operation's temporary working directory; DBOPFS originals remain
+untouched. Native `prepare` acquisitions remain stored after their final use.
+Core closes independent services concurrently, so the model-assets service
+waits for all native retain handles during disposal instead of assuming service
+order. Owners must release their handles after joining their actual engine
+lifetime.
 
 Closing a browser accessor does not by itself establish native unload.
 Explicitly release unused prepared projections. Core disposal also releases
-preparation ownership and cleans up after retained engine uses end.
+preparation ownership and ends the live records after retained engine uses end.
 
 ### Native Laya decisions
 
