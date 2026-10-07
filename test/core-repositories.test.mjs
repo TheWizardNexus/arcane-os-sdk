@@ -440,6 +440,110 @@ test(
     }
 );
 
+test('clone-local identity requires native argument text without starting repository work', function cloneIdentityInput() {
+    const directory = path.resolve('moon-cheese-clone-identity');
+    function unexpectedProcess() { assert.fail('Construction must not start Git.'); }
+    for (const field of ['name', 'email']) {
+        for (const value of [null, false, 17, {}, [], 'Moon\0Cheese', '\uD800']) {
+            assert.throws(function invalidCloneIdentity() {
+                createRepositoryWorkspace({directory, cloneIdentity: {[field]: value}, run: unexpectedProcess});
+            }, {name: 'TypeError', message: `cloneIdentity.${field} must be text representable as a native process argument.`});
+        }
+    }
+});
+
+test('new checkouts capture exact clone-local identity fields and preserve omitted inheritance', async function cloneIdentitySelection(t) {
+    const root = await fixture(t);
+    const remote = 'https://example.invalid/Moon Cheese/dispatches.git';
+    const branch = 'cheese-launch';
+    const stdout = '\uFEFF  Complete clone output 🧀\r\nLast line.\n';
+    const stderr = '  Complete clone progress\rFinal progress.\n';
+    const cases = [
+        {label: 'omitted', identity: undefined, configuration: []},
+        {label: 'undefined-fields', identity: {name: undefined, email: undefined}, configuration: []},
+        {label: 'name-only', identity: {name: '  Moon\nDispatcher 🧀  '}, configuration: ['--config', 'user.name=  Moon\nDispatcher 🧀  ']},
+        {label: 'email-only', identity: {email: 'moon=cheese@example.invalid'}, configuration: ['--config', 'user.email=moon=cheese@example.invalid']},
+        {label: 'both', identity: {name: '\uFEFF Moon Dispatcher', email: 'moon@example.invalid'},
+            configuration: ['--config', 'user.name=\uFEFF Moon Dispatcher', '--config', 'user.email=moon@example.invalid']},
+        {label: 'empty', identity: {name: '', email: ''}, configuration: ['--config', 'user.name=', '--config', 'user.email=']}
+    ];
+    for (const selection of cases) {
+        for (const existingEmpty of [false, true]) {
+            const directory = path.join(root, `${selection.label}-${existingEmpty ? 'empty' : 'missing'}`);
+            if (existingEmpty) await mkdir(directory);
+            const calls = [];
+            const signal = new AbortController().signal;
+            function onEvent() {}
+            async function fakeClone(command, args, options) {
+                calls.push({command, args, options});
+                await mkdir(directory, {recursive: true});
+                return processResult(stdout, stderr);
+            }
+            const cloneIdentity = selection.identity === undefined ? undefined : {...selection.identity};
+            const repository = createRepositoryWorkspace({directory, remote, branch, cloneIdentity, onEvent, run: fakeClone});
+            assert.equal(calls.length, 0);
+            if (cloneIdentity) {
+                cloneIdentity.name = 'Later UI name';
+                cloneIdentity.email = 'later@example.invalid';
+            }
+            assert.deepEqual(await repository.open({signal}), {directory, cloned: true, stdout, stderr});
+            assert.deepEqual(calls, [{command: 'git',
+                args: ['clone', '--progress', ...selection.configuration, '--branch', branch, '--', remote, directory],
+                options: {cwd: root, signal, onEvent}}]);
+            assert.deepEqual(await repository.open(), {directory, cloned: false});
+            assert.equal(calls.length, 1);
+            await repository.close();
+        }
+    }
+});
+
+test('clone-local identity leaves existing checkout configuration and content unchanged', async function existingCloneIdentity(t) {
+    const directory = await fixture(t);
+    const configuration = '[user]\n\tname = Existing Dispatcher\n\temail = existing@example.invalid\n';
+    const content = '\uFEFF  Complete authored dispatch 🧀\r\n';
+    const gitDirectory = path.join(directory, '.git');
+    await mkdir(gitDirectory);
+    await writeFile(path.join(gitDirectory, 'config'), configuration);
+    await writeFile(path.join(directory, 'moon.md'), content);
+    const calls = [];
+    async function fakeExistingRoot(command, args) {
+        calls.push({command, args});
+        return processResult('true\n\n');
+    }
+    const repository = createRepositoryWorkspace({directory,
+        cloneIdentity: {name: 'Another Dispatcher', email: 'another@example.invalid'}, run: fakeExistingRoot});
+    assert.deepEqual(await repository.open(), {directory, cloned: false});
+    assert.deepEqual(calls, [{command: 'git', args: ['rev-parse', '--is-inside-work-tree', '--show-prefix']}]);
+    assert.equal(await readFile(path.join(gitDirectory, 'config'), 'utf8'), configuration);
+    assert.equal(await readFile(path.join(directory, 'moon.md'), 'utf8'), content);
+    await repository.close();
+});
+
+test('clone-local identity preserves the original clone failure and partial destination', async function failedCloneIdentity(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'partial clone');
+    const details = {code: 128, stdout: 'Complete clone output.\n', stderr: 'Complete original clone failure.\n'};
+    const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Original clone failure.', {details});
+    const calls = [];
+    async function failedClone(command, args) {
+        calls.push({command, args});
+        await mkdir(directory);
+        await writeFile(path.join(directory, 'partial.txt'), 'Preserved clone state.');
+        throw failure;
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'selected-remote',
+        cloneIdentity: {name: 'Moon Dispatcher'}, run: failedClone});
+    await assert.rejects(repository.open(), function original(error) {
+        assert.equal(error, failure);
+        assert.equal(error.details, details);
+        return true;
+    });
+    assert.deepEqual(calls, [{command: 'git',
+        args: ['clone', '--progress', '--config', 'user.name=Moon Dispatcher', '--', 'selected-remote', directory]}]);
+    assert.equal(await readFile(path.join(directory, 'partial.txt'), 'utf8'), 'Preserved clone state.');
+    await repository.close();
+});
+
 test('same-directory owners clone once with complete remote, branch and output, while distinct names stay distinct', async function oneClone(t) {
     const dataRoot = await fixture(t);
     const calls = [];
@@ -819,12 +923,13 @@ test('writer snapshots exact text and selected paths, retains clone output and s
 });
 
 test(
-    'writer-first long-path selection preserves captured identity, complete output and one-clone preparation',
+    'writer-first clone-local and long-path selections preserve command identity, complete output and one-clone preparation',
     async function writerLongPaths(t) {
         const root = await fixture(t);
         const directory = path.join(root, 'long-path writer');
         const remote = 'https://example.invalid/moon.git';
         const branch = 'cheese-launch';
+        const cloneIdentity = {name: 'Saved Moon Dispatcher'};
         const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};
         const prefix = ['-c', 'user.name=Moon Dispatcher', '-c', 'user.email=moon@example.invalid', '-c', 'credential.username=moon-account'];
         const controller = new AbortController();
@@ -871,9 +976,11 @@ test(
             }
             return {code: 0, signal: null, stdout: null, stderr: null};
         }
-        const options = {directory, remote, branch, longPaths: true, gitIdentity, onEvent: observeEvent, run: fakeGit};
+        const options = {directory, remote, branch, longPaths: true, cloneIdentity, gitIdentity, onEvent: observeEvent, run: fakeGit};
         const repository = createRepositoryWorkspace(options);
         options.longPaths = false;
+        cloneIdentity.name = 'Later saved name';
+        cloneIdentity.email = 'later-saved@example.invalid';
         gitIdentity.name = 'Later UI selection';
         gitIdentity.email = 'later@example.invalid';
         gitIdentity.username = 'later-account';
@@ -883,6 +990,7 @@ test(
         );
         const cloneArguments = ['clone', '--progress'];
         if (process.platform === 'win32') cloneArguments.push('--config', 'core.longpaths=true');
+        cloneArguments.push('--config', 'user.name=Saved Moon Dispatcher');
         cloneArguments.push('--branch', branch, '--', remote, directory);
         assert.deepEqual(
             calls,

@@ -45,7 +45,7 @@ export function resolveArcaneDataPaths({dataRoot} = {}) {
 
 /** One connected checkout, composed into an application's own Core service. */
 export function createRepositoryWorkspace(
-    {name, directory, dataRoot, remote, branch, longPaths, gitIdentity, onEvent, run = runProcess} = {}
+    {name, directory, dataRoot, remote, branch, longPaths, cloneIdentity = {}, gitIdentity, onEvent, run = runProcess} = {}
 ) {
     let selected = directory;
     if (selected === undefined) {
@@ -62,6 +62,15 @@ export function createRepositoryWorkspace(
         throw new TypeError('longPaths must be a boolean when supplied.');
     }
     if (!is.function(run)) throw new TypeError('run must implement the SDK process adapter.');
+    const {name: cloneName, email: cloneEmail} = cloneIdentity;
+    const cloneConfiguration = [];
+    for (const [field, value] of Object.entries({name: cloneName, email: cloneEmail})) {
+        if (value === undefined) continue;
+        if (!is.string(value) || !value.isWellFormed() || value.includes('\0')) {
+            throw new TypeError(`cloneIdentity.${field} must be text representable as a native process argument.`);
+        }
+        cloneConfiguration.push('--config', `user.${field}=${value}`);
+    }
     const execute = createGitIdentityRunner(run, gitIdentity);
     const repositoryDirectory = path.resolve(selected);
     const pending = new Set();
@@ -108,6 +117,7 @@ export function createRepositoryWorkspace(
         if (process.platform === 'win32' && longPaths !== undefined) {
             arguments_.push('--config', `core.longpaths=${longPaths}`);
         }
+        arguments_.push(...cloneConfiguration);
         if (branch !== undefined) arguments_.push('--branch', branch);
         arguments_.push('--', remote, repositoryDirectory);
         const result = await prepareRun(

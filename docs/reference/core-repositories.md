@@ -47,7 +47,7 @@ const status = await repository.status({signal});
 await repository.close();
 ```
 
-`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run}={})`
+`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})`
 returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
@@ -68,6 +68,10 @@ property is the absolute selected working path.
   writes that choice to the new repository before its first checkout. Omission
   leaves Git's configuration unchanged. The option does not rewrite an existing
   checkout, change a global setting, or alter non-Windows clone commands.
+- Optional `cloneIdentity:{name?,email?}` persists explicitly selected author
+  fields in a newly cloned repository's local Git configuration. Omitted fields
+  keep Git's ordinary inheritance; existing checkouts retain their configuration.
+  See [clone-local author selection](#clone-local-author-selection).
 - `onEvent` and optional `run` use the existing SDK process owner. The default
   adapter is `runProcess`; Git must be available on PATH. Credentials and
   authentication remain with Git and the native host. The SDK adds no download,
@@ -304,8 +308,8 @@ Each supplied name/email becomes command-local `-c user.name=...` or
 `GIT_COMMITTER_*` fields. Those selected fields take precedence over inherited
 author/committer settings and environment values; omitted fields, dates and
 unrelated environment remain inherited. Git retains its ordinary commit
-identity formatting and may reject an unusable identity. The SDK changes
-neither `process.env` nor global/local Git files.
+identity formatting and may reject an unusable identity. This command-local
+selection changes neither `process.env` nor global/local Git files.
 
 `username` supplies only command-local `credential.username`. Git's existing
 credential helper and remote protocol still own actual authentication. A
@@ -321,6 +325,46 @@ pull, commit and push, and every bare-snapshot Git command, including init and
 fetch. Existing arguments, content, output, errors, queue and cancellation
 semantics remain unchanged. Other repository helpers and CLI cwd defaults keep
 their existing behavior.
+
+### Clone-local author selection
+
+`createRepositoryWorkspace` also accepts `cloneIdentity:{name?,email?}` when the
+application wants its explicit selection retained by a newly owned clone:
+
+```javascript
+const repository = createRepositoryWorkspace({
+    name: 'moon-cheese-dispatches',
+    remote: applicationConnection.remote,
+    cloneIdentity: {name: 'Moon Dispatcher', email: 'moon@example.invalid'}
+});
+await repository.open({signal});
+```
+
+Each supplied field becomes `clone --config user.name=<name>` or
+`clone --config user.email=<email>`. Git writes these choices to the new local
+configuration before the initial checkout, on every supported platform. This
+adds no separate configuration command or post-clone initialization. It applies
+whenever the owner's first preparing operation needs a clone, including `write`.
+
+The exact strings are captured during I/O-free construction. Empty strings are
+explicit values; omitted or `undefined` fields add no setting, preserving Git's
+global inheritance, includes and any template configuration. Later caller edits
+do not alter an accepted owner. Non-string fields, NUL and text that the native
+process transport cannot represent report `TypeError` instead of changing input.
+Git retains ordinary configuration precedence, author formatting and failures.
+
+An existing checkout is never reconfigured by `cloneIdentity`, even when it is
+supplied. Changing or omitting the selection on a later owner does not remove a
+previously stored local setting. This option changes no global configuration,
+credentials, username selection, branch or remote. A failed or cancelled clone
+retains its actual diagnostics and any partial directory for the caller.
+
+`gitIdentity` remains the separate command-local selection described above.
+When both options are supplied, `cloneIdentity` selects the new clone's saved
+name/email while `gitIdentity` controls the selected child commands and their
+author/committer environment. Application defaults and per-repository choices
+remain application-owned. Neither option identifies the authenticated GitHub
+account or establishes who submitted a historical record.
 
 ## Write, commit and push selected text
 
