@@ -401,6 +401,11 @@ or service. Availability of a particular engine belongs to the selected
 local-AI installer and service; a generic ONNX runtime is not a speech model.
 
 Selected `onnx` bundles its complete managed `onnxruntime-node` dependency tree.
+For the SDK-selected Windows x64 ONNX `1.30.0` distribution, that tree includes
+the corrected native libraries and its runtime record retains
+`nativeDistributionRevision: '1.30.0-directml-reshape-1'`. See
+[ONNX runtime preparation](local-ai.md#development) for selection,
+release-asset acquisition and existing-installation behavior.
 Its `modulePath` resolves against the artifact root just as a server runtime's
 `executable` does. Library/module records need no executable. The generated Core
 service exposes retained worker sessions through `onnx.load/run/unload/status`;

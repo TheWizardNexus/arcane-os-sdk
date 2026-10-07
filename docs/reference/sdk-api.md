@@ -9003,7 +9003,7 @@ import createLocalAIService from 'arcane-os/core/local-ai';
 
 ### Overview
 
-Reuses matching managed runtimes or installs complete selected official
+Reuses matching managed runtimes or installs complete selected
 llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly supplied directory.
 
 ### Signature and result
@@ -9016,14 +9016,22 @@ Import it from `arcane-os/local-ai`. Runtime requirements accept IDs or
 `{id,version?,url?}` records. The result is an array of absolute
 `{id,version,platform,architecture,root}` records, with `executable` for servers,
 `modulePath` for ONNX, image `libraryPath`/`bindingModulePath`/`variants`/`models`,
-or NeMo library directories. Image requirements also accept `backend` and
+or NeMo library directories. The SDK-selected Windows x64 ONNX `1.30.0`
+distribution also returns `nativeDistributionRevision: '1.30.0-directml-reshape-1'`.
+With no explicit `url`, an omitted ONNX version or explicit `1.30.0` selects
+the corrected native archive from the installed SDK's numeric release.
+Other ONNX versions, platforms/architectures and explicit URLs retain their
+upstream package path. Reuse requires the selected revision; older installation
+trees remain intact while a fresh installation is prepared. See
+[ONNX runtime preparation](local-ai.md#development).
+Image requirements also accept `backend` and
 `models`; their pinned default runtime, CPU/Metal selection and separate model
 preparation are described in [local image generation](local-image-generation.md).
 Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
 Installation changes no global PATH or system service and loads no model.
-Supported assets belong to the selected upstream distribution; see
+Supported assets belong to the selected distribution; see
 [platform and archive requirements](local-ai.md#native-bundling).
 
 ```javascript
@@ -9056,6 +9064,11 @@ runtime paths are artifact-relative under `runtime/local-ai/<id>`, and `files`
 contains the complete emitted inventory. Existing runtime destinations are
 preserved and reported as a conflict. Copying settles all started work and
 reports failures/cancellation without executing app services or models.
+
+The corrected Windows x64 ONNX selection retains its
+`nativeDistributionRevision` and complete native libraries. Its `modulePath`
+is relocated with the other runtime paths; bundling introduces no separate
+runtime selection. See [ONNX runtime preparation](local-ai.md#development).
 
 Image records relocate the complete library, binding and variant paths. Model
 URL descriptors retain their original acquisition metadata for preparation

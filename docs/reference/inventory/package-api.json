@@ -609,10 +609,10 @@
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
-      "summary": "Reuses selected managed native runtimes or installs complete official llama.cpp/Ollama/image distributions, ONNX npm runtime trees or NeMo libraries.",
-      "availability": "Node; upstream platform and architecture assets determine runtime availability",
-      "protocol": "Official upstream release archives and selected ONNX/Koffi npm runtime installations",
-      "normalization": "Returns absolute runtime records, including image library/binding/variant/model metadata; shares matching installs, preserves libraries, reports failures without changing global PATH or services and prepares no model files"
+      "summary": "Reuses selected managed native runtimes or installs complete llama.cpp/Ollama/image distributions, ONNX npm runtime trees with selected SDK native libraries, or NeMo libraries.",
+      "availability": "Node; selected distribution platform and architecture assets determine runtime availability",
+      "protocol": "Upstream release archives and selected ONNX/Koffi npm installations; corrected Windows x64 ONNX native libraries from the installed SDK numeric release",
+      "normalization": "Returns absolute runtime records, including image library/binding/variant/model metadata; Windows x64 ONNX with no explicit URL and omitted version or 1.30.0 adds nativeDistributionRevision 1.30.0-directml-reshape-1, reuses that revision or prepares a fresh installation while preserving older trees; explicit URLs and other ONNX versions/platforms retain their upstream package path; shares matching installs, preserves libraries, reports failures without changing global PATH or services and prepares no model files"
     },
     {
       "id": "local-ai:bundleLocalAIRuntimes",
@@ -624,9 +624,9 @@
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
       "summary": "Copies selected complete runtime distributions into a fresh native artifact staging root.",
-      "availability": "Node; supports bundling published upstream platform assets independently of the build host",
+      "availability": "Node; supports bundling selected published platform assets independently of the build host",
       "protocol": "Artifact-relative runtime/local-ai layout",
-      "normalization": "Returns {runtimes,files} with artifact-relative runtime/variant paths and complete inventory; image URL descriptors remain for post-launch preparation and external model working paths report portability incompatibility"
+      "normalization": "Returns {runtimes,files} with artifact-relative runtime/variant paths and complete inventory; corrected Windows x64 ONNX retains nativeDistributionRevision and complete native libraries while modulePath becomes artifact-relative; image URL descriptors remain for post-launch preparation and external model working paths report portability incompatibility"
     },
     {
       "id": "root:WS",

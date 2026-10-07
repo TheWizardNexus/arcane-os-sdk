@@ -138,10 +138,23 @@ Zstandard archives use the supported Node runtime's decompressor.
 
 Selected ONNX preparation installs `onnxruntime-node@1.30.0` by default into a
 managed npm prefix, retaining its complete published runtime dependency tree.
-It uses the upstream CPU installation option to skip supplementary GPU downloads.
+The npm installation skips supplementary upstream GPU downloads. On Windows
+x64, an omitted version or explicit `1.30.0`, with no explicit `url`, also
+selects the SDK's corrected native distribution, revision
+`1.30.0-directml-reshape-1`. The installer downloads
+`arcane-onnx-runtime-windows-x64.tar.gz` from the installed `arcane-os` package's
+numeric GitHub release and extracts its native libraries into the new
+installation. Its URL is
+`https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/<sdk-version>/arcane-onnx-runtime-windows-x64.tar.gz`.
+The same-version npm JavaScript and binding remain in place. Explicit URLs,
+other ONNX versions and other platform/architecture selections retain their
+upstream package path. For the corrected selection, an existing installation
+without the matching `nativeDistributionRevision` is left intact and a fresh
+installation is prepared; running installations keep their original trees.
 Node/npm must be available while preparing that runtime; a native app consumes
 the bundled tree without installing it again. Applications that omit ONNX do
-not install its package.
+not install its package. Runtime preparation alone establishes no model or
+device execution result.
 
 For the optional development browser connection, load the bootstrap after the
 managed import map and before creating a Core-backed provider:
@@ -722,7 +735,7 @@ not execution evidence on each platform.
 
 ## Native bundling
 
-The SDK portable native build includes selected official runtime trees under
+The SDK portable native build includes complete selected runtime trees under
 `runtime/local-ai/<runtime-id>`. Runtime records in the artifact are relative
 to the artifact root and resolve on the destination machine. The generated
 Core entry composes the local AI service only when the application selects it.
@@ -732,13 +745,16 @@ Model files remain application-selected native resources.
 `arcane-os/local-ai`. Both accept `{runtimes,directory,platform,architecture,
 signal,onEvent}`; bundling also requires `outputRoot`. Platform names follow
 Node: `win32`, `linux`, `darwin`, and supported Android distributions.
-Architectures are `x64` or `arm64`. Availability depends on the upstream
-runtime's published platform assets; Ollama has no official Android runtime
+Architectures are `x64` or `arm64`. Availability depends on the selected
+distribution's published platform assets; Ollama has no official Android runtime
 archive in this installer.
 
 Ensure returns absolute `{id,version,platform,architecture,root}` records.
 Server runtimes also include `executable`; ONNX includes `modulePath` pointing
-to its public package entry. Image records include `libraryPath`,
+to its public package entry. The corrected Windows x64 ONNX selection also
+includes `nativeDistributionRevision: '1.30.0-directml-reshape-1'`; bundling
+retains that metadata with the complete native libraries. Image records include
+`libraryPath`,
 `bindingModulePath`, requested `backend`, installed `variants` and selected
 `models` metadata. Variant records carry backend, runtime root and library path.
 Bundle returns `{runtimes,files}`,
