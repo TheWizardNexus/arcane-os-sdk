@@ -646,6 +646,24 @@ export function createCoreFacade(client){
         storage:{list:()=>invoke('storage.list'),get:key=>invoke('storage.get',{key}),set:(key,value)=>invoke('storage.set',{key,value}),delete:key=>invoke('storage.delete',{key})},
         preferences:{list:()=>invoke('preferences.list'),get:key=>invoke('preferences.get',{key}),set:(key,value)=>invoke('preferences.set',{key,value}),
             setMany:entries=>invoke('preferences.setMany',{entries}),delete:key=>invoke('preferences.delete',{key})},
+        notifications: {
+            status(options) {
+                return invoke('notifications.status', {}, options).catch(function notificationStatusUnavailable(error) {
+                    if (error?.code !== 'METHOD_NOT_ALLOWED' || error?.reason !== 'core-namespace-unavailable') throw error;
+                    return {supported: false, available: false, permissionDisabled: null,
+                        reason: 'host-notifications-unavailable', error};
+                });
+            },
+            show(request, options) {
+                return invoke('notifications.show', request, options);
+            },
+            state(selection = {}, options) {
+                return invoke('notifications.state', selection, options);
+            },
+            close(selection, options) {
+                return invoke('notifications.close', selection, options);
+            }
+        },
         window: {
             state(options) {
                 return invoke('window.state', {}, {signal: options?.signal});

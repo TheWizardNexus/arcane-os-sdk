@@ -284,6 +284,105 @@ forwards the app's computed `--background` and `--text-color` in native hosts.
 Applications using that owner need no duplicate theme listener. Ordinary
 browsers keep their CSS presentation without making a native request.
 
+## Native desktop notifications
+
+`Arcane.notifications` uses the existing Core request transport to the actual
+application window's native host. The Windows adapter is source implementation;
+selected native build and actual OS delivery verification remain pending. A
+matching published host is required for delivery. The portable facade is the
+same on Windows, Linux and macOS, with Android requiring a host adapter; other
+unimplemented hosts and direct shared-Core listener connections are unavailable.
+Those listener connections bypass the window bridge. There is no browser
+`Notification`, audio or simulated delivery substitute.
+
+| Method | Parameters | Result |
+| --- | --- | --- |
+| `status(options?)` | Request options only | Actual native `supported`, `available` and `permissionDisabled`, with the host's reason/error when present |
+| `show(request, options?)` | `{id,title,body,data}` | Complete notification record for the actual submission outcome |
+| `state(selection = {}, options?)` | Optional `{id}` selects one owned ID; omission selects all retained records | `{revision,notifications:[complete records]}` |
+| `close(selection, options?)` | `{id}` | Complete record after the exact owned notice's removal operation |
+
+Every method accepts the standard `invoke` options `signal`, `timeoutMs` and
+`onRequest({requestId})`. Requests, title/body strings and opaque JSON-compatible
+`data` pass through unchanged. The application owns recipients, triggers, text,
+deduplication and navigation. The OS controls presentation; preserving the
+complete request does not establish that every character was visibly displayed.
+
+`status()` changes no OS permissions or preferences. Only the exact Core error
+`METHOD_NOT_ALLOWED` with `reason:'core-namespace-unavailable'` becomes
+`{supported:false,available:false,permissionDisabled:null,
+reason:'host-notifications-unavailable',error}`; `error` is the original complete
+error and no platform is invented. All other invocation rejections propagate
+unchanged. The native adapter can return an unavailable result with the complete
+OS initialization or settings error. `permissionDisabled:null` means the permission state is
+unknown. Use this status operation to discover the window adapter; Core's
+service capability list does not describe host-intercepted notification methods.
+Native `supported:null` means initialization could not establish OS support;
+`available:false` retains its actual reason and complete error when supplied.
+
+A retained record contains `{id,title,body,data,state,revision}` and the actual
+timestamps, reasons and complete errors supplied by its owner. `submitted` means
+the native `Show` call returned. It does not establish visible display or human
+receipt. Later activation, dismissal and failure remain observable and retained.
+A dismissal due to timeout does not establish removal from Notification Center.
+Use `close({id})` for explicit OS removal. Closing retains the record; showing
+the same caller ID again during this host lifetime rejects with its existing
+record instead of resending or replacing it.
+The top-level `event` names the latest observation, while `events` retains the
+complete ordered history. An activation racing successful removal can report
+`event:'activated'` with `state:'closed'`; the application owns action routing.
+
+The live `notifications.state` event carries one complete updated record. It is
+future-only. Subscribe before requesting the snapshot, then merge records by
+their revisions so a delayed snapshot cannot overwrite a newer event:
+
+```js
+const records = new Map();
+function receiveNotification(record) {
+    const previous = records.get(record.id);
+    if (!previous || record.revision >= previous.revision) records.set(record.id, record);
+}
+const stop = Arcane.events.on('notifications.state', receiveNotification);
+try {
+    const snapshot = await Arcane.notifications.state();
+    for (const record of snapshot.notifications) receiveNotification(record);
+} catch (error) {
+    stop();
+    throw error;
+}
+// Call stop() when this observation ends; it does not remove native notices.
+```
+
+When the installed Core client changes, detach the old event listener and ignore
+its outstanding snapshot response. Recreate the records map for the new
+client/host lifetime so an earlier host's revisions cannot suppress its records.
+Subscribe and read the new client's snapshot
+through [installation observation](#observe-installation-and-retirement).
+Accepted notices and their records survive renderer navigation within the same
+native host. There is no persisted cross-process recovery or cold-process
+activation contract.
+
+Windows reuses an SDK-created native identity and shortcut for the existing
+WebView profile across launches, preserving that profile's OS notification
+preferences. Its owned `AppUserModelId` registration stores the application's
+display name, icon and live activator identity without changing notification
+preferences or registering a cold-start launch command.
+The SDK persists registration metadata only; its notification text
+and data records remain in host memory. OS notification retention remains
+platform-owned.
+Distinct profiles have independent notification settings. One live notifier
+owns a profile's COM activation registration; a second simultaneous host using
+that profile reports `available:false` with
+`reason:'notification-owner-already-running'` and may retry explicitly later.
+Shutdown releases live COM ownership and owned notices while preserving the
+identity registration for a later launch.
+
+Cancellation observed before submission prevents that pending show from
+submitting. After submission, request cancellation or renderer retirement cannot
+reverse human interaction and does not remove the accepted notice; `close` is
+explicit. Host shutdown drains owned operations, removes owned notices and
+detaches callbacks, surfacing complete cleanup errors.
+
 ## Events and request lifetime
 
 `events.on(name, listener)`, `once(name, listener)` and

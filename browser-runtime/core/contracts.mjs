@@ -43,6 +43,26 @@ export const CORE_METHOD_CONTRACTS={
         output: '{requestedTarget,resolvedDevice,resolution,reason}',
         meaning: 'Resolve a saved physical identity. Explicit null selects engine-owned automatic resolution; it does not claim a configured or observed device.'
     },
+    'notifications.status': {
+        input: '{}',
+        output: '{supported,available,permissionDisabled,reason?,error?}',
+        meaning: 'Actual native host support and OS permission state; no preference changes or browser/audio substitution.'
+    },
+    'notifications.show': {
+        input: '{id,title,body,data}',
+        output: 'notification-record-v1',
+        meaning: 'Submit one exact application notification. Submitted means native Show returned, not display or human receipt. Caller IDs cannot be reused during this host lifetime.'
+    },
+    'notifications.state': {
+        input: '{id?}',
+        output: '{revision,notifications:notification-record-v1[]}',
+        meaning: 'Retained complete records for this application host lifetime, including actual terminal outcomes; accepted notices survive renderer navigation.'
+    },
+    'notifications.close': {
+        input: '{id}',
+        output: 'notification-record-v1',
+        meaning: 'Remove only the exact owned notice and retain its record. Cancellation after submission does not reverse human interaction.'
+    },
     'window.state': {
         input: '{}',
         output: '{platform,supported,state}',

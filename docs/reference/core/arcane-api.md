@@ -49,6 +49,7 @@ This inventory covers every enumerable, non-method member exposed directly or th
 | `Arcane.storage` | Namespace | App-scoped native key/value storage. |
 | `Arcane.preferences` | Namespace | App-scoped preference reads and atomic writes. |
 | `Arcane.window` | Namespace | SDK host window presentation for the calling document; adapter availability is independent of the OS-user appearance service. |
+| `Arcane.notifications` | Namespace | Native app-scoped desktop notifications and retained host-lifetime outcomes; see the [notification contract](../core-client.md#native-desktop-notifications). |
 | `Arcane.appearance` | Namespace | Native appearance state and application. |
 | `Arcane.session` | Namespace | Current Arcane session lifecycle. |
 | `Arcane.provisioning` | Namespace | Provisioning-plan operations. |
@@ -393,6 +394,37 @@ product-neutral reference.
 | `Arcane.capabilities.list()` | None | `Promise<{app, grants, methods}>` | Returns the current Core-bound application descriptor, grants, and exact allowed RPC names. Android callers use `Arcane.platform.status().capabilities`; the direct method is not projected there. |
 
 Terminal output and lifecycle changes are event-driven. The canonical [Arcane event inventory](arcane-events.md#event-inventory) defines `terminal.output`, `terminal.exit`, and the Android `terminal.error` payload. The shared `TerminalClient` adapter correlates those deliveries with owned sessions and re-emits DOM events for reusable UI code.
+
+## Native desktop notifications
+
+These methods use the actual application's native window bridge. Windows source
+support is pending selected native build and OS delivery verification. Direct
+shared-Core listeners and other unimplemented host adapters are unavailable;
+there is no browser or audio substitute. The [complete contract](../core-client.md#native-desktop-notifications)
+defines records, cancellation, duplicate IDs, permission reporting and recovery.
+
+| Method | Parameters | Return | Description |
+| --- | --- | --- | --- |
+| `Arcane.notifications.status(options?)` | `options`: standard `signal`, `timeoutMs`, `onRequest` request options | `Promise<{supported,available,permissionDisabled,reason?,error?}>` | Reports actual host support and permission state without changing preferences. Only an exact unavailable Core namespace is normalized, retaining its original complete error. |
+| `Arcane.notifications.show(request, options?)` | `request`: `{id,title,body,data}`; `options`: standard request options | `Promise<NotificationRecord>` | Submits exact title/body and opaque JSON-compatible data for the application's stable ID. Native submission is distinct from visual display or human receipt; a reused ID rejects with the existing record. |
+| `Arcane.notifications.state(selection?, options?)` | `selection`: `{id?}`, defaults to `{}`; `options`: standard request options | `Promise<{revision,notifications:NotificationRecord[]}>` | Returns complete retained records for the current host lifetime. Subscribe to `notifications.state` first and merge by revision. |
+| `Arcane.notifications.close(selection, options?)` | `selection`: `{id}`; `options`: standard request options | `Promise<NotificationRecord>` | Removes the exact owned notice and retains its record; no implicit resend or replacement. |
+
+`NotificationRecord` contains `{id,title,body,data,state,revision}` plus actual
+timestamps, reasons and complete errors. `event` identifies the latest observed
+event and `events` retains its ordered history; activation can race removal
+without changing an already `closed` state. Accepted notices survive renderer
+navigation. Terminal callbacks remain retained; timeout dismissal does not mean
+Notification Center removal. Recipients, triggers, text, deduplication and
+navigation belong to the application. Cross-process persistence and cold-start
+activation are outside this contract.
+
+Windows keeps a stable native identity per WebView profile so the OS retains
+that profile's notification preferences. The SDK persists registration metadata
+only; its notification text/data records remain in host memory. A second
+simultaneous notifier for the same profile reports
+`notification-owner-already-running`; distinct profiles remain independent.
+Live COM ownership and notices drain at host shutdown.
 
 ## Platform, installation, users, and system
 

@@ -26,6 +26,31 @@ Every subscription method returns an unsubscribe function. Call it when the owni
 | `terminal.exit` | Live, future-only terminal session notification. | Core-backed Arcane Terminal and Android Arcane Terminal hosts. | A terminal process exits and the host removes its session. | `sessionId` identifies the terminal session; `exitCode` is the process exit code when available; `signal` is the terminating signal name or `null`. |
 | `terminal.error` | Live, future-only terminal session notification. | Android Arcane Terminal hosts. | Android stops a session at its output limit or cannot read one of its output streams. | `sessionId` identifies the terminal session; `message` explains the output-limit or stream-reading failure. |
 | `appearance.changed` | Live, future-only host notification. | Microsoft NT WebView2 hosts. | The host observes an operating-system appearance change. | `scheme` is the configured host scheme; `effectiveScheme` is the resolved `dark` or `light` scheme; `source` is `windows`. |
+| `notifications.state` | Live, future-only complete notification record; retained state is read separately. | SDK Windows application-window adapter; native build and OS delivery verification pending. Other unimplemented hosts and direct shared-Core listeners are unavailable. | An owned native notification changes submission, activation, dismissal, closure or failure state. | Complete `{id,title,body,data,state,revision}` record plus actual timestamps, reasons and errors. Caller `id` correlates the record; `revision` orders updates. Native submission is not a display or human-receipt acknowledgement. |
+
+### Recover native notification state
+
+Subscribe to `notifications.state` before calling `Arcane.notifications.state()`
+and merge each record by revision. The event is not a durable completion event
+for `when()`. A later renderer reads the host's retained records, including
+actual terminal outcomes; accepted notices survive navigation. Retire old-client
+subscriptions and pending snapshots when the installed client changes.
+The record's `event` names its latest observation and `events` retains complete
+ordered history. A raced `event:'activated'` can accompany `state:'closed'`;
+the application decides how to route that actual activation.
+
+Windows profile identity/shortcut registration persists across launches to
+preserve OS preferences; the SDK's notification text, data and event records
+remain in host memory for the current lifetime. A second simultaneous notifier
+for that profile is unavailable with `notification-owner-already-running`;
+other profiles are independent. Shutdown drains owned notices and live COM
+ownership.
+
+`submitted` means native `Show` returned. Later failure remains possible, and a
+timeout dismissal does not establish removal from Notification Center. Explicit
+`Arcane.notifications.close({id})` removes the owned notice while retaining its
+record. See the [complete notification contract](../core-client.md#native-desktop-notifications)
+for cancellation, permissions, exact content and host-lifetime limits.
 
 ### Subscribe and clean up
 

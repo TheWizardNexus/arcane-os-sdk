@@ -105,12 +105,16 @@ namespace Arcane.Core.Hosts.Windows
         private readonly object stateLock = new object();
         private readonly Queue<CoreDelivery> pending = new Queue<CoreDelivery>();
         private readonly Dictionary<string, long> requestGenerations = new Dictionary<string, long>();
+        private readonly Dictionary<string, DesktopNotificationRequest> desktopNotificationRequests =
+            new Dictionary<string, DesktopNotificationRequest>();
         private readonly List<Exception> failures = new List<Exception>();
         private readonly List<Task> failureNotifications = new List<Task>();
         private readonly TaskCompletionSource<object> ready = new TaskCompletionSource<object>();
         private readonly TaskCompletionSource<object> initialized = new TaskCompletionSource<object>();
         private readonly TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
         private ArcaneCoreProcess core;
+        private ArcaneNotifications desktopNotifications;
+        private Task desktopNotificationsClosing;
         private ArcaneBridge bridge;
         private ArcaneBridge activeBridge;
         private Task initialization;
@@ -561,6 +565,33 @@ namespace Arcane.Core.Hosts.Windows
                 if (documentGeneration != generation || closing)
                     throw new InvalidOperationException("The requesting document is no longer connected.");
                 string method = EnvelopeString(envelope, "method");
+                if (EnvelopeString(envelope, "protocol") == "arcane/1")
+                {
+                    if (requestId != null && (method == "notifications.status" || method == "notifications.show"
+                        || method == "notifications.state" || method == "notifications.close"))
+                    {
+                        DesktopNotificationRequest operation = new DesktopNotificationRequest(documentGeneration);
+                        desktopNotificationRequests.Add(requestId, operation);
+                        operation.Completion = CompleteDesktopNotificationAsync(envelope, requestId, method, operation);
+                        operation.Completion.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
+                        // Bridge acceptance means this host owns the request;
+                        // the correlated response carries its native outcome.
+                        return Task.FromResult<object>(null);
+                    }
+                    if (EnvelopeString(envelope, "type") == "control")
+                    {
+                        string control = EnvelopeString(envelope, "control");
+                        DesktopNotificationRequest selected;
+                        if (control == "request.cancel" && desktopNotificationRequests.TryGetValue(
+                            EnvelopeString(envelope, "requestId") ?? String.Empty, out selected)
+                            && selected.Generation == documentGeneration)
+                        {
+                            selected.Cancellation.Cancel();
+                            return Task.FromResult<object>(null);
+                        }
+                        if (control == "requests.cancelAll") CancelDesktopNotificationRequests(documentGeneration);
+                    }
+                }
                 if (requestId != null && EnvelopeString(envelope, "protocol") == "arcane/1"
                     && (method == "window.setTheme" || method == "window.state" || method == "window.setState"))
                 {
@@ -582,6 +613,115 @@ namespace Arcane.Core.Hosts.Windows
                     requestGenerations[requestId] = documentGeneration;
                 return accepted;
             }
+        }
+
+        private async Task CompleteDesktopNotificationAsync(Dictionary<string, object> request,
+            string id, string method, DesktopNotificationRequest operation)
+        {
+            try
+            {
+                Dictionary<string, object> response = new Dictionary<string, object>
+                {
+                    { "protocol", "arcane/1" }, { "type", "response" }, { "id", id }
+                };
+                try
+                {
+                    object value;
+                    Dictionary<string, object> parameters = request.TryGetValue("parameters", out value)
+                        ? value as Dictionary<string, object> : new Dictionary<string, object>();
+                    if (parameters == null) throw new ArgumentException("Supply a notification request object.");
+                    if (desktopNotifications == null)
+                        desktopNotifications = new ArcaneNotifications(options.ApplicationId, options.ProfileDirectory,
+                            options.Title, options.IconPath, DesktopNotificationChanged);
+                    Dictionary<string, object> result = await desktopNotifications.InvokeAsync(
+                        method, parameters, operation.Cancellation.Token).ConfigureAwait(false);
+                    // Cancellation after native submission does not rewrite an
+                    // accepted result. Its record also remains in host state.
+                    response["ok"] = true;
+                    response["result"] = result;
+                }
+                catch (Exception error)
+                {
+                    string code = error.Data["code"] as string;
+                    if (code == null) code = error is OperationCanceledException ? "CANCELLED"
+                        : error is ArgumentException ? "INVALID_ARGUMENT" : "ARCANE_NOTIFICATION_FAILED";
+                    response["ok"] = false;
+                    response["error"] = ArcaneHost.ErrorRecord(error, code);
+                }
+                response["time"] = DateTime.UtcNow.ToString("o");
+                string json = ArcaneHost.Serializer().Serialize(response);
+                lock (stateLock) pending.Enqueue(new CoreDelivery(operation.Generation, json));
+                ScheduleDelivery();
+            }
+            catch (Exception error)
+            {
+                // A bridge-accepted request must receive its response or the
+                // owning transport failure, including serialization failures.
+                CoreFailed(error);
+            }
+            finally
+            {
+                lock (stateLock)
+                {
+                    desktopNotificationRequests.Remove(id);
+                    operation.Cancellation.Dispose();
+                }
+            }
+        }
+
+        private void DesktopNotificationChanged(Dictionary<string, object> record)
+        {
+            string json = ArcaneHost.Serializer().Serialize(new Dictionary<string, object>
+            {
+                { "protocol", "arcane/1" }, { "type", "event" },
+                { "event", "notifications.state" }, { "data", record }, { "time", DateTime.UtcNow.ToString("o") }
+            });
+            lock (stateLock) pending.Enqueue(new CoreDelivery(generation, json));
+            ScheduleDelivery();
+        }
+
+        private void CancelDesktopNotificationRequests(long? documentGeneration)
+        {
+            lock (stateLock)
+            {
+                // Cancellation can settle a queued operation synchronously;
+                // iterate a snapshot while its completion removes correlation.
+                foreach (DesktopNotificationRequest operation in
+                    new List<DesktopNotificationRequest>(desktopNotificationRequests.Values))
+                    if (!documentGeneration.HasValue || operation.Generation == documentGeneration.Value)
+                        operation.Cancellation.Cancel();
+            }
+        }
+
+        private void StopDesktopNotifications()
+        {
+            CancelDesktopNotificationRequests(null);
+            if (desktopNotifications == null || desktopNotificationsClosing != null) return;
+            try { desktopNotificationsClosing = desktopNotifications.CloseAsync(); }
+            catch (Exception error) { Report(error); }
+        }
+
+        private async Task DrainDesktopNotificationsAsync()
+        {
+            List<Task> operations = new List<Task>();
+            lock (stateLock)
+            {
+                foreach (DesktopNotificationRequest operation in desktopNotificationRequests.Values)
+                    operations.Add(operation.Completion);
+            }
+            if (desktopNotificationsClosing != null) operations.Add(desktopNotificationsClosing);
+            Task settled = Task.WhenAll(operations);
+            try { await settled; }
+            catch (Exception error) { ReportTaskFailure(settled, error); }
+        }
+
+        private sealed class DesktopNotificationRequest
+        {
+            internal readonly long Generation;
+            internal readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
+            internal Task Completion;
+
+            internal DesktopNotificationRequest(long generation) { Generation = generation; }
         }
 
         private async Task LoadApplicationIconAsync()
@@ -762,12 +902,14 @@ namespace Arcane.Core.Hosts.Windows
         private void DocumentConnected(long documentGeneration)
         {
             ArcaneBridge previous;
+            long previousGeneration;
             lock (stateLock)
             {
                 if (closing) return;
                 if (documentGeneration == generation && documentReady) return;
                 if (documentGeneration != registeredGeneration) return;
                 previous = activeBridge;
+                previousGeneration = generation;
                 generation = documentGeneration;
                 activeBridge = bridge;
                 documentReady = true;
@@ -775,6 +917,7 @@ namespace Arcane.Core.Hosts.Windows
             if (previous != null && previous != activeBridge)
             {
                 previous.Stop(new OperationCanceledException("The previous document has navigated away."));
+                CancelDesktopNotificationRequests(previousGeneration);
                 if (transportFailure == null)
                 {
                     try { ObserveSend(core.SendAsync(CancelRendererRequests)); }
@@ -960,6 +1103,7 @@ namespace Arcane.Core.Hosts.Windows
             if (IsDisposed) return;
             if (bridge != null) bridge.Stop(transportFailure);
             if (activeBridge != null) activeBridge.Stop(transportFailure);
+            CancelDesktopNotificationRequests(null);
             NotifyTransportFailure();
             if (core != null) core.CloseAsync();
             ScheduleDelivery();
@@ -1014,6 +1158,7 @@ namespace Arcane.Core.Hosts.Windows
             if (bridge != null) bridge.Stop(new InvalidOperationException("The application window is closing."));
             if (activeBridge != null) activeBridge.Stop(new InvalidOperationException("The application window is closing."));
             StopAppControl();
+            StopDesktopNotifications();
             WindowStateTransition.ReleasePending(this);
             shutdown = DrainAndCloseAsync();
             shutdown.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
@@ -1042,6 +1187,7 @@ namespace Arcane.Core.Hosts.Windows
                 }
             }
             await DrainAppControlAsync();
+            await DrainDesktopNotificationsAsync();
             // Joining the independent image owner belongs after Core input has
             // closed; image I/O must never delay accepted service work draining.
             if (iconLoading != null)

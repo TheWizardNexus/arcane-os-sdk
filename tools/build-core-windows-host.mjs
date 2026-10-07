@@ -1,14 +1,16 @@
-import {copyFile, mkdir, mkdtemp, writeFile} from 'node:fs/promises';
+import {access, copyFile, mkdir, mkdtemp, readdir, writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {runAppControl} from '../browser-runtime/core/app-control.mjs';
 
 /** Compile reusable Windows x64 host assets once; application assembly copies them. */
-export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, compiler, outputRoot}) {
+export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, compiler, outputRoot,
+    windowsMetadataPath, frameworkReferenceDirectory}) {
     const packageRoot = path.resolve(webViewPackageRoot);
     const seaRoot = path.resolve(seaDirectory);
     const parent = path.resolve(outputRoot);
+    const notificationReferences = await resolveNotificationReferences({windowsMetadataPath, frameworkReferenceDirectory});
     await mkdir(parent, {recursive: true});
     const directory = await mkdtemp(path.join(parent, 'arcane-windows-host-'));
     const runtime = path.join(directory, 'runtime');
@@ -34,9 +36,10 @@ export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, co
         '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll',
         '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
         ...references.map(function managedReference(name) { return `/reference:${path.join(managed, name)}`; }),
+        ...notificationReferences.map(function notificationReference(filename) { return `/reference:${filename}`; }),
         path.join(source, 'ArcaneLauncher.cs'), path.join(source, 'ArcaneHost.cs'), path.join(source, 'ArcaneCoreProcess.cs'),
         path.join(source, 'ArcaneFrameTransport.cs'), path.join(source, 'ArcaneAppControl.cs'),
-        path.join(source, 'ArcaneWindowControl.cs')
+        path.join(source, 'ArcaneWindowControl.cs'), path.join(source, 'ArcaneNotifications.cs'),
     ];
 
     // Compiler and copying use separate files. Observe both before reporting a
@@ -65,10 +68,55 @@ export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, co
     return {directory, executable, runtime};
 }
 
-if (import.meta.main) {
-    const [webViewPackageRoot, seaDirectory, compiler, outputRoot] = process.argv.slice(2);
-    if (!webViewPackageRoot || !seaDirectory || !compiler || !outputRoot) {
-        throw new Error('Usage: node tools/build-core-windows-host.mjs <extracted-WebView2-package> <Core-SEA-directory> <csc.exe> <output-directory>');
+/** Windows supplies these compile references; they are not copied into the app. */
+async function resolveNotificationReferences({windowsMetadataPath, frameworkReferenceDirectory}) {
+    const programFiles = process.env['ProgramFiles(x86)'] ?? process.env.ProgramFiles;
+    const systemRoot = process.env.SystemRoot;
+    if (!systemRoot || ((!windowsMetadataPath || !frameworkReferenceDirectory) && !programFiles)) {
+        throw new Error('Build the Windows host with the installed Windows SDK and .NET Framework reference assemblies.');
     }
-    console.log(await buildCoreWindowsHost({webViewPackageRoot, seaDirectory, compiler, outputRoot}));
+    const metadataRoot = programFiles && path.join(programFiles, 'Windows Kits', '10', 'UnionMetadata');
+    const frameworkRoot = programFiles && path.join(programFiles, 'Reference Assemblies', 'Microsoft', 'Framework', '.NETFramework');
+    const facadeNames = ['Facades/System.Runtime.dll', 'Facades/System.Runtime.InteropServices.WindowsRuntime.dll'];
+    const selections = await Promise.all([
+        windowsMetadataPath ? Promise.resolve(path.resolve(windowsMetadataPath)) :
+            installedReferenceDirectory(metadataRoot, ['Windows.winmd']).then(function metadata(directory) {
+                return path.join(directory, 'Windows.winmd');
+            }),
+        frameworkReferenceDirectory ? Promise.resolve(path.resolve(frameworkReferenceDirectory)) :
+            installedReferenceDirectory(frameworkRoot, facadeNames, ['v4.6.2', 'v4.6.1'])
+    ]);
+    const references = [selections[0],
+        ...facadeNames.map(function frameworkFacade(name) { return path.join(selections[1], name); }),
+        path.join(systemRoot, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'System.Runtime.WindowsRuntime.dll')];
+    await Promise.all(references.map(function existingReference(filename) { return access(filename); }));
+    return references;
+}
+
+async function installedReferenceDirectory(root, filenames, preferred = []) {
+    const entries = await readdir(root, {withFileTypes: true});
+    const versions = entries.filter(function versionDirectory(entry) {
+        return entry.isDirectory() && /^v?\d+(?:\.\d+)+$/u.test(entry.name);
+    }).map(function versionName(entry) { return entry.name; }).sort(function newerFirst(left, right) {
+        return right.localeCompare(left, 'en', {numeric: true});
+    });
+    for (const version of new Set([...preferred, ...versions])) {
+        const directory = path.join(root, version);
+        try {
+            await Promise.all(filenames.map(function existingReference(name) { return access(path.join(directory, name)); }));
+            return directory;
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+    throw new Error(`The installed reference directories under ${root} do not contain ${filenames.join(', ')}.`);
+}
+
+if (import.meta.main) {
+    const [webViewPackageRoot, seaDirectory, compiler, outputRoot, windowsMetadataPath, frameworkReferenceDirectory] = process.argv.slice(2);
+    if (!webViewPackageRoot || !seaDirectory || !compiler || !outputRoot) {
+        throw new Error('Usage: node tools/build-core-windows-host.mjs <extracted-WebView2-package> <Core-SEA-directory> <csc.exe> <output-directory> [Windows.winmd] [.NETFramework-reference-directory]');
+    }
+    console.log(await buildCoreWindowsHost({webViewPackageRoot, seaDirectory, compiler, outputRoot,
+        windowsMetadataPath, frameworkReferenceDirectory}));
 }
