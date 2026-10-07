@@ -7813,6 +7813,17 @@ published SDK/runtime dependencies and the canonical Core entry/client into a
 fresh output directory. Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.
 
+The generated `runtime/arcane-core.mjs` also accepts
+`--arcane-app-entry <app-relative-module>` through the host's supported Node
+executable; the portable provider supplies no executable. Include that module
+and its complete source closure through `package.nativeResources`. The flag
+imports it from the packaged `app/` directory, preserves complete `process.argv`,
+and runs its top-level work rather than invoking an export or making it
+`import.meta.main`. The entry owns explicit launch-context reads, services,
+signals and shutdown; ordinary Core startup is skipped only in this mode.
+See [app-owned runtime entry](core-native-packaging.md#app-owned-runtime-entry)
+and [packaged MCP commands and lifetime](mcp-stdio.md#launch-from-a-native-package).
+
 Explicit `native.launchContext.coreListener:{endpoint}` also composes one passive
 model observation service after `startCoreHost()` and before listener binding,
 using that runtime and existing services exposing `localai.status`, `image.status`
@@ -7820,11 +7831,13 @@ and `decisions.status`. Missing owners remain `null`; renderer attachment stays
 application-owned. Ordinary stdio and shared/headless branches gain no model
 startup or readiness barrier. See [native observation composition](core-native-packaging.md#launch-time-locations).
 
-An optional `appDescriptor.native.window` record carries `width`, `height` and
-`resizable` into `manifest.window`. Dimensions are positive integral logical
-client units; `resizable` is an optional boolean. Omitted fields remain omitted.
-The portable payload records the selection; the selected platform host owns
-its window behavior. See [initial native window size](core-native-packaging.md#initial-native-window-size).
+An optional `appDescriptor.native.window` record carries `width`, `height`,
+`resizable` and `state` into `manifest.window`. Dimensions are positive integral
+logical client units; `resizable` is an optional boolean, and `state` selects
+`normal`, `maximized` or `fullscreen`. Omitted fields remain omitted. The portable
+payload records the selection; the matching Windows host applies it, while
+current other-platform hosts retain their existing window behavior. See
+[initial native window size and state](core-native-packaging.md#initial-native-window-size).
 
 ### Availability and normalization
 
@@ -7941,11 +7954,25 @@ The matching Windows host consumes `appDescriptor.native.window` through
 `manifest.window`. Optional `width` and `height` select initial client dimensions
 in 96-DPI logical units; the host scales them for its actual DPI and fits the
 outer window within the current screen's usable area. Optional `resizable:false`
-selects a fixed-size border and disables maximizing. Omitted fields preserve
-the existing host defaults. Initial sizing preserves a window already restored
-to a non-normal state and does not add saved-bounds storage. The initial-fit
-logic is not reapplied during later user resizing. See [initial native window size](core-native-packaging.md#initial-native-window-size)
-for a complete descriptor example and the other-platform boundary.
+selects a fixed-size border and disables the maximize control. Optional `state`
+selects `normal`, `maximized` or `fullscreen`; the host applies an explicit state
+after its initial sizing pass and before the composing launcher's `Load` handler.
+Initial sizing runs only for a Normal window. Omitted fields preserve existing
+host choices, including the current state when `state` is omitted. Fullscreen
+retains normal bounds and frame controls for restoration. No saved-bounds store
+is added, and initial-fit logic is not reapplied during later user resizing.
+See [initial native window size and state](core-native-packaging.md#initial-native-window-size)
+for the complete descriptor and unchanged other-platform behavior.
+
+The packaged `runtime/ArcaneCore.exe` also accepts
+`--arcane-app-entry <app-relative-module>` directly, without a script argument
+or the GUI launcher. Include the entry and complete source closure through
+`package.nativeResources`. It imports the selected packaged `app/` module with
+complete `process.argv` unchanged, running top-level work without invoking an
+export or making it `import.meta.main`. The entry owns explicit launch-context
+reads, services, signals and shutdown; this mode skips ordinary Core startup,
+while omission retains it. See [app-owned runtime entry](core-native-packaging.md#app-owned-runtime-entry)
+and [packaged MCP commands and lifetime](mcp-stdio.md#launch-from-a-native-package).
 
 The returned `arcane-native-builder/1` provider exposes `describe`, `doctor`,
 `prepare`, `build`, `verify` and `run`. Build returns `{app,target,manifest}`
