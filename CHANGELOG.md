@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.89.0
+
+- Add explicitly selected clone-local author name/email before the first
+  checkout. Existing repositories and omitted settings retain their current
+  identity; Git author settings remain distinct from authenticated accounts.
+- Add an app-owned entry point to the packaged native runtime. Applications
+  can launch their MCP module through that runtime with complete arguments,
+  while ordinary Core startup and app-owned shutdown remain intact.
+- Add native window-state control and Escape app-control support. Use the
+  matching Windows host asset and rebuild consumer artifacts through their
+  existing public SDK workflow.
+- Support opt-in extension-local decision runtime distribution and projected
+  native llama preparation with retained model lifetime and per-host target
+  selection. Model acquisition and application preferences remain with their
+  existing owners; CUDA acquisition requires its applicable dependency approval.
+- Preserve literal Unicode and whitespace in RiskSignalAnalyzer input.
+- Select the corrected portable Windows x64 ONNX 1.30.0 distribution through
+  the matching numeric SDK release. Include its complete native runtime closure
+  and notices in the separate retained runtime asset; keep native speech work
+  outside this release.
+
 ## 0.88.1
 
 - Recover an ordinary workspace-operation lock when its recorded runner is
