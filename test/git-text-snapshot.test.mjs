@@ -10,7 +10,8 @@ function deferred() {
     return {promise, resolve};
 }
 
-async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, blobOutput, gitIdentity} = {}) {
+async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, blobOutput, gitIdentity,
+    allowUnborn, advertisement, advertisementGate} = {}) {
     const parent = path.resolve('.arcane/test/git-text-snapshot');
     await mkdir(parent, {recursive: true});
     const cacheDirectory = await mkdtemp(path.join(parent, 'case-'));
@@ -18,6 +19,7 @@ async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, b
     t.after(async function removeOwnedCache() { await rm(cacheDirectory, {recursive: true, force: true}); });
     const state = {
         revision: 'a'.repeat(40), calls: [], fetchStarted: deferred(), events: [],
+        advertisement: advertisement ?? `${'a'.repeat(40)}\trefs/heads/main\n`, advertisementStarted: deferred(),
         files: files ?? [
             {path: 'messages/moon\tcheese\n🧀.md', object: 'b'.repeat(40), content: '\uFEFF  Moon 🧀\r\n\u0000whole story\n\n'},
             {path: 'participants/empty.yaml', object: 'c'.repeat(40), content: ''}
@@ -56,7 +58,15 @@ async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, b
             assert.deepEqual(args.slice(0, 2), ['--git-dir', cacheDirectory]);
             const operation = args[2];
             if (operation === 'rev-parse') stdout = args[3] === '--is-bare-repository' ? `${bare}\n` : `${state.revision}\n`;
-            else if (operation === 'fetch') {
+            else if (operation === 'ls-remote') {
+                assert.deepEqual(args.slice(2), ['ls-remote', '--symref', '--', 'example-remote']);
+                assert.equal(options.signal, undefined);
+                state.advertisementStarted.resolve();
+                if (advertisementGate) await advertisementGate.promise;
+                if (state.advertisementFailure) throw state.advertisementFailure;
+                stdout = state.advertisement;
+                if (state.advertisementCode) return {code: state.advertisementCode, stdout, stderr: 'Complete remote diagnostic.\n'};
+            } else if (operation === 'fetch') {
                 assert.deepEqual(args.slice(2), ['fetch', '--no-tags', '--no-write-fetch-head', '--', 'example-remote', '+main:refs/arcane/text-snapshot']);
                 assert.equal(options.signal, undefined);
                 state.fetchStarted.resolve();
@@ -85,7 +95,7 @@ async function fixture(t, {files, selectPath, fetchGate, failure, bare = true, b
         return {code: 0, stdout, stderr: ''};
     }
     const owner = createGitTextSnapshot({
-        cacheDirectory, remote: 'example-remote', ref: 'main', gitIdentity,
+        cacheDirectory, remote: 'example-remote', ref: 'main', gitIdentity, allowUnborn,
         selectPath: selectPath ?? function selectAll() { return true; },
         run, onEvent: function observe(event) { state.events.push(event); }
     });
@@ -304,4 +314,86 @@ test('close reports an accepted refresh failure after caller cancellation', asyn
     const observed = assert.rejects(closed, function original(error) { return error === failure.current; });
     fetchGate.resolve();
     await observed;
+});
+
+test('explicit unborn snapshots reobserve the remote and distinguish committed empty trees', async function unbornSnapshots(t) {
+    const {owner, state} = await fixture(t, {allowUnborn: true, advertisement: '', files: []});
+    const empty = await owner.refresh();
+    assert.deepEqual(empty, {revision: null, files: [], unborn: true});
+    empty.files.push({path: 'caller-only', content: 'Never retained.'});
+    assert.deepEqual(await owner.refresh(), {revision: null, files: [], unborn: true});
+    assert.equal(state.calls.some(function fetched(call) { return call.args[2] === 'fetch'; }), false);
+    state.advertisement = `${state.revision}\trefs/heads/main\n`;
+    assert.deepEqual(await owner.refresh(), {revision: state.revision, files: [], unborn: false});
+    assert.deepEqual(await owner.refresh(), {revision: state.revision, files: [], unborn: false});
+    assert.equal(state.calls.filter(function tree(call) { return call.args[2] === 'ls-tree'; }).length, 1);
+    state.advertisement = '';
+    assert.deepEqual(await owner.refresh(), {revision: null, files: [], unborn: true});
+    state.advertisement = `${state.revision}\trefs/heads/main\n`;
+    assert.deepEqual(await owner.refresh(), {revision: state.revision, files: [], unborn: false});
+    assert.equal(state.calls.filter(function tree(call) { return call.args[2] === 'ls-tree'; }).length, 2);
+    assert.equal(state.calls.filter(function observed(call) { return call.args[2] === 'ls-remote'; }).length, 6);
+    assert.equal(state.events.at(-1).data.unborn, false);
+});
+
+test('allowUnborn requires an explicit boolean before any work', function unbornOption() {
+    for (const allowUnborn of [null, 0, 1, 'true', {}, []]) {
+        assert.throws(function invalidOption() {
+            createGitTextSnapshot({cacheDirectory: 'uncreated-cache', remote: 'selected-remote', ref: 'main',
+                selectPath: function selectAll() { return true; }, allowUnborn,
+                run: function neverRun() { assert.fail('Construction must not execute Git.'); }});
+        }, {name: 'TypeError', message: 'allowUnborn must be a boolean.'});
+    }
+});
+
+test('advertised HEAD, other branches, tags and symbolic refs retain selected-ref failures', async function populatedRemote(t) {
+    const failure = {current: new Error('Complete missing selected ref failure.\n')};
+    for (const advertisement of [
+        `${'a'.repeat(40)}\tHEAD\n`, `${'a'.repeat(40)}\trefs/heads/other\n`,
+        `${'a'.repeat(40)}\trefs/tags/cheese\n`, 'ref: refs/heads/other\tHEAD\n', ' \n'
+    ]) {
+        const {owner, state} = await fixture(t, {allowUnborn: true, advertisement, failure});
+        await assert.rejects(owner.refresh(), function nativeFailure(error) { return error === failure.current; });
+        assert.equal(state.calls.filter(function fetched(call) { return call.args[2] === 'fetch'; }).length, 1);
+    }
+    const {owner, state} = await fixture(t, {advertisement: '', failure});
+    await assert.rejects(owner.refresh(), function defaultFailure(error) { return error === failure.current; });
+    assert.equal(state.calls.some(function observed(call) { return call.args[2] === 'ls-remote'; }), false);
+});
+
+test('empty remote output with a failure never becomes an unborn result', async function failedAdvertisement(t) {
+    const {owner, state} = await fixture(t, {allowUnborn: true, advertisement: ''});
+    await owner.refresh();
+    const failure = new Error('Authentication or transport failed with complete diagnostics.');
+    failure.details = {code: 128, stdout: '', stderr: 'Complete rejection.\n'};
+    state.advertisementFailure = failure;
+    await assert.rejects(owner.refresh(), function original(error) { return error === failure; });
+    state.advertisementFailure = null;
+    state.advertisementCode = 128;
+    await assert.rejects(owner.refresh(), function failedProcess(error) {
+        assert.equal(error.code, 'ARCANE_OPERATION_FAILED');
+        assert.deepEqual(error.details, {code: 128, stdout: '', stderr: 'Complete remote diagnostic.\n'});
+        return true;
+    });
+    assert.equal(state.calls.some(function fetched(call) { return call.args[2] === 'fetch'; }), false);
+});
+
+test('unborn acquisition preserves shared identity, cancellation, cache role and drain', async function unbornLifetime(t) {
+    const advertisementGate = deferred();
+    const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};
+    const {owner, state} = await fixture(t, {allowUnborn: true, advertisement: '', advertisementGate, gitIdentity});
+    const controller = new AbortController();
+    const cancelled = owner.refresh({signal: controller.signal});
+    const retained = owner.refresh();
+    await state.advertisementStarted.promise;
+    controller.abort();
+    await assert.rejects(cancelled, {code: 'ARCANE_CANCELLED'});
+    const closing = owner.close();
+    advertisementGate.resolve();
+    assert.deepEqual(await retained, {revision: null, files: [], unborn: true});
+    await closing;
+    assert.equal(state.calls.filter(function observed(call) { return call.args[8] === 'ls-remote'; }).length, 1);
+    const wrongRole = await fixture(t, {allowUnborn: true, advertisement: '', bare: false});
+    await assert.rejects(wrongRole.owner.refresh(), {code: 'ARCANE_GIT_SNAPSHOT_CACHE_INVALID'});
+    assert.equal(wrongRole.state.calls.some(function observed(call) { return call.args[2] === 'ls-remote'; }), false);
 });

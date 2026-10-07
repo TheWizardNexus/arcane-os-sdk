@@ -670,6 +670,10 @@ test('configuration observes selected branch and remote arrays without preparing
         let stdout;
         if (args[0] === 'rev-parse') stdout = 'true\n\n';
         else if (args[0] === 'symbolic-ref') stdout = 'refs/heads/moon.release+dispatch\n';
+        else if (args[0] === '--no-optional-locks') {
+            assert.deepEqual(args, ['--no-optional-locks', 'status', '--porcelain=v2', '-z', '--branch', '--untracked-files=no']);
+            stdout = '# branch.oid selected-commit\0# branch.head moon.release+dispatch\0';
+        }
         else if (calls.length === 3) {
             assert.equal(args.at(-1), '^branch\\.moon\\.release\\+dispatch[.](remote|merge)$');
             stdout = 'branch.moon.release+dispatch.remote\nearlier\0branch.moon.release+dispatch.remote\nmoon+relay\0'
@@ -684,12 +688,12 @@ test('configuration observes selected branch and remote arrays without preparing
     }
     const repository = createRepositoryWorkspace({directory, remote: 'never-clone', run});
     assert.deepEqual(await repository.configuration(), {
-        repositoryRoot: directory, headRef: 'refs/heads/moon.release+dispatch',
+        repositoryRoot: directory, headRef: 'refs/heads/moon.release+dispatch', revision: 'selected-commit', unborn: false,
         origin: {urls: [originUrl, ''], pushUrls: ['']},
         upstream: {remoteNames: ['earlier', 'moon+relay'], mergeRefs: ['refs/heads/main', 'refs/heads/other'],
             urls: [upstreamUrl, upstreamUrl], pushUrls: []}
     });
-    assert.equal(calls.length, 4);
+    assert.equal(calls.length, 5);
     assert.deepEqual(await readdir(root), []);
     await repository.close();
     await assert.rejects(repository.configuration(), {code: 'CORE_CLOSING'});
@@ -697,7 +701,7 @@ test('configuration observes selected branch and remote arrays without preparing
 
 test('configuration preserves detached and unborn HEAD, unset configuration and actual failures', async function configurationStates(t) {
     const root = await fixture(t);
-    for (const selected of ['detached', 'unborn', 'local', 'missing', 'non-text']) {
+    for (const selected of ['detached', 'unborn', 'local', 'missing', 'non-text', 'missing-state', 'failed-state']) {
         const directory = path.join(root, selected);
         const calls = [];
         const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Complete missing-repository failure.');
@@ -707,6 +711,11 @@ test('configuration preserves detached and unborn HEAD, unset configuration and 
             if (selected === 'missing') throw failure;
             let stdout;
             if (args[0] === 'rev-parse') stdout = 'true\n\n';
+            else if (args[0] === '--no-optional-locks') {
+                stdout = selected === 'missing-state' ? '# branch.head main\0'
+                    : `# branch.oid ${selected === 'unborn' || selected === 'failed-state' ? '(initial)' : 'selected-commit'}\0`
+                        + `# branch.head ${selected === 'detached' ? '(detached)' : 'main'}\0`;
+            }
             else if (args[0] === 'symbolic-ref') {
                 if (selected === 'detached') return {code: 1, stdout: null, stderr: ''};
                 stdout = 'refs/heads/main\n';
@@ -719,6 +728,9 @@ test('configuration preserves detached and unborn HEAD, unset configuration and 
                 else return {code: 1, stdout: null, stderr: ''};
             } else return {code: 1, stdout: null, stderr: ''};
             await options.onOutput({stream: 'stdout', chunk: Buffer.from(stdout)});
+            if (selected === 'failed-state' && args[0] === '--no-optional-locks') {
+                return {code: 128, stdout: null, stderr: 'Complete branch-state failure.\n'};
+            }
             return processResult(null);
         }
         const repository = createRepositoryWorkspace({directory, remote: 'never-clone', run});
@@ -732,9 +744,19 @@ test('configuration preserves detached and unborn HEAD, unset configuration and 
                 assert.equal(error.details.stderr, 'Complete invalid-text diagnostic.');
                 return true;
             });
+        } else if (selected === 'missing-state' || selected === 'failed-state') {
+            await assert.rejects(repository.configuration(), function actualStateFailure(error) {
+                assert.equal(error.code, selected === 'missing-state' ? 'ARCANE_REPOSITORY_HEAD_UNAVAILABLE' : 'ARCANE_OPERATION_FAILED');
+                assert.equal(error.details.code, selected === 'missing-state' ? 0 : 128);
+                assert.ok(Buffer.isBuffer(error.rawStdout));
+                if (selected === 'failed-state') assert.equal(error.details.stderr, 'Complete branch-state failure.\n');
+                return true;
+            });
         } else {
             const result = await repository.configuration();
             assert.equal(result.headRef, selected === 'detached' ? null : 'refs/heads/main');
+            assert.equal(result.unborn, selected === 'unborn');
+            assert.equal(result.revision, selected === 'unborn' ? null : 'selected-commit');
             assert.deepEqual(result.origin, {urls: [], pushUrls: []});
             assert.deepEqual(result.upstream, selected === 'detached' ? null : {
                 remoteNames: selected === 'local' ? ['.'] : [],
@@ -1335,6 +1357,159 @@ test('writer distinguishes pre-spawn observer failure from interrupted commit an
                 return true;
             }
         );
+        await repository.close();
+    }
+});
+
+test('initialBranch changes only a newly cloned fully unadvertised initial checkout', async function initialBranchSelection(t) {
+    const root = await fixture(t);
+    const remote = '../Moon # % 🧀/wire.git';
+    const remoteBase = path.join(root, 'catalog');
+    const remoteArgument = path.resolve(remoteBase, remote);
+    for (const selected of ['unborn', 'relative', 'local-refs', 'committed', 'advertised', 'existing']) {
+        const directory = path.join(root, selected);
+        const selectedRemote = selected === 'relative' ? remote : remoteArgument;
+        if (selected === 'existing') {
+            await mkdir(directory);
+            await writeFile(path.join(directory, 'keep.md'), 'Complete existing content.\n');
+        }
+        const calls = [];
+        async function run(command, args, options) {
+            calls.push(args);
+            assert.equal(command, 'git');
+            if (args[0] === 'clone') {
+                assert.deepEqual(args, ['clone', '--progress', '--', selectedRemote, directory]);
+                await mkdir(directory);
+                return processResult('Complete clone output.\n', 'Complete clone diagnostic.\n');
+            }
+            if (args[0] === 'rev-parse') return processResult('true\n\n');
+            if (args[0] === 'ls-remote') {
+                assert.equal(options.cwd, root);
+                assert.deepEqual(args, ['ls-remote', '--symref', '--', selectedRemote]);
+                return processResult(selected === 'advertised' ? 'selected-commit\trefs/heads/other\n' : '', 'Complete remote observation.\n');
+            }
+            assert.equal(options.cwd, directory);
+            if (args[0] === '--no-optional-locks') {
+                return processResult(`# branch.oid ${selected === 'committed' ? 'selected-commit' : '(initial)'}\0# branch.head old-default\0`);
+            }
+            if (args[0] === 'for-each-ref') {
+                assert.deepEqual(args, ['for-each-ref', '--format=%(refname)']);
+                return processResult(selected === 'local-refs' ? 'refs/heads/moon-main\n' : '', 'Complete local refs.\n');
+            }
+            assert.deepEqual(args, ['symbolic-ref', 'HEAD', 'refs/heads/moon-main']);
+            return processResult('', 'Complete initial-branch diagnostic.\n');
+        }
+        const options = {directory, remote, remoteBase: selected === 'relative' ? undefined : remoteBase,
+            initialBranch: 'moon-main', run};
+        const repository = createRepositoryWorkspace(options);
+        options.initialBranch = 'later-selection';
+        options.remoteBase = 'later-base';
+        assert.equal(calls.length, 0);
+        const result = await repository.open();
+        assert.equal(result.cloned, selected !== 'existing');
+        assert.equal(calls.some(function switched(args) { return args[0] === 'symbolic-ref'; }),
+            selected === 'unborn' || selected === 'relative');
+        if (selected === 'existing') {
+            assert.equal(calls.length, 1);
+            assert.equal(await readFile(path.join(directory, 'keep.md'), 'utf8'), 'Complete existing content.\n');
+            assert.equal(result.outputs, undefined);
+        } else {
+            assert.equal(result.stdout, 'Complete clone output.\n');
+            assert.equal(result.stderr, 'Complete clone diagnostic.\n');
+            assert.deepEqual(result.outputs.map(function operation(output) { return output.operation; }),
+                selected === 'unborn' || selected === 'relative' ? ['clone', 'observeRemote', 'observeHead', 'observeRefs', 'selectInitialBranch']
+                    : selected === 'local-refs' ? ['clone', 'observeRemote', 'observeHead', 'observeRefs']
+                        : selected === 'committed' ? ['clone', 'observeRemote', 'observeHead'] : ['clone', 'observeRemote']);
+            assert.equal(result.outputs[1].stderr, 'Complete remote observation.\n');
+        }
+        const previousCalls = calls.length;
+        assert.deepEqual(await repository.open(), {directory, cloned: false});
+        assert.equal(calls.length, previousCalls);
+        await repository.close();
+    }
+});
+
+test('first write composes initialBranch, identity and explicit publication without a pull', async function firstPublication(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'first publication');
+    const calls = [];
+    const content = '\uFEFF  Entire moon-cheese dispatch 🧀\r\nNUL:\0\n';
+    const message = '  Exact first publication\n\nFinal line.  ';
+    const prefix = ['-c', 'user.name=Moon Dispatcher'];
+    async function run(command, args, options) {
+        assert.deepEqual(args.slice(0, prefix.length), prefix);
+        assert.equal(options.env.GIT_AUTHOR_NAME, 'Moon Dispatcher');
+        args = args.slice(prefix.length);
+        calls.push(args);
+        let stdout = '';
+        if (args[0] === 'clone') {
+            await mkdir(directory);
+            stdout = 'Complete clone output.\n';
+            assert.deepEqual(args, ['clone', '--progress', '--config', 'user.email=moon@example.invalid', '--', 'selected-remote', directory]);
+        } else if (args[0] === '--no-optional-locks') stdout = '# branch.oid (initial)\0# branch.head old-default\0';
+        else if (args.includes('commit')) {
+            const chunks = [];
+            for await (const chunk of options.input) chunks.push(chunk);
+            assert.deepEqual(chunks, [message]);
+        }
+        await options.onOutput({stream: 'stdout', chunk: stdout});
+        await options.onOutput({stream: 'stderr', chunk: `Complete ${args[0]} diagnostic.\n`});
+        return {code: 0, stdout: null, stderr: null};
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'selected-remote', initialBranch: 'main',
+        cloneIdentity: {email: 'moon@example.invalid'}, gitIdentity: {name: 'Moon Dispatcher'}, run});
+    const result = await repository.write({files: [{path: 'dispatch.md', content}], message,
+        target: {remote: 'selected-remote', ref: 'refs/heads/main'}});
+    assert.equal(result.state, 'pushed');
+    assert.equal(await readFile(path.join(directory, 'dispatch.md'), 'utf8'), content);
+    assert.equal(calls.some(function pulled(args) { return args[0] === 'pull'; }), false);
+    assert.deepEqual(calls[3], ['for-each-ref', '--format=%(refname)']);
+    assert.deepEqual(calls[4], ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+    assert.deepEqual(calls.at(-1), ['push', '--no-follow-tags', '--', 'selected-remote', 'HEAD:refs/heads/main']);
+    assert.deepEqual(result.outputs.map(function stage(output) { return output.stage; }),
+        ['prepare', 'prepare', 'prepare', 'prepare', 'prepare', 'stage', 'commit', 'push']);
+    assert.equal(result.outputs[0].stdout, 'Complete clone output.\n');
+    assert.equal(result.outputs[4].stderr, 'Complete symbolic-ref diagnostic.\n');
+    await repository.close();
+});
+
+test('initial preparation keeps completed output and actual remote, parser, selection and cancellation failures', async function failedInitialPreparation(t) {
+    const root = await fixture(t);
+    for (const selected of ['remote', 'head', 'refs', 'selection', 'cancelled']) {
+        const directory = path.join(root, selected);
+        const controller = new AbortController();
+        const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Complete original Git failure.',
+            {details: {code: 128, stdout: '', stderr: 'Complete native diagnostic.\n'}});
+        const calls = [];
+        async function run(command, args) {
+            calls.push(args);
+            if (args[0] === 'clone') {
+                await mkdir(directory);
+                await writeFile(path.join(directory, 'retained.md'), 'Retained preparation state.');
+                return processResult('Complete clone output.\n');
+            }
+            if (args[0] === 'ls-remote') {
+                if (selected === 'remote') throw failure;
+                if (selected === 'cancelled') controller.abort('Cancelled after complete remote observation.');
+                return processResult('', 'Complete remote observation.\n');
+            }
+            if (args[0] === '--no-optional-locks') {
+                return processResult(selected === 'head' ? '# branch.head main\0' : '# branch.oid (initial)\0');
+            }
+            if (args[0] === 'for-each-ref' && selected !== 'refs') return processResult();
+            throw failure;
+        }
+        const repository = createRepositoryWorkspace({directory, remote: 'selected-remote', initialBranch: 'main', run});
+        await assert.rejects(repository.open({signal: controller.signal}), function complete(error) {
+            assert.equal(error.details.cloned, true);
+            assert.equal(error.details.outputs[0].stdout, 'Complete clone output.\n');
+            if (selected === 'remote' || selected === 'refs' || selected === 'selection') assert.equal(error.cause, failure);
+            else assert.equal(error.code, selected === 'head' ? 'ARCANE_REPOSITORY_HEAD_UNAVAILABLE' : 'ARCANE_CANCELLED');
+            return true;
+        });
+        assert.equal(await readFile(path.join(directory, 'retained.md'), 'utf8'), 'Retained preparation state.');
+        assert.equal(calls.some(function mutated(args) { return ['pull', 'push', 'checkout', 'switch'].includes(args[0]); }), false);
+        if (selected === 'cancelled') assert.equal(calls.length, 2);
         await repository.close();
     }
 });

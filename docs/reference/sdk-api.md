@@ -5409,7 +5409,7 @@ a dedicated bare Git cache. It does not create or alter a working checkout.
 ### Signature, lifecycle, and result
 
 ```text
-createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})
+createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,allowUnborn=false,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Import from `arcane-os`. The application owns the cache location, remote, ref,
@@ -5420,6 +5420,14 @@ ends only that wait. `close()`, `drain()` and `dispose()` stop acceptance and
 await accepted refresh/process cleanup. Errors remain observable instead of
 returning stale or partial success. See [Git text snapshots](git-text-snapshot.md)
 for complete inputs, text semantics, errors, events and Core service composition.
+
+Optional `allowUnborn:true` observes the complete remote advertisement on every
+acquisition. Only successful empty output returns
+`{revision:null,files:[],unborn:true}`; committed results add `unborn:false` and
+retain the actual commit even for an empty tree. Any advertised HEAD, branch
+or tag continues through ordinary selected-ref fetch; missing refs and actual
+Git failures remain errors. Omitted/false preserves the prior result and commands.
+See [unborn remotes](git-text-snapshot.md#unborn-remotes).
 
 Optional `remoteBase` explicitly selects `remote` as a local filesystem locator.
 Only its Git fetch argument is derived using `path.resolve(remoteBase, remote)`,
@@ -8400,7 +8408,7 @@ explicit existing path. The application owns the remote, branch and Core API.
 ### Signature and result
 
 ```text
-createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
+createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,initialBranch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. Construction does
@@ -8410,6 +8418,17 @@ Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the [complete inputs, results,
 errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+Optional `initialBranch` selects `refs/heads/<initialBranch>` only after a new
+clone, successful complete empty remote advertisement, explicit local
+initial-state observation and a successful empty local-ref listing. Any local
+ref supplied by a Git template or hook remains unchanged. Existing destinations and committed/advertised
+clones keep their branches; `branch` still means Git's existing-branch/tag clone
+selection. New-clone `open` results with this option add complete ordered
+preparation `outputs`; subsequent failures retain completed outputs and their
+original cause. Omission adds no command or result field. See
+[first-publication composition](core-repositories.md#first-publication-from-an-unborn-remote)
+for the direct first commit/push without an implicit pull.
 
 Optional factory `remoteBase` explicitly selects the initial-clone `remote` as
 a local filesystem locator. Only its Git argument is derived through the host's
@@ -8446,13 +8465,17 @@ omitted fields remain inherited. Username remains a credential hint, with
 authentication owned by ordinary Git and its configured helper.
 
 `configuration({signal})` observes an existing working root without clone,
-initialization or fetch. It returns `{repositoryRoot,headRef,origin,upstream}`:
+initialization or fetch. It returns `{repositoryRoot,headRef,revision,unborn,origin,upstream}`:
 full symbolic HEAD (including unborn, null when detached), origin URL/pushURL
 arrays and current branch remote/merge/URL/pushURL arrays. Unset, empty and
-repeated configuration values remain distinct. These are ordinary configured
-values, not authentication or endpoint proof, and are not atomic with later
-operations. Raw stdout is decoded without replacement; unrepresentable text
-reports `ARCANE_GIT_CONFIGURATION_NOT_TEXT` with full diagnostics.
+repeated configuration values remain distinct. `revision:null,unborn:true`
+comes only from Git's explicit porcelain-v2 initial state; committed and
+detached states retain their current revision with `unborn:false`. Missing
+branch-state output reports `ARCANE_REPOSITORY_HEAD_UNAVAILABLE`. These are
+ordinary configured values and local branch observations, not authentication
+or endpoint proof, and are not atomic with later operations. Raw stdout is
+decoded without replacement; unrepresentable text reports
+`ARCANE_GIT_CONFIGURATION_NOT_TEXT` with full diagnostics.
 
 `pull({target,signal})`, `push({target,signal})` and
 `write({files:[{path,content}],message,target,signal})` accept optional

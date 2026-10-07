@@ -5,7 +5,7 @@ import Is from 'strong-type';
 import {ArcaneError, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
 import {captureRepositoryRemote, captureRepositoryTarget, repositoryConfiguration, pullRepositoryTarget, pushRepositoryTarget,
-    repositoryPushArguments, repositoryStatus} from '../repository.mjs';
+    repositoryHeadArguments, repositoryHeadState, repositoryPushArguments, repositoryStatus} from '../repository.mjs';
 import {createGitIdentityRunner} from '../git-identity.mjs';
 
 export {readGitIdentity} from '../git-identity.mjs';
@@ -45,7 +45,7 @@ export function resolveArcaneDataPaths({dataRoot} = {}) {
 
 /** One connected checkout, composed into an application's own Core service. */
 export function createRepositoryWorkspace(
-    {name, directory, dataRoot, remote, remoteBase, branch, longPaths, cloneIdentity = {}, gitIdentity, onEvent, run = runProcess} = {}
+    {name, directory, dataRoot, remote, remoteBase, branch, initialBranch, longPaths, cloneIdentity = {}, gitIdentity, onEvent, run = runProcess} = {}
 ) {
     let selected = directory;
     if (selected === undefined) {
@@ -59,6 +59,12 @@ export function createRepositoryWorkspace(
     if (remote !== undefined) requireString(remote, 'remote');
     const remoteArgument = captureRepositoryRemote(remote, remoteBase);
     if (branch !== undefined) requireString(branch, 'branch');
+    if (initialBranch !== undefined) {
+        requireString(initialBranch, 'initialBranch');
+        if (!initialBranch.isWellFormed() || initialBranch.includes('\0')) {
+            throw new TypeError('initialBranch must be text representable as a native process argument.');
+        }
+    }
     if (longPaths !== undefined && !is.boolean(longPaths)) {
         throw new TypeError('longPaths must be a boolean when supplied.');
     }
@@ -126,9 +132,60 @@ export function createRepositoryWorkspace(
             arguments_,
             {cwd: path.dirname(repositoryDirectory), signal, onEvent}
         );
+        let outputs;
+        if (initialBranch !== undefined) {
+            const options = {cwd: repositoryDirectory, signal, onEvent};
+            outputs = [];
+            function completed(operation, observation) {
+                outputs.push({operation, stdout: observation.stdout, stderr: observation.stderr,
+                    code: observation.code, signal: observation.signal ?? null});
+            }
+            completed('clone', result);
+            try {
+                throwIfAborted(signal);
+                const advertised = await prepareRun('git', ['ls-remote', '--symref', '--', remoteArgument],
+                    {cwd: path.dirname(repositoryDirectory), signal, onEvent});
+                completed('observeRemote', advertised);
+                throwIfAborted(signal);
+                if (advertised.code !== 0) {
+                    throw new ArcaneError('ARCANE_OPERATION_FAILED', 'Git remote observation failed.', {details: advertised});
+                }
+                if (advertised.stdout === '') {
+                    const state = await prepareRun('git', [...repositoryHeadArguments], options);
+                    completed('observeHead', state);
+                    throwIfAborted(signal);
+                    if (state.code !== 0) {
+                        throw new ArcaneError('ARCANE_OPERATION_FAILED', 'Git branch state observation failed.', {details: state});
+                    }
+                    if (repositoryHeadState(state.stdout, state).unborn) {
+                        const references = await prepareRun('git', ['for-each-ref', '--format=%(refname)'], options);
+                        completed('observeRefs', references);
+                        throwIfAborted(signal);
+                        if (references.code !== 0) {
+                            throw new ArcaneError('ARCANE_OPERATION_FAILED', 'Git local ref observation failed.', {details: references});
+                        }
+                        // Git templates or hooks can supply local refs even
+                        // when the remote and this checkout's HEAD are unborn.
+                        if (references.stdout === '') {
+                            const selection = await prepareRun('git', ['symbolic-ref', 'HEAD', `refs/heads/${initialBranch}`], options);
+                            completed('selectInitialBranch', selection);
+                            throwIfAborted(signal);
+                            if (selection.code !== 0) {
+                                throw new ArcaneError('ARCANE_OPERATION_FAILED', 'Git initial branch selection failed.', {details: selection});
+                            }
+                        }
+                    }
+                }
+            } catch (cause) {
+                throw new ArcaneError(cause?.code ?? 'ARCANE_REPOSITORY_PREPARE_FAILED',
+                    cause instanceof Error ? cause.message : String(cause),
+                    {cause, details: {directory: repositoryDirectory, cloned: true, outputs}, exitCode: cause?.exitCode});
+            }
+        }
         throwIfAborted(signal);
         opened = true;
-        return {directory: repositoryDirectory, cloned: true, stdout: result.stdout, stderr: result.stderr};
+        return {directory: repositoryDirectory, cloned: true, stdout: result.stdout, stderr: result.stderr,
+            ...(outputs === undefined ? {} : {outputs})};
     }
 
     function accept(operation, signal) {

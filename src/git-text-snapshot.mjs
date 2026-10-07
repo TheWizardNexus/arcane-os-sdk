@@ -15,11 +15,12 @@ const snapshotRef = 'refs/arcane/text-snapshot';
  * One application service owns each dedicated cache directory. Construction
  * performs no I/O; refresh coalesces callers and close drains accepted work.
  */
-export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, selectPath, gitIdentity, onEvent, run = runProcess} = {}) {
+export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, selectPath, allowUnborn = false, gitIdentity, onEvent, run = runProcess} = {}) {
     for (const [name, value] of Object.entries({cacheDirectory, remote, ref})) {
         if (!is.string(value) || value === '') throw new TypeError(`${name} must be a nonempty string.`);
     }
     if (!is.function(selectPath)) throw new TypeError('selectPath must be a function.');
+    if (!is.boolean(allowUnborn)) throw new TypeError('allowUnborn must be a boolean.');
     const remoteArgument = captureRepositoryRemote(remote, remoteBase);
     const execute = createGitIdentityRunner(run, gitIdentity);
     const directory = path.resolve(cacheDirectory);
@@ -70,11 +71,28 @@ export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, 
         try {
             await events.send({type: 'git.snapshot.refreshing', message: 'Refreshing the selected repository revision.', data: {ref}});
             await prepare(events);
+            if (allowUnborn) {
+                // No ref pattern or --exit-code: a successful complete empty
+                // advertisement is distinct from a missing selected ref.
+                const advertised = await git(['ls-remote', '--symref', '--', remoteArgument], {onEvent: events.send});
+                if (advertised.code !== 0) {
+                    throw new ArcaneError(ERROR_CODES.operationFailed, 'Git remote observation failed.', {details: advertised});
+                }
+                if (advertised.stdout === '') {
+                    const result = {revision: null, files: [], unborn: true};
+                    await events.send({type: 'git.snapshot.completed', message: 'The remote advertises no revision.',
+                        data: {revision: null, unborn: true, reused: retained?.unborn === true}});
+                    await events.drain();
+                    retained = result;
+                    return result;
+                }
+            }
             await git(['fetch', '--no-tags', '--no-write-fetch-head', '--', remoteArgument, `+${ref}:${snapshotRef}`], {onEvent: events.send});
             const selected = await git(['rev-parse', '--verify', `${snapshotRef}^{commit}`], {onEvent: events.send});
             const revision = selected.stdout.trim();
             if (retained?.revision === revision) {
-                await events.send({type: 'git.snapshot.completed', message: 'The selected repository revision is unchanged.', data: {revision, reused: true}});
+                await events.send({type: 'git.snapshot.completed', message: 'The selected repository revision is unchanged.',
+                    data: {revision, reused: true, ...(allowUnborn ? {unborn: false} : {})}});
                 await events.drain();
                 return retained;
             }
@@ -125,8 +143,9 @@ export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, 
                     }
                 });
             }
-            const result = {revision, files: reader.finish()};
-            await events.send({type: 'git.snapshot.completed', message: 'Repository text snapshot is ready.', data: {revision, reused: false}});
+            const result = {revision, files: reader.finish(), ...(allowUnborn ? {unborn: false} : {})};
+            await events.send({type: 'git.snapshot.completed', message: 'Repository text snapshot is ready.',
+                data: {revision, reused: false, ...(allowUnborn ? {unborn: false} : {})}});
             await events.drain();
             retained = result;
             return result;
@@ -156,7 +175,8 @@ export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, 
             accepted.then(settled, settled);
         }
         return waitForSnapshot(active, signal).then(function copyResult(snapshot) {
-            return {revision: snapshot.revision, files: snapshot.files.map(function copyFile(file) { return {...file}; })};
+            return {revision: snapshot.revision, files: snapshot.files.map(function copyFile(file) { return {...file}; }),
+                ...(allowUnborn ? {unborn: snapshot.unborn} : {})};
         });
     }
 

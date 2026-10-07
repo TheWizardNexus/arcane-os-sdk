@@ -85,6 +85,25 @@ export function repositoryPushArguments(selection) {
         : ['push', '--no-follow-tags', '--', selection.remoteArgument, `HEAD:${selection.target.ref}`];
 }
 
+// Both configuration and new-clone preparation consume Git's explicit initial
+// state. NUL framing keeps unusual working filenames outside these headers.
+export const repositoryHeadArguments = [
+    '--no-optional-locks', 'status', '--porcelain=v2', '-z', '--branch', '--untracked-files=no'
+];
+
+export function repositoryHeadState(output, details) {
+    const prefix = '# branch.oid ';
+    const record = output.split('\0').find(function branchCommit(value) {
+        return value.startsWith(prefix);
+    });
+    const revision = record?.slice(prefix.length);
+    if (!revision) {
+        throw new ArcaneError('ARCANE_REPOSITORY_HEAD_UNAVAILABLE',
+            'Git did not report its current commit or initial branch state.', {details});
+    }
+    return revision === '(initial)' ? {revision: null, unborn: true} : {revision, unborn: false};
+}
+
 /** Observe an existing workspace without initializing or refreshing it. */
 export async function repositoryConfiguration({workspaceRoot = process.cwd(), signal, onEvent, run = runProcess} = {}) {
     const repositoryRoot = path.resolve(workspaceRoot);
@@ -147,7 +166,12 @@ export async function repositoryConfiguration({workspaceRoot = process.cwd(), si
         upstream.urls = remotes.get(`remote.${remoteName}.url`) ?? [];
         upstream.pushUrls = remotes.get(`remote.${remoteName}.pushurl`) ?? [];
     }
-    return {repositoryRoot, headRef, origin, upstream};
+    const state = await readGitText([...repositoryHeadArguments], options);
+    if (state.result.code !== 0) throw processFailure(state, 'Git branch state observation failed.');
+    let headState;
+    try { headState = repositoryHeadState(state.output, state.result); }
+    catch (error) { error.rawStdout = state.rawStdout; throw error; }
+    return {repositoryRoot, headRef, ...headState, origin, upstream};
 }
 
 export async function repositoryStatus({

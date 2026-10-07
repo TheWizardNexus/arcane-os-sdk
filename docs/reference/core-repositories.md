@@ -47,7 +47,7 @@ const status = await repository.status({signal});
 await repository.close();
 ```
 
-`createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})`
+`createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,initialBranch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})`
 returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
@@ -63,6 +63,10 @@ property is the absolute selected working path.
   `branch`, when supplied, is passed unchanged to Git's `clone --branch` option;
   otherwise Git selects the remote's default branch. Existing checkouts keep
   their own branch, remote, tracked files, untracked files and local changes.
+- Optional `initialBranch` names the branch for first publication from a new
+  unborn clone. It is separate from `branch`, which selects an existing remote
+  branch or tag. Omit `branch` when the remote has no advertised revision.
+  See [first publication](#first-publication-from-an-unborn-remote).
 - Supplying `remoteBase` explicitly declares this initial-clone `remote` to be
   a local filesystem locator. Its native absolute command argument is captured
   during construction. Omission leaves Git's original string interpretation
@@ -147,6 +151,8 @@ Its result is:
 {
     repositoryRoot,
     headRef: fullSymbolicRef | null,
+    revision: currentCommit | null,
+    unborn: boolean,
     origin: {urls: [...], pushUrls: [...]},
     upstream: {remoteNames: [...], mergeRefs: [...], urls: [...], pushUrls: [...]} | null
 }
@@ -160,6 +166,16 @@ arrays contain that branch's configured `remote` and `merge` values; `urls` and
 means the local repository and has no remote URL arrays. Origin is observed
 independently, even when it is not the upstream.
 
+`revision` and `unborn` come from Git's successful
+[porcelain-v2 branch observation](https://git-scm.com/docs/git-status#_porcelain_format_version_2):
+`(initial)` yields `revision:null, unborn:true`; a current commit yields that
+opaque revision and `unborn:false`, including a commit with an empty tree and
+detached HEAD. Symbolic HEAD alone does not establish an unborn branch.
+The command uses `--no-optional-locks` and omits untracked-file discovery, so
+this observation does not refresh the index on disk. A missing branch-state
+record reports `ARCANE_REPOSITORY_HEAD_UNAVAILABLE`; unsuccessful commands
+retain their actual failures rather than becoming an initial state.
+
 Arrays retain configured order, repeated values, complete UTF-8 strings and
 empty strings. `[]` means unset; `['']` means an explicit empty value. The
 reader honors configured includes and ordinary Git configuration precedence.
@@ -172,8 +188,8 @@ Metadata uses the shared raw-Git-text reader. Lifecycle/stderr events remain
 with the process owner, raw stdout remains parser-owned, and undecodable text
 reports `ARCANE_GIT_CONFIGURATION_NOT_TEXT`. Failures retain complete raw
 stdout, process diagnostics and causal errors using the identity reader's
-documented attachment behavior. One observation uses four read-only Git
-commands for an attached local branch, or three otherwise. Results are not a
+documented attachment behavior. One observation uses five read-only Git
+commands for an attached local branch, or four otherwise. Results are not a
 transaction with later work or external Git activity. The app owns any decision
 that the current checkout corresponds to its selected repository and branch.
 
@@ -211,6 +227,69 @@ selection, retry, reset, force, reversal or recommit. The app decides when to
 observe, refresh, write and publish. See Git's [pull](https://git-scm.com/docs/git-pull),
 [push](https://git-scm.com/docs/git-push) and [configuration](https://git-scm.com/docs/git-config)
 contracts.
+
+### First publication from an unborn remote
+
+An opt-in [snapshot refresh](git-text-snapshot.md#unborn-remotes) can report
+`{revision:null,files:[],unborn:true}` after a successful complete empty remote
+advertisement. This means no revision was advertised to this connection; it
+does not assert that hidden refs or unreachable objects cannot exist.
+The application retains that explicit state instead of inventing a commit.
+
+For an application-selected new connection with that state, prepare its first
+branch without passing the existing-branch `clone --branch` option:
+
+```javascript
+const repository = createRepositoryWorkspace({
+    name: connection.name,
+    remote: connection.locator,
+    remoteBase: connection.localBaseDirectory,
+    initialBranch: 'main'
+});
+await repository.open({signal});
+const observed = await repository.configuration({signal});
+// The application matches observed.headRef, unborn and configured URLs to its connection.
+const publication = await repository.write({
+    files: selectedFiles,
+    message: authoredCommitMessage,
+    target: {remote: connection.locator, remoteBase: connection.localBaseDirectory, ref: 'refs/heads/main'},
+    signal
+});
+```
+
+`initialBranch` is captured during construction. After a successful new clone,
+the SDK observes the complete remote advertisement using the clone's original
+working-directory context and captured remote argument. Only empty successful
+output followed by the new checkout's explicit initial state and successful
+empty `git for-each-ref --format=%(refname)` observation selects
+`HEAD` as `refs/heads/<initialBranch>` through
+[Git symbolic-ref](https://git-scm.com/docs/git-symbolic-ref). Git owns branch-name
+validity. Advertised HEAD, branches or tags keep ordinary clone selection;
+an already committed clone and every existing destination remain unchanged.
+Any local ref supplied by Git's template or hook behavior is preserved and
+leaves HEAD unchanged, even when the remote advertises nothing.
+Omission adds no process and preserves the previous open result.
+
+For a new clone with `initialBranch`, `open` retains its clone `stdout`/`stderr`
+and adds ordered `outputs:[{operation,stdout,stderr,code,signal}]`. Operations
+are `clone`, `observeRemote`, `observeHead`, `observeRefs` and `selectInitialBranch`, only as
+performed. A later preparation failure preserves completed outputs in
+`error.details:{directory,cloned:true,outputs}` and the original complete
+failure as `cause`; cancellation retains completed observations too. A writer
+that prepares first retains these processes in its existing `stage:'prepare'`
+output records. Failed preparation leaves the actual directory intact and does
+not retry initialization or rename an existing checkout on the next call.
+
+There is nothing to pull before the first commit of a confirmed new unborn
+connection. Use the existing exact-file `write` and explicit non-force
+`HEAD:refs/heads/main` publication directly. For a committed remote, retain the
+ordinary selected-branch clone and targeted pull/write composition. An existing
+local checkout, different local branch or intervening remote change needs the
+application's own connection decision; an unborn observation is not permission
+to discard or switch it. Observations and publication are not transactional:
+concurrent remote changes, authentication failures and rejected pushes remain
+actual errors. No pull failure is converted into success, and no retry, force,
+rollback, global setting or fabricated revision is introduced.
 
 ### Relative local repository locators
 

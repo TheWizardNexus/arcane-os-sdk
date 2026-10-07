@@ -33,7 +33,7 @@ policy stable for the lifetime of its snapshot owner.
 
 ## API and lifecycle
 
-`createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run})`
+`createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,allowUnborn=false,gitIdentity,onEvent,run})`
 returns `{refresh,close,drain,dispose}`. `run` defaults to the SDK's existing
 `runProcess`; applications normally omit it. It is the same process adapter
 contract, not a second process supervisor. `onEvent` is the ordinary SDK event
@@ -90,6 +90,47 @@ cache across independent instances or processes requires coordination by its
 application owner; this factory does not install a daemon or cross-process lock.
 An empty cache is initialized once. An existing non-bare checkout is rejected
 without repurposing it. The cache is retained when the owner closes.
+
+## Unborn remotes
+
+Optional `allowUnborn:true` adds an explicit no-advertised-revision state:
+
+```javascript
+const snapshot = createGitTextSnapshot({
+    cacheDirectory: applicationCacheDirectory,
+    remote: applicationRepository,
+    ref: 'refs/heads/main',
+    selectPath: applicationSelectPath,
+    allowUnborn: true
+});
+const observed = await snapshot.refresh({signal});
+// Empty advertisement: {revision: null, files: [], unborn: true}.
+// Selected commit: {revision: actualCommit, files: selectedText, unborn: false}.
+```
+
+Each opted-in acquisition first completes unfiltered
+`git ls-remote --symref -- <remote>` with the same captured locator and identity.
+Only successful empty stdout produces the explicit unborn result. No revision
+is invented and no fetch, tree listing or blob process runs on that path.
+The [Git remote advertisement](https://git-scm.com/docs/git-ls-remote) is scoped
+to refs visible to that connection, not hidden refs or unreachable objects.
+
+Any advertised HEAD, branch, tag or other output continues through the ordinary
+selected-ref fetch and commit resolution. A missing selected ref on a populated
+remote remains a Git failure. Failed observations, authentication/transport
+errors and stderr wording never establish an unborn result. A real commit with
+an empty tree or zero selected files retains its actual revision and
+`unborn:false`. Omitting the boolean, or supplying `false`, preserves the
+previous `{revision,files}` result and command sequence without a remote probe.
+
+Bare-cache role discovery still precedes remote observation. Every later
+refresh observes again, so prior empty or committed results cannot hide a
+changed remote or a failure. Caller cancellation, shared acquisition, independent
+result copies and drain remain unchanged. Opted-in completion events add
+`unborn`; `revision:null` and `unborn:true` describe the explicit empty state.
+This option adds one remote command per acquisition; existing revision-based
+text reuse still applies to committed results. For writing the first commit,
+see [first-publication composition](core-repositories.md#first-publication-from-an-unborn-remote).
 
 ## Complete text and observable failures
 
