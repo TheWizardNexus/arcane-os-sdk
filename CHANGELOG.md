@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.88.0
+
+- Add optional `signal` and `startLanguageModel` controls to `AI.setAI`,
+  `configureProviders`, `transitionAI`, and `transitionProviders`, preserving
+  their existing arguments, return values, and eager default. Explicitly
+  deferred selections stay unloaded through later readiness notifications;
+  an explicit runtime load or startup can activate them.
+- Keep cancellation and supersession with the owning selection. Accepted
+  cleanup settles before a cancelled transition can configure or preload a
+  replacement, and stale continuations cannot alter a newer selection.
+  Completed activation is independent of a later caller abort.
+- Preserve truthful busy, loaded `unloading` state while an accepted request
+  finishes cancellation; new inference remains unavailable during cleanup.
+- Preserve keyboard focus in the shared theme switcher during asynchronous
+  selection. Pending choices remain focusable and expose `aria-disabled` while
+  repeated activation is ignored; completion never overrides an intentional
+  focus move. Unavailable Skin choices remain natively disabled.
+
 ## 0.87.0
 
 - Add `createDocumentAcquisitionService` through
