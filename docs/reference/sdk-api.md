@@ -9076,7 +9076,7 @@ connectAppControl({endpoint,signal,onError}={})
 ```
 
 Connects once to the explicit running native window and resolves
-`{endpoint,closed,status,inspect,capture,act,close}`. The Windows host selects its
+`{endpoint,closed,status,inspect,capture,act,key,resize,close}`. The Windows host selects its
 own listener through `native.launchContext.appControl.endpoint` and preserves the
 existing Core child, origin, profile and application lifetime. The client uses
 portable Node local IPC; other native host adapters do not yet implement these
@@ -9088,14 +9088,49 @@ and no automatic reconnect or action retry occurs.
 and live control state. Inspection and actions accept optional `shadowPath`, an
 ordered array of unique CSS host selectors through open shadow roots; their
 `selector` resolves inside the final root. Omission retains top-level light DOM.
-Closed roots remain unavailable. `capture(parameters={},options)` returns a full base64 PNG
+Closed roots remain unavailable. Inspection also returns top-level `viewport`
+CSS-pixel width/height and `devicePixelRatio`, `documentHasFocus`, and `focusPath`
+through the active open-shadow branch. These focus records have null selectors
+and remain separate from the selected root's `activeElement`; frames and closed
+roots end the path. `capture(parameters={},options)` returns a full base64 PNG
 of the rendered viewport. `act(parameters,options)` requires a returned
 `documentGeneration`, one CSS selector, and `click`, `fill`, `select` or `scroll`
-fields. Options preserve the Core client signal/timeout contract. `close()`
-cancels this connection's requests and returns `closed`, without closing the app.
-Document changes and actual errors remain observable; a dispatched action is
-not reversed by later cancellation. Full parameter/result, CLI and platform
-contracts are in [native application control](native-app-control.md).
+fields.
+
+`key(parameters,options)` requires the observed `documentGeneration` and
+`key:'Tab'`, `'Enter'` or `'Space'`; `shiftKey:true` is supported only for Tab.
+It sends a fixed ordered press/release pair to the selected WebView's current
+focus, without selecting an element or activating the desktop window. Accepted
+pairs share one keyboard owner. Once a press is attempted, its matching release
+is attempted on the same WebView even after cancellation, navigation or failure;
+a failed or ambiguous press is never replayed. Results retain previous/actual
+document views and complete attempted/completed phase records. Generation checks
+bracket native input rather than atomically binding it to a document, so focus
+or navigation can change between phases.
+
+`resize(parameters,options)` accepts positive integral native client `width`
+and `height` supported by WinForms, plus optional `documentGeneration`. It changes
+only `ClientSize` while the actual window is `Normal`; maximized or minimized
+windows fail before size mutation. Results retain immediate `previous`/`actual`
+native dimensions, requested dimensions, attempted/completed flags and a later
+observed CSS `viewport`. Platform constraints can change actual dimensions;
+native and CSS observations are not an atomic snapshot. Restore explicitly with
+the same operation's `previous.width` and `previous.height`, not CSS dimensions
+or a historical status snapshot. Cancellation does not restore the window.
+
+Options preserve the Core client signal/timeout contract. Cancellation before
+dispatch prevents execution; dispatched work and owned key release remain
+observed through completion. Actual errors retain complete partial results;
+responses completed after cancellation or disconnection remain in host
+diagnostics. `close()` cancels this connection's requests and returns `closed`,
+without closing the app. Document changes and actual errors remain observable.
+Dispatch completion does not establish application handler completion or a
+successful business action; inspect the resulting built application to establish
+that outcome. Assembly requires a matching published Windows host asset.
+
+The CLI provides `app-control key` and `app-control resize`, each forwarding the
+complete parsed `--request` object. Full parameter/result, error, cancellation,
+CLI and platform contracts are in [native application control](native-app-control.md).
 
 ## runSharedCoreHost()
 

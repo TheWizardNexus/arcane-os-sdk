@@ -2,25 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.">
+  <meta name="description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, targeted DOM actions, fixed keys and Normal-window client resizing through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-app-control/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native application control · Arcane OS SDK"><meta property="og:description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-app-control/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native application control · Arcane OS SDK"><meta name="twitter:description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native application control · Arcane OS SDK"><meta property="og:description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, targeted DOM actions, fixed keys and Normal-window client resizing through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-app-control/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native application control · Arcane OS SDK"><meta name="twitter:description" content="connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, targeted DOM actions, fixed keys and Normal-window client resizing through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Native application control | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native application control</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-application-control">Native application control</h1><p class="doc-lead">connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, and targeted DOM actions through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.</p><div class="doc-meta"><span>SDK 0.85.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native application control</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-application-control">Native application control</h1><p class="doc-lead">connectAppControl from arcane-os/core/app-control connects to one explicitly selected running application window. The Windows WebView2 host provides document inspection, a PNG of its rendered viewport, targeted DOM actions, fixed keys and Normal-window client resizing through its own local named pipe. The application keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window or send global keyboard or pointer input.</p><div class="doc-meta"><span>SDK 0.86.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="./" aria-current="page">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/native-app-control.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#cli">CLI</a></nav></details><p><code>connectAppControl</code> from <code>arcane-os/core/app-control</code> connects to one explicitly
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-app-control.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#fixed-keys">Fixed keys</a><a href="#resize-and-restore-a-normal-window">Resize and restore a Normal window</a><a href="#cli">CLI</a></nav></details><p><code>connectAppControl</code> from <code>arcane-os/core/app-control</code> connects to one explicitly
 selected running application window. The Windows WebView2 host provides document
-inspection, a PNG of its rendered viewport, and targeted DOM actions through its
-own local named pipe. The application keeps its existing Core child, profile,
-origin and window lifecycle. These operations do not activate the desktop window
+inspection, a PNG of its rendered viewport, targeted DOM actions, fixed keys and
+Normal-window client resizing through its own local named pipe. The application
+keeps its existing Core child, profile, origin and window lifecycle. These operations do not activate the desktop window
 or send global keyboard or pointer input.</p>
 <p>The Node client uses the SDK&#39;s existing <code>arcane/1</code> framing and local pipe/socket
 transport on Windows, Linux and macOS. The native window adapter described here
@@ -102,6 +102,14 @@ connection or other business result.</p>
 <td>Requires <code>documentGeneration</code>, one unambiguous CSS <code>selector</code> within the root selected by optional <code>shadowPath</code>, and the action fields below.</td>
 </tr>
 <tr>
+<td><code>key(parameters, options?)</code></td>
+<td>Requires <code>documentGeneration</code> and <code>key:&#39;Tab&#39;</code>, <code>&#39;Enter&#39;</code>, or <code>&#39;Space&#39;</code>. Optional <code>shiftKey:true</code> is supported only for Tab. Sends one ordered press/release pair to the selected WebView&#39;s current focus.</td>
+</tr>
+<tr>
+<td><code>resize(parameters, options?)</code></td>
+<td>Requires positive integral native client <code>width</code> and <code>height</code> supported by WinForms. Optional <code>documentGeneration</code> selects the expected document. Resizes only a Normal window and returns immediate previous/actual client dimensions plus the subsequently observed CSS viewport.</td>
+</tr>
+<tr>
 <td><code>close()</code></td>
 <td>Closes this caller&#39;s connection and cancels its pending requests. It never closes the app or Core. Returns the connection&#39;s completion promise.</td>
 </tr>
@@ -117,20 +125,33 @@ connection or other business result.</p>
 </div>
 <p>Each operation&#39;s separate <code>options</code> uses the existing Core client request
 contract, including <code>signal</code> and <code>timeoutMs</code>. Connection cancellation closes only
-that connection. Cancellation before UI dispatch prevents execution. Once a
-script or capture has been dispatched, cancellation cannot reverse its effects;
-the host still observes its completion. A disconnected caller&#39;s completed result
-is retained in the host diagnostics instead of being represented as delivered.</p>
+that connection. Cancellation before UI dispatch prevents execution; keys also
+check cancellation after waiting for the keyboard owner and immediately before
+the press. Once a script, capture, key press or resize has been dispatched,
+cancellation cannot reverse its effects. The host observes its actual completion,
+including the owned key release. The caller receives its ordinary abort result;
+the complete later response is retained in host diagnostics for a cancelled
+request or closed connection instead of being represented as delivered.</p>
 <h2 id="document-operations">Document operations</h2>
 <p>Inspection defaults to the top-level light DOM. Its result contains <code>scope</code>, <code>title</code>,
 <code>readyState</code>, <code>doctype</code>, <code>roots</code>, <code>controls</code>, <code>frames</code>, <code>shadowHosts</code>,
-<code>activeElement</code>, <code>scrollingElement</code>, <code>selection</code>, <code>documentGeneration</code>, and
-<code>url</code>. Each root retains its complete <code>html</code> and <code>text</code>; controls retain their
+<code>activeElement</code>, <code>scrollingElement</code>, <code>selection</code>, <code>viewport</code>, <code>documentHasFocus</code>,
+<code>focusPath</code>, <code>documentGeneration</code>, and <code>url</code>. Each root retains its complete
+<code>html</code> and <code>text</code>; controls retain their
 attributes and current form, selection, disabled, scrolling and related state.
 Generated CSS selectors are useful for the inspected document; a later DOM edit
 can change their meaning. Application-authored stable selectors are preferable
 when available. Component replacement or mutation can make a selector stale
 without changing the native document generation.</p>
+<p><code>viewport</code> contains the top-level document&#39;s <code>innerWidth</code> and <code>innerHeight</code> as
+CSS-pixel <code>width</code>/<code>height</code>, plus its current <code>devicePixelRatio</code>.
+<code>documentHasFocus</code> records <code>document.hasFocus()</code>. <code>focusPath</code> describes the
+top-level active element followed by each active element in accessible open
+shadow roots along that focus branch. These records retain complete attributes,
+DOM-derived names and control state, with <code>selector:null</code>; they are observations,
+not selector targets. Reading a focused body or host&#39;s name can traverse its
+complete text subtree. The path stops at a frame element or closed shadow host;
+it does not enter frame documents or closed roots.</p>
 <h3 id="open-shadow-roots">Open shadow roots</h3>
 <p><code>inspect</code> and <code>act</code> accept <code>shadowPath</code>, an ordered array of CSS host selectors.
 The first selector resolves inside the top-level document; each later selector
@@ -160,7 +181,10 @@ inspection; pair selectors from its result with that same path for actions.</p>
 <p><code>activeElement</code> comes from the selected root. <code>scrollingElement</code> is <code>null</code> for a
 shadow-root scope because the root has no document scrolling element; scroll
 actions still target elements. <code>selection.text</code>, <code>title</code>, <code>readyState</code>, <code>doctype</code>
-and native URL/generation remain document-level information. Role/name label
+and native URL/generation remain document-level information. The added
+<code>viewport</code>, <code>documentHasFocus</code> and <code>focusPath</code> also always describe the top-level
+document: the focus path can enter open roots outside the selected inspection
+root. The selected root&#39;s <code>activeElement</code> remains separate. Role/name label
 references resolve within the element&#39;s own tree. Inspection follows the DOM
 tree, not the composed rendering tree: slot-assigned light-DOM nodes remain in
 their own containing DOM tree and are not duplicated inside the selected shadow
@@ -179,9 +203,10 @@ Shadow actions add the selected <code>shadowPath</code> to their result and reta
 actual target state after dispatch, including disconnection by the action.</p>
 <p>Role/name hints are derived from DOM attributes and labels, not a native
 accessibility-tree computation. Frame documents and unselected shadow-root
-contents are outside the selected scope. Frame elements and open-shadow hosts
-are described; closed shadow roots cannot be discovered. Capture is the current rendered
-viewport, not an offscreen full-document rendering. Covered and minimized-window
+contents are outside the selected HTML/control scope; the document-level focus
+path separately describes its active open-shadow branch. Frame elements and
+open-shadow hosts are described; closed shadow roots cannot be discovered.
+Capture is the current rendered viewport, not an offscreen full-document rendering. Covered and minimized-window
 capture behavior requires execution evidence in the selected environment.</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -214,23 +239,105 @@ immediate state, including browser value sanitization; input is not silently
 rewritten by the SDK.</p>
 <p>The host publishes a new generation when an actual replacement document becomes
 ready. A creation-time document marker is also checked inside the executing
-script so a queued action cannot run against a successor page. During navigation,
+script so a queued DOM action cannot run against a successor page. During navigation,
 operations report that the document is not ready. A change during completion
 reports the actual result with that failure; actions are never retried. These
 markers are transient document lifecycle state and are not written to saved data.</p>
+<h2 id="fixed-keys">Fixed keys</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const page = await app.inspect();
+const moved = await app.key({documentGeneration: page.documentGeneration, key: &#39;Tab&#39;});
+console.log(moved.previous.focusPath, moved.actual.focusPath);
+await app.key({documentGeneration: moved.documentGeneration, key: &#39;Tab&#39;, shiftKey: true});
+await app.key({documentGeneration: moved.documentGeneration, key: &#39;Enter&#39;});
+</code></pre></div>
+<p>Keys use the selected WebView&#39;s current focus. No selector, shadow path, frame
+selection, focus assignment or desktop activation is performed. Tab and
+Shift+Tab use a fixed Tab <code>rawKeyDown</code>/<code>keyUp</code> pair, with the Shift modifier on
+both events for Shift+Tab. Enter and Space use <code>keyDown</code> with their corresponding
+text, followed by <code>keyUp</code>, preserving browser default actions and application
+<code>preventDefault</code> handling. Shift+Tab does not send a separate Shift key pair.
+The API exposes these fixed keys, not an arbitrary protocol method or script.</p>
+<p>The result contains <code>key</code>, <code>shiftKey</code>, <code>previous</code> and <code>actual</code> document views,
+<code>press</code>, <code>release</code>, <code>documentGeneration</code> and <code>url</code>. Each view contains the same
+<code>viewport</code>, <code>documentHasFocus</code> and <code>focusPath</code> described above. Each key phase
+records its fixed <code>parameters</code>, <code>attempted</code>, <code>completed</code>, and the complete
+protocol <code>response</code> when returned. Dispatch completion describes the native
+command, not application handler completion or a successful business action.
+Inspect the resulting page to establish the application outcome.</p>
+<p>Accepted key pairs share one keyboard owner so another key request cannot
+interleave between press and release. Other independent control operations keep
+their existing scheduling. The host awaits each native phase in order. Once
+the press is attempted, the host observes that task and attempts the matching
+release on the same WebView even after cancellation, navigation or press
+failure. Release can itself activate Space. A failed or ambiguous press is
+never replayed.</p>
+<p>Generation checks occur before dispatch and after completion; the native input
+command has no atomic document binding. Navigation or focus changes can occur
+between the checks and phases, and Tab intentionally changes focus before its
+release. A detected document change is reported with the actual attempted and
+completed phases. Dispatch, release or later observation failures retain the
+complete partial result at <code>error.data.find(entry =&gt; entry.key === &#39;result&#39;).value</code>
+under <code>ARCANE_APP_CONTROL_FAILED</code>. Original exceptions remain in <code>cause</code>; if
+both native phases fail, both errors are also retained in the aggregate and
+their respective phase records. An unavailable <code>actual</code> view is omitted rather
+than inferred.</p>
+<h2 id="resize-and-restore-a-normal-window">Resize and restore a Normal window</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const resized = await app.resize({width: 1200, height: 800});
+try {
+    console.log(resized.previous, resized.actual, resized.viewport);
+    console.log(await app.inspect({selector: &#39;#pm-content&#39;}));
+} finally {
+    await app.resize({width: resized.previous.width, height: resized.previous.height});
+}
+</code></pre></div>
+<p><code>width</code> and <code>height</code> select the native WinForms client dimensions, in the same
+units returned by <code>status().window</code>. They are not CSS viewport dimensions.
+The host changes only <code>ClientSize</code>; it does not assign window state, position,
+restore bounds, activation or WebView zoom, and it preserves the profile and
+origin. Read <code>viewport</code> for the resulting CSS dimensions instead of assuming a
+particular DPI or zoom conversion.</p>
+<p>Immediately before the UI-thread mutation, the host checks the actual
+<code>WindowState</code> and records <code>previous:{title,state,width,height}</code>. It records
+<code>actual</code> in the same shape immediately after the native setter, then observes
+the CSS <code>viewport</code> asynchronously. The result also contains <code>requested</code>,
+<code>resizeAttempted</code>, <code>resizeCompleted</code>, <code>documentGeneration</code> and <code>url</code>.
+Platform constraints may make actual dimensions differ from requested ones.
+Other input or concurrent resize requests can change the window between the
+native snapshot and the document observation; these records are not an atomic
+native/CSS snapshot. Completion does not establish that asynchronous application
+resize handlers have settled.</p>
+<p>Maximized or minimized windows return <code>ARCANE_APP_CONTROL_FAILED</code> before any
+size mutation, with <code>reason:&#39;unsupported-window-state&#39;</code>,
+<code>supportedWindowState:&#39;Normal&#39;</code> and the complete current <code>window</code> in the error&#39;s
+<code>data</code> entries. The host never automatically restores, maximizes or minimizes a
+window to satisfy this request. Invalid dimensions return <code>INVALID_ARGUMENT</code>.
+The same state rule applies to explicit restoration.</p>
+<p>Restore using the actual <code>previous.width</code> and <code>previous.height</code> from the
+operation being reversed, never a historical status snapshot or CSS viewport
+dimensions. Restoration is an explicit second request; cancellation does not
+resize the window back. If a dispatched resize or its later observation fails,
+the complete partial <code>result</code> remains in the error&#39;s <code>data</code>, including the
+recorded previous dimensions, actual dimensions and attempted/completed flags.
+Use that actual record when deciding whether and how to restore.</p>
 <h2 id="cli">CLI</h2>
 <div class="code-block reference-code"><div class="code-bar"><span>powershell</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-powershell">arcane app-control status --endpoint &#39;\\.\pipe\arcane-pm-control&#39;
 arcane app-control inspect --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --selector &#39;#pm-content&#39;
 arcane app-control inspect --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\inspection.json&#39;
 arcane app-control capture --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --output &#39;.arcane\view.png&#39;
 arcane app-control act --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\action.json&#39;
+arcane app-control key --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\key.json&#39;
+arcane app-control resize --endpoint &#39;\\.\pipe\arcane-pm-control&#39; --request &#39;.arcane\resize.json&#39;
 </code></pre></div>
-<p>The action file is the complete action parameter object, including the actual
+<p>The action or key file is the complete parameter object, including the actual
 <code>documentGeneration</code> returned by the preceding status or inspection. Inspection
 also accepts <code>--request</code> for a complete parameter object, such as
 <code>{&quot;shadowPath&quot;:[&quot;#appearance-panel&quot;,&quot;theme-switcher&quot;]}</code> or the same object with
 <code>selector</code> and <code>documentGeneration</code>. Inspection&#39;s <code>--request</code> and <code>--selector</code>
-options are mutually exclusive. The CLI reads the selected file completely.
+options are mutually exclusive. A key file can contain
+<code>{&quot;documentGeneration&quot;:3,&quot;key&quot;:&quot;Tab&quot;,&quot;shiftKey&quot;:true}</code>, using the observed
+generation. A resize file contains native dimensions such as
+<code>{&quot;width&quot;:1200,&quot;height&quot;:800}</code>. Each requires <code>--request</code>; the CLI reads the
+selected file completely and forwards the parsed parameter object unchanged.
 Paths are relative to the current directory. Capture
 writes the PNG to the explicitly selected file and prints its metadata. The other
 operations print complete JSON. <code>app-control --help</code> describes this command&#39;s
@@ -240,9 +347,9 @@ Host shutdown stops new control work and observes accepted operations alongside
 the existing Core drain. It does not wait for desktop input or leave an
 independent controller process running.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#cli">CLI</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#select-the-running-instance">Select the running instance</a><a href="#public-client">Public client</a><a href="#document-operations">Document operations</a><a href="#fixed-keys">Fixed keys</a><a href="#resize-and-restore-a-normal-window">Resize and restore a Normal window</a><a href="#cli">CLI</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.85.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.86.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
