@@ -22,17 +22,22 @@ function cancelled(reason) {
  * selects its model; Core owns the running engine and its loaded sessions.
  * Creating this provider neither connects a transport nor installs a runtime.
  */
-export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.cpp'} = {}) {
+export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.cpp', prepareModel} = {}) {
     if (!is.string(id) || !id.trim()) throw new TypeError('The Core AI provider id must be a nonempty string.');
     if (suppliedClient !== undefined && suppliedClient !== null
         && (!is.function(suppliedClient?.invoke) || !is.function(suppliedClient?.events?.on))) {
         throw new TypeError('The Core AI client must expose invoke and events.on.');
+    }
+    if (prepareModel !== undefined && prepareModel !== null && !is.function(prepareModel)) {
+        throw new TypeError('Core AI model preparation must be a function.');
     }
 
     let runtime = null;
     let models = [];
     let selection = null;
     let selectionConnection = null;
+    let acceptedLoad = null;
+    let retainedSelection = null;
     let disposed = false;
     let loading = false;
     let unloading = false;
@@ -75,7 +80,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
     }
 
     function status() {
-        const loaded = !disposed && modelReady();
+        const loaded = !disposed && Boolean(acceptedLoad) && modelReady();
         return {
             state: disposed ? 'disposed' : loading ? 'loading' : loaded ? 'ready'
                 : runtime?.error ? 'error' : runtime?.available === true ? 'unloaded' : 'unavailable',
@@ -86,6 +91,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             modelId: selection?.modelId ?? null,
             available: !disposed && runtime?.available === true,
             installed: runtime?.installed === true,
+            execution: runtime?.execution ?? null,
             error: runtime?.error ?? null
         };
     }
@@ -113,6 +119,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         lifecycleRevision += 1;
         loading = false;
         unloading = false;
+        acceptedLoad = null;
         runtime = {installed: false, available: false, state: client ? 'unknown' : 'unavailable', error};
         models = [];
         previous?.unsubscribe?.();
@@ -181,7 +188,9 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             const starting = !runtime?.error && ['starting', 'loading'].includes(runtime?.state);
             const released = !runtime?.error && runtime?.released === true && runtime.owned === true
                 && runtime.state === 'stopped' && knownModel;
-            if (runtime?.error || (runtime?.available !== true && !starting && !released)) {
+            const preparable = is.function(prepareModel) && runtime?.installed === true && runtime.managed === true
+                && !['closed', 'closing'].includes(runtime.state);
+            if (runtime?.error || (runtime?.available !== true && !starting && !released && !preparable)) {
                 return {
                     available: false,
                     code: 'ARCANE_AI_PROVIDER_UNAVAILABLE',
@@ -189,7 +198,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
                     error: runtime?.error ?? null
                 };
             }
-            if (!starting && !knownModel) {
+            if (!starting && !knownModel && !preparable) {
                 return {
                     available: false,
                     code: 'ARCANE_AI_MODEL_UNAVAILABLE',
@@ -206,31 +215,88 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         }
     }
 
-    async function load({selection: value, signal, progress} = {}) {
+    async function load({selection: value, signal, progress, assetProjectionId, resourcePaths, executionTarget} = {}) {
         const core = requireClient();
         const currentConnection = connection;
         requireSelection(value);
         if (signal?.aborted) throw cancelled(signal.reason);
+        loading?.controller?.abort(cancelled());
         selection = value;
         selectionConnection = currentConnection;
-        const operation = {};
+        acceptedLoad = null;
+        const operation = ownRequest(signal, null, core);
+        let completed = false;
         loading = operation;
         unloading = false;
         lifecycleRevision += 1;
-        try {
-            progress?.({phase: 'loading', modelId: value.modelId});
-            const revision = lifecycleRevision;
-            const current = await invokeOwned(core, 'llama.load', {model: value.modelId}, signal);
+
+        function assertCurrentLoad() {
             assertCurrentConnection(currentConnection);
+            operation.controller.signal.throwIfAborted();
             if (loading !== operation || selection !== value) throw cancelled();
-            if (lifecycleRevision === revision) acceptRuntime(current);
-            if (!modelReady()) throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Core did not report the selected model loaded and ready.', current?.error);
-            progress?.({phase: 'ready', modelId: value.modelId});
-            assertCurrentConnection(currentConnection);
-            if (loading !== operation || selection !== value) throw cancelled();
+        }
+
+        function reportProgress(event) {
+            if (disposed || connection !== currentConnection || operation.controller.signal.aborted
+                || loading !== operation || selection !== value) return;
+            progress?.(event);
+        }
+
+        operation.result = Promise.resolve().then(async function prepareAndLoadModel() {
+            let preparation;
+            let failed = false;
+            let failure;
+            try {
+                assertCurrentLoad();
+                reportProgress({phase: 'loading', modelId: value.modelId});
+                assertCurrentLoad();
+                if (prepareModel) {
+                    preparation = await prepareModel({selection: value, signal: operation.controller.signal, progress: reportProgress});
+                    assertCurrentLoad();
+                }
+                const projectionId = assetProjectionId === undefined ? preparation?.assetProjectionId : assetProjectionId;
+                const paths = resourcePaths === undefined ? preparation?.resourcePaths : resourcePaths;
+                const target = executionTarget === undefined ? preparation?.executionTarget : executionTarget;
+                const parameters = {model: value.modelId};
+                if (projectionId !== undefined) parameters.assetProjectionId = projectionId;
+                if (paths !== undefined) parameters.resourcePaths = paths;
+                if (target !== undefined) parameters.executionTarget = target;
+                const revision = lifecycleRevision;
+                retainedSelection = {selection: value, connection: currentConnection};
+                const current = await core.invoke('llama.load', parameters, {signal: operation.controller.signal});
+                assertCurrentLoad();
+                if (lifecycleRevision === revision) acceptRuntime(current);
+                if (!modelReady()) throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Core did not report the selected model loaded and ready.', current?.error);
+            } catch (error) {
+                failed = true;
+                failure = error;
+            }
+            try {
+                // Core has retained the projection before its load settles.
+                // A cancelled preparation still releases any late result.
+                if (is.function(preparation?.release)) await preparation.release();
+            } catch (error) {
+                if (failed) throw new AggregateError([failure, error], 'Local model loading and preparation release failed.', {cause: failure});
+                throw error;
+            }
+            if (failed) throw failure;
+            assertCurrentLoad();
+            if (!modelReady()) throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Core no longer reports the selected model loaded and ready.', runtime?.error);
+            acceptedLoad = operation;
+            reportProgress({phase: 'ready', modelId: value.modelId});
+            assertCurrentLoad();
+            if (!modelReady()) throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Core no longer reports the selected model loaded and ready.', runtime?.error);
+            completed = true;
             return {authority: authority(value), status: {...status(), state: 'ready', busy: false}};
+        });
+        try {
+            return await operation.result;
         } finally {
-            if (loading === operation) loading = false;
+            operation.release();
+            if (loading === operation) {
+                if (!completed) acceptedLoad = null;
+                loading = false;
+            }
         }
     }
 
@@ -254,7 +320,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         return request;
     }
 
-    function streamRequest(core, parameters, signal) {
+    function streamRequest(core, parameters, signal, assertAcceptedLoad) {
         const request = ownRequest(signal, parameters.model, core);
         const chunks = [];
         const readers = [];
@@ -284,6 +350,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
 
         request.result = Promise.resolve().then(function invokeStream() {
             request.controller.signal.throwIfAborted();
+            assertAcceptedLoad();
             return core.invoke('llama.chat', {...parameters, stream: true, streamId}, {signal: request.controller.signal});
         }).then(function streamCompleted(result) {
             if (request.controller.signal.aborted) throw cancelled(request.controller.signal.reason);
@@ -329,9 +396,14 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
         const currentConnection = connection;
         requireSelection(value);
         if (signal?.aborted) throw cancelled(signal.reason);
-        if (loading || unloading || selectionConnection !== connection || selection?.modelId !== value.modelId) {
-            throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Load the selected local model before requesting inference.');
+        const currentLoad = acceptedLoad;
+        function assertAcceptedLoad() {
+            if (loading || unloading || !currentLoad || acceptedLoad !== currentLoad
+                || selectionConnection !== connection || selection?.modelId !== value.modelId) {
+                throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'Load the selected local model before requesting inference.');
+            }
         }
+        assertAcceptedLoad();
         const model = payload?.model ?? value.modelId;
         if (!models.some(function knownModel(record) { return record.id === model; })) {
             const revision = lifecycleRevision;
@@ -339,6 +411,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             assertCurrentConnection(currentConnection);
             if (lifecycleRevision === revision) acceptRuntime(current);
         }
+        assertAcceptedLoad();
         if (!models.some(function knownModel(record) { return record.id === model; })) {
             throw localAIError('ARCANE_AI_MODEL_UNAVAILABLE', 'The requested model is unavailable in the local llama.cpp runtime.');
         }
@@ -347,11 +420,12 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             throw localAIError('ARCANE_AI_MODEL_NOT_READY', 'The requested local runtime or selected model is not ready.');
         }
         const parameters = {model, payload};
-        if (operation === 'stream') return streamRequest(core, parameters, signal);
+        if (operation === 'stream') return streamRequest(core, parameters, signal, assertAcceptedLoad);
         if (operation !== 'chat') throw localAIError('ARCANE_AI_PROVIDER_OPERATION_UNAVAILABLE', 'The local llama.cpp provider supports chat and stream.');
         const pending = ownRequest(signal, model, core);
         pending.result = Promise.resolve().then(function invokeChat() {
             pending.controller.signal.throwIfAborted();
+            assertAcceptedLoad();
             return core.invoke('llama.chat', {...parameters, stream: false}, {signal: pending.controller.signal});
         }).then(function chatCompleted(result) {
             if (pending.controller.signal.aborted) throw cancelled(pending.controller.signal.reason);
@@ -361,16 +435,18 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
     }
 
     async function unload({signal} = {}) {
-        const value = selection;
+        const retained = retainedSelection;
+        const value = retained?.selection;
         const core = requireClient();
         const currentConnection = connection;
         if (signal?.aborted) throw cancelled(signal.reason);
-        if (value && value === selection && selectionConnection !== currentConnection) {
+        if (retained && retained.connection !== currentConnection) {
             throw localAIError('ARCANE_AI_CORE_UNAVAILABLE', 'The selected model belongs to a retired Core connection.');
         }
         if (value) requireSelection(value);
         const operation = {};
         unloading = operation;
+        acceptedLoad = null;
         loading = false;
         lifecycleRevision += 1;
         for (const request of requests) request.controller.abort();
@@ -388,6 +464,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
             if (unloading !== operation) throw cancelled();
             selection = null;
             selectionConnection = null;
+            retainedSelection = null;
             unloading = false;
             return status();
         } catch (error) {
@@ -403,10 +480,12 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
     function dispose({signal} = {}) {
         if (disposing) return disposing;
         // The runtime also supplies its configured selection after unload.
-        // Only this provider's retained selection owns a native release.
-        const value = selection;
-        const core = selectionConnection?.client;
+        // Only a dispatched selection owns a native release; preparation alone
+        // must not unload a model owned by another provider.
+        const value = retainedSelection?.selection;
+        const core = retainedSelection?.connection.client;
         disposed = true;
+        acceptedLoad = null;
         loading = false;
         unloading = false;
         lifecycleRevision += 1;
@@ -425,6 +504,7 @@ export function createCoreLocalAIProvider({client: suppliedClient, id = 'llama.c
                 }
                 selection = null;
                 selectionConnection = null;
+                retainedSelection = null;
                 return status();
             }
         ).catch(

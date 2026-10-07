@@ -27,6 +27,9 @@ export async function discoverLocalAIRuntimes({config,appRoot,signal}={}){
     const outcomes=await Promise.allSettled(selected.map(async function discoverRuntime(requirement){
         throwIfAborted(signal);
         if(!['llama.cpp','ollama'].includes(requirement.id))return {missing:requirement};
+        // A PATH executable or HTTP listener cannot establish its compiled
+        // backend. An explicit distribution goes through its installer owner.
+        if(requirement.id==='llama.cpp'&&requirement.backend&&requirement.backend!=='auto')return {missing:requirement};
         const configuration=config[requirement.id==='llama.cpp'?'llamaCpp':'ollama']??{};
         const url=localAIServerURL(requirement.id,configuration);
         const concreteVersion=requirement.version&&requirement.version!=='latest';

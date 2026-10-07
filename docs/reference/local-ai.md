@@ -86,13 +86,32 @@ transport loss retain their owning cancellation behavior. A terminal engine
 failure reaches the original request as its actual error rather than a
 fabricated readiness success. See [native speech reconciliation](native-speech.md).
 
-`llamaCpp` accepts `url`, `model`, `modelsDirectory`, and an `args` string array.
+`llamaCpp` accepts `url`, `model`, `alias`, `modelsDirectory`, `executionTarget`,
+and an `args` string array.
 `model` selects a single GGUF file; `modelsDirectory` selects llama.cpp router
 mode. Paths resolve from the application root. Ollama accepts `url`,
 `modelsDirectory`, and `args`. The default endpoints are
 `http://127.0.0.1:8080` and `http://127.0.0.1:11434`, respectively. Default model
 directories are `.arcane/models/llama.cpp` and `.arcane/models/ollama` inside the
 application. Applications choose and provision their models explicitly.
+
+A llama runtime requirement accepts `backend: 'auto' | 'cpu' | 'cuda'`, with
+`auto` preserving the ordinary platform distribution. Explicit `cpu` also
+configures CPU execution, including on a Metal-capable macOS distribution.
+`cuda` currently selects the official Windows x64 CUDA 13.4 engine and its
+matching same-release CUDA companion archive. For example:
+
+```json
+{"runtimes": [{"id": "llama.cpp", "backend": "cuda"}]}
+```
+
+Development prepares this explicit distribution instead of treating an unknown
+PATH executable or external listener as proof of its backend. Native packaging
+bundles the selected runtime tree and companion libraries through the existing
+runtime workflow. A custom CUDA `url` also needs its explicit `companionUrl`;
+the SDK does not guess a companion location. Installation records distinguish
+the distribution's `backend` from its `requestedBackend` execution mode.
+Selecting an unavailable distribution reports its actual error.
 
 ## Development
 
@@ -226,7 +245,7 @@ background health polling.
 | --- | --- | --- |
 | `llama.status` | `{}` | Runtime state and model catalog |
 | `llama.models` | `{}` | `{models}` |
-| `llama.load` | `{model}` | State after the exact model reports loaded |
+| `llama.load` | `{model,assetProjectionId?,resourcePaths?,executionTarget?}` | State after the exact model reports loaded |
 | `llama.unload` | `{model}` | Current state after release |
 | `llama.chat` | `{model,payload,stream?,streamId?}` | Complete OpenAI-shaped completion |
 
@@ -237,6 +256,36 @@ catalog observation. The llama.cpp runtime record includes `released: true`
 only after Core successfully closes its owned single-model server. Explicit
 load, inference or recovery can resume that engine; observation cannot.
 Status observation adds no background polling.
+
+For a saved browser GGUF, prepare its complete file through the existing
+[`model-assets` owner](model-assets.md), then call `llama.load` with its
+`assetProjectionId` and `resourcePaths: {model: 'selected.gguf'}`. Core retains
+that member before replacing its owned server, uses the exact `model` value as
+the server alias, and releases the retained use only after actual process exit.
+The preparation owner can release its use when loading settles. Replacement,
+cancelled loading, unload and shutdown all preserve this lifetime. A cancelled
+projected load joins process shutdown before returning. Ordinary router loads
+retain their existing shared-load behavior.
+
+`executionTarget: {deviceId}` uses the identifier from this computer's execution
+device catalog. Windows CPU selection disables GPU offload; Windows NVIDIA GPU
+selection requires the CUDA distribution and resolves the current adapter LUID
+to its CUDA UUID. The new server sees that one physical GPU as `CUDA0`.
+No machine-specific device ID is embedded in configuration examples. Each host
+resolves its own saved selection; an absent or unsupported device reports an
+error. Other host adapters remain subject to their declared catalog support.
+`executionTarget: null` uses the configured runtime default. Omission preserves
+an active selection's target. Runtime `execution` separates `requestedTarget`,
+`resolvedDevice` and `configuredTarget`; `observedTarget: null` means actual
+inference placement has not been observed. Configuration is not placement proof.
+
+An external server keeps ownership of its model and device. Projected loading
+or explicit target changes report `LOCAL_AI_EXTERNAL_SELECTION_UNSUPPORTED`
+without stopping it or changing a working Core observation. `managed` describes
+whether an installed executable can be managed at this listener; `owned` reports
+an actual SDK-owned process. Recovery retains a live projection across process
+replacement. If the projection was already released after exit, prepare it again;
+resuming never substitutes another model or target.
 
 The `payload` is the complete request. SDK option names are translated only at
 the upstream protocol boundary; messages, tool definitions and documents remain
@@ -365,9 +414,43 @@ runtime still reconciles the provider at its existing operation boundaries.
 permits that load preflight even before its catalog arrives; Core's `llama.load`
 waits for startup and verifies the exact requested model. An owned, successfully
 released service permits loading only a model retained in its actual catalog.
-An available service still requires that catalog membership. These observations
+With `prepareModel`, an installed `managed` service also admits an explicit
+load before the requested model exists in its catalog. An available external
+service still requires catalog membership. These observations
 do not fabricate model records or readiness, and unavailable external services,
 closed services and actual errors remain unavailable.
+
+The optional `prepareModel({selection,signal,progress})` callback runs only at
+an actual provider load. Return `{assetProjectionId,resourcePaths,executionTarget,release?}`;
+direct `provider.load` fields override the corresponding callback
+fields, including an explicit null target. The provider awaits `release()`
+after Core loading settles and before reporting readiness. Preparation must
+observe cancellation and settle so even a late returned projection is released.
+Only a dispatched Core selection owns a native unload; cancelled preparation
+alone does not unload another model.
+
+```js
+import {prepareCoreModelAssets} from 'arcane-os/ai/core-model-assets';
+
+// modelFile is the complete GGUF Blob/File read from the application's store.
+// selectedDeviceId came from this host's execution-device catalog.
+const provider = createCoreLocalAIProvider({
+  client,
+  async prepareModel({signal, progress}) {
+    const projection = await prepareCoreModelAssets({
+      client, workingDirectory: '.arcane/model-work', signal,
+      members: [{path: 'moon-raccoon.gguf', file: modelFile}],
+      onProgress: progress
+    });
+    return {
+      assetProjectionId: projection.id,
+      resourcePaths: {model: 'moon-raccoon.gguf'},
+      executionTarget: {deviceId: selectedDeviceId},
+      release: projection.release
+    };
+  }
+});
+```
 
 `dispose()` removes installation and service subscriptions and cancels owned
 operations synchronously, then attempts its actually retained model's release

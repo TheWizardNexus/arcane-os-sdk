@@ -476,7 +476,7 @@ test('portable Core shares one model-assets owner for ONNX and image selections'
         if (selection.includes('stable-diffusion.cpp')) assert.ok(entry.includes('{...context, modelAssets}'));
     }
     const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: ['llama.cpp']}});
-    assert.equal(entry.includes('createModelAssetService'), false);
+    assert.equal(entry.includes('createModelAssetService'), true);
 });
 
 test('portable Core opts into one lazy shared host while retaining default stdio and current packaged origin replay', function sharedCoreEntry() {

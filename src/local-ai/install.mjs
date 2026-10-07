@@ -9,7 +9,7 @@ import {ArcaneError,ERROR_CODES,normalizeError,throwIfAborted} from '../errors.m
 import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
 import {extractLocalAIArchive} from './archive.mjs';
-import {normalizeImageRuntimeRequirement} from './config.mjs';
+import {normalizeImageRuntimeRequirement,normalizeLlamaRuntimeRequirement} from './config.mjs';
 import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
 import {bundledWhisperRuntime, installedWhisperRuntime, installWhisperDistribution, whisperRuntimeSelection} from './whisper/install.mjs';
 
@@ -24,7 +24,8 @@ function selectRuntimes(runtimes){
     for(const item of runtimes){
         const requirement=is.string(item)?{id:item}:item;
         const runtime=requirement?.id==='stable-diffusion.cpp'?normalizeImageRuntimeRequirement(requirement)
-            :requirement?.id==='whisper.cpp'?normalizeWhisperRuntimeRequirement(requirement):requirement;
+            :requirement?.id==='whisper.cpp'?normalizeWhisperRuntimeRequirement(requirement)
+            :requirement?.id==='llama.cpp'?normalizeLlamaRuntimeRequirement(requirement):requirement;
         if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp','whisper.cpp'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
@@ -32,7 +33,9 @@ function selectRuntimes(runtimes){
         if(prior&&runtime.id==='whisper.cpp'&&whisperRuntimeSelection(prior)!==whisperRuntimeSelection(runtime)){
             throw new ArcaneError(ERROR_CODES.usage,'Select one complete whisper.cpp runtime and model requirement for this operation.');
         }
-        if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url||(runtime.id==='stable-diffusion.cpp'&&prior.backend!==runtime.backend))){
+        if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url
+            ||(['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)&&prior.backend!==runtime.backend)
+            ||(runtime.id==='llama.cpp'&&prior.companionUrl!==runtime.companionUrl))){
             throw new ArcaneError(ERROR_CODES.usage,`Select one ${runtime.id} runtime version and URL for this operation.`);
         }
         if(runtime.version!==undefined&&(!is.string(runtime.version)||!runtime.version)){
@@ -53,7 +56,7 @@ function selectedDirectory(directory){
     return path.resolve(directory);
 }
 
-function releaseAssetNames(id,version,platform,architecture){
+function releaseAssetNames(id,version,platform,architecture,backend){
     if(id==='nemo-speech'){
         if(!['x64','arm64'].includes(architecture))return [];
         const arch=architecture==='x64'?'x86_64':'aarch64';
@@ -70,6 +73,9 @@ function releaseAssetNames(id,version,platform,architecture){
         if(platform==='win32')return [`ollama-windows-${arch}.zip`];
         if(platform==='linux')return [`ollama-linux-${arch}.tar.zst`,`ollama-linux-${arch}.tgz`];
         return [];
+    }
+    if(id==='llama.cpp'&&backend==='cuda'){
+        return platform==='win32'&&architecture==='x64'?[`llama-${version}-bin-win-cuda-13.4-x64.zip`]:[];
     }
     if(!['x64','arm64'].includes(architecture))return [];
     if(platform==='win32')return [`llama-${version}-bin-win-cpu-${architecture}.zip`];
@@ -93,9 +99,17 @@ async function selectRelease(runtime,platform,architecture,signal){
     if (runtime.id === 'stable-diffusion.cpp') {
         return selectImageRelease(runtime, platform, architecture, signal);
     }
+    const backend=runtime.id==='llama.cpp'?llamaBackendCandidate(runtime,platform,architecture):undefined;
     if(runtime.url){
         const name=path.posix.basename(new URL(runtime.url).pathname);
-        return {version:runtime.version??'custom',url:runtime.url,name};
+        return {
+            version:runtime.version??'custom',url:runtime.url,name,
+            ...(runtime.id==='llama.cpp'?{backend,requestedBackend:runtime.backend}:{}),
+            ...(backend==='cuda'?{companion:{
+                url:runtime.companionUrl,
+                name:path.posix.basename(new URL(runtime.companionUrl).pathname)
+            }}:{})
+        };
     }
     const repository=runtime.id==='nemo-speech'?'NVIDIA/NeMo-Speech.cpp':runtime.id==='llama.cpp'?'ggml-org/llama.cpp':'ollama/ollama';
     const version=runtime.version??(runtime.id==='nemo-speech'?'0.2.0':undefined);
@@ -112,12 +126,38 @@ async function selectRelease(runtime,platform,architecture,signal){
         }
     }
     // Select only published format variants for this exact target distribution.
-    const names=releaseAssetNames(runtime.id,release.tag_name,platform,architecture);
+    const names=releaseAssetNames(runtime.id,release.tag_name,platform,architecture,backend);
     const asset=release.assets?.find(function isSelectedAsset(candidate){return names.includes(candidate.name);});
     if(!asset){
         throw new ArcaneError(ERROR_CODES.targetUnavailable,`${runtime.id} ${release.tag_name} has no published ${platform}/${architecture} runtime archive${names.length?` named ${names.join(' or ')}`:''}.`);
     }
-    return {version:release.tag_name,url:asset.browser_download_url,name:asset.name};
+    let companion;
+    if(backend==='cuda'){
+        const companionName='cudart-llama-bin-win-cuda-13.4-x64.zip';
+        const companionAsset=release.assets?.find(function selectedCudaRuntime(candidate){return candidate.name===companionName;});
+        if(!companionAsset){
+            throw new ArcaneError(ERROR_CODES.targetUnavailable,`llama.cpp ${release.tag_name} has no matching CUDA runtime archive named ${companionName}.`);
+        }
+        companion={url:companionAsset.browser_download_url,name:companionAsset.name};
+    }
+    return {
+        version:release.tag_name,url:asset.browser_download_url,name:asset.name,
+        ...(runtime.id==='llama.cpp'?{backend,requestedBackend:runtime.backend}:{}),
+        ...(companion?{companion}:{})
+    };
+}
+
+function llamaBackendCandidate(runtime,platform,architecture){
+    if(runtime.backend==='cuda'){
+        if(platform!=='win32'||architecture!=='x64'){
+            throw new ArcaneError(ERROR_CODES.targetUnavailable,`The selected llama.cpp CUDA distribution is unavailable for ${platform}/${architecture}.`);
+        }
+        return 'cuda';
+    }
+    // A custom automatic archive declares no backend capability. Official macOS
+    // archives include Metal; requested CPU execution is configured at launch.
+    if(runtime.url)return runtime.backend;
+    return platform==='darwin'?'metal':'cpu';
 }
 
 async function imageBackendCandidate(backend, platform, signal) {
@@ -368,6 +408,7 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
     const imageBackend = runtime.id === 'stable-diffusion.cpp' && !runtime.url
         ? await imageBackendCandidate(runtime.backend, platform, signal)
         : runtime.backend;
+    const llamaBackend=runtime.id==='llama.cpp'?llamaBackendCandidate(runtime,platform,architecture):null;
     for(const entry of entries){
         throwIfAborted(signal);
         if(!entry.isDirectory())continue;
@@ -380,6 +421,8 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
         }
         if(installation.requestVersion!==(runtime.version??null)||installation.requestUrl!==(runtime.url??null))continue;
         if (runtime.id === 'stable-diffusion.cpp' && installation.requestBackend !== runtime.backend) continue;
+        if(runtime.id==='llama.cpp'&&((installation.requestBackend??'auto')!==runtime.backend
+            ||(installation.requestCompanionUrl??null)!==(runtime.companionUrl??null)))continue;
         let whisperRequirement;
         if (runtime.id === 'whisper.cpp') {
             if (!installation.requestWhisper) continue;
@@ -388,6 +431,7 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
         }
         const record=installation.runtime;
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
+        if(runtime.id==='llama.cpp'&&record.backend!==undefined&&record.backend!==llamaBackend)continue;
         try{
             if(runtime.id==='whisper.cpp'){
                 if(await installedWhisperRuntime(record,signal,!reuseWhisper))return reuseWhisper?{runtime:record,requirement:whisperRequirement}:record;
@@ -436,7 +480,11 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
                 }
                 continue;
             }
-            if((await stat(record.executable)).isFile())return {...record,...(runtime.version?{requestedVersion:runtime.version}:{})};
+            if((await stat(record.executable)).isFile())return {
+                ...record,
+                ...(runtime.id==='llama.cpp'?{backend:record.backend??llamaBackend,requestedBackend:runtime.backend}:{}),
+                ...(runtime.version?{requestedVersion:runtime.version}:{})
+            };
         }catch(error){
             if(runtime.id==='onnx'&&(error.code==='MODULE_NOT_FOUND'||error instanceof SyntaxError))continue;
             if(error.code!=='ENOENT')throw error;
@@ -533,9 +581,14 @@ async function installONNXPackage(runtime,{root,directory,platform,architecture,
 
 async function installRuntime(runtime,{directory,platform,architecture,signal,onEvent}){
     const runtimeBase=path.join(directory,runtime.id,`${platform}-${architecture}`,encodeURIComponent(runtime.version??'default'));
-    const base=runtime.id==='stable-diffusion.cpp'?path.join(runtimeBase,runtime.backend):runtimeBase;
+    const base=['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?path.join(runtimeBase,runtime.backend):runtimeBase;
     await onEvent({type:'local-ai.install.starting',message:`Preparing ${runtime.id} for ${platform}/${architecture}.`,data:{id:runtime.id,platform,architecture}});
-    const installed=await installedRuntime(base,runtime,platform,architecture,signal);
+    let installed=await installedRuntime(base,runtime,platform,architecture,signal);
+    // Previous default installations predate backend-specific directories. Keep
+    // those working trees reusable for the same automatic requirement.
+    if(!installed&&runtime.id==='llama.cpp'&&runtime.backend==='auto'){
+        installed=await installedRuntime(runtimeBase,runtime,platform,architecture,signal);
+    }
     if(installed){
         await onEvent({type:'local-ai.install.available',message:`${runtime.id} ${installed.version} is already installed.`,data:installed});
         return installed;
@@ -550,6 +603,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
     const attempt=await mkdtemp(path.join(base,'install-'));
     const root=path.join(attempt,'runtime');
     const archive=release&&runtime.id!=='stable-diffusion.cpp'?path.join(attempt,release.name):null;
+    const companionArchive=release?.companion?path.join(attempt,'companion',release.companion.name):null;
     let completed=false;
     try{
         let locations;
@@ -563,19 +617,46 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
                 {root, directory, platform, architecture, signal, onEvent}
             );
         }else{
-            await onEvent({type:'local-ai.install.downloading',message:`Downloading ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version,platform,architecture}});
-            const response=await upstreamResponse(release.url,signal);
-            await pipeline(Readable.fromWeb(response.body),createWriteStream(archive,{flags:'wx'}),{signal});
-            await onEvent({type:'local-ai.install.extracting',message:`Extracting ${runtime.id} ${release.version}.`,data:{id:runtime.id,version:release.version}});
-            await extractLocalAIArchive({archive,directory:root,signal,onEvent});
-            locations={version:release.version,...(runtime.id==='nemo-speech'
+            const assets=[{url:release.url,name:release.name,archive}];
+            if(companionArchive){
+                await mkdir(path.dirname(companionArchive));
+                assets.push({...release.companion,archive:companionArchive});
+            }
+            const downloads=await Promise.allSettled(assets.map(async function downloadRuntimeArchive(asset){
+                await onEvent({
+                    type:'local-ai.install.downloading',
+                    message:runtime.id==='llama.cpp'?`Downloading ${runtime.id} ${release.version}: ${asset.name}.`:`Downloading ${runtime.id} ${release.version}.`,
+                    data:{id:runtime.id,version:release.version,platform,architecture,...(runtime.id==='llama.cpp'?{asset:asset.name}:{})}
+                });
+                const response=await upstreamResponse(asset.url,signal);
+                await pipeline(Readable.fromWeb(response.body),createWriteStream(asset.archive,{flags:'wx'}),{signal});
+            }));
+            const failures=downloads.filter(function archiveDownloadFailed(outcome){return outcome.status==='rejected';});
+            if(failures.length===1)throw failures[0].reason;
+            if(failures.length>1){
+                throw new AggregateError(failures.map(function archiveDownloadFailure(outcome){return outcome.reason;}),`Download of ${runtime.id} archives failed.`);
+            }
+            // The pair downloads independently, then extracts in order because
+            // both archives populate the same new runtime directory.
+            for(const asset of assets){
+                await onEvent({
+                    type:'local-ai.install.extracting',
+                    message:runtime.id==='llama.cpp'?`Extracting ${runtime.id} ${release.version}: ${asset.name}.`:`Extracting ${runtime.id} ${release.version}.`,
+                    data:{id:runtime.id,version:release.version,...(runtime.id==='llama.cpp'?{asset:asset.name}:{})}
+                });
+                await extractLocalAIArchive({archive:asset.archive,directory:root,signal,onEvent});
+            }
+            locations={version:release.version,
+                ...(runtime.id==='llama.cpp'?{backend:release.backend,requestedBackend:release.requestedBackend}:{}),
+                ...(runtime.id==='nemo-speech'
                 ?await nemoRuntimeDirectories(root,signal)
                 :{executable:await runtimeExecutable(root,runtime.id,platform,signal)})};
         }
         const record={id:runtime.id,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
         throwIfAborted(signal);
         if(archive)await unlink(archive);
-        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(runtime.id==='stable-diffusion.cpp'?{requestBackend:runtime.backend}:{}),...(runtime.id==='whisper.cpp'?{requestWhisper:whisperRuntimeSelection(runtime)}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
+        if(companionArchive)await unlink(companionArchive);
+        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?{requestBackend:runtime.backend}:{}),...(runtime.id==='llama.cpp'?{requestCompanionUrl:runtime.companionUrl??null}:{}),...(runtime.id==='whisper.cpp'?{requestWhisper:whisperRuntimeSelection(runtime)}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
         completed=true;
         await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${record.version} is available.`,data:record});
         return record;
@@ -595,7 +676,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
 
 function shareInstallation(runtime,options){
     throwIfAborted(options.signal);
-    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,runtime.id==='stable-diffusion.cpp'?runtime.backend:null,runtime.id==='whisper.cpp'?whisperRuntimeSelection(runtime):null]);
+    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?runtime.backend:null,runtime.id==='whisper.cpp'?whisperRuntimeSelection(runtime):null,runtime.id==='llama.cpp'?runtime.companionUrl??null:null]);
     let entry=installations.get(key);
     if(entry?.controller.signal.aborted){
         // The prior cancelled attempt owns its cleanup. A later request waits

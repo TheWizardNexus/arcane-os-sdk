@@ -155,8 +155,8 @@ export function coreEntrySource(application, version, services, {localAI, runtim
     const imageSelected = localAI?.runtimes?.some(function selectedImage(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
     }) ?? false;
-    const modelAssetsSelected = imageSelected || (localAI?.runtimes?.some(function selectedONNX(requirement) {
-        return (typeof requirement === 'string' ? requirement : requirement.id) === 'onnx';
+    const modelAssetsSelected = imageSelected || (localAI?.runtimes?.some(function selectedProjectedRuntime(requirement) {
+        return ['onnx', 'llama.cpp'].includes(typeof requirement === 'string' ? requirement : requirement.id);
     }) ?? false);
     const whisperSelected = localAI?.runtimes?.some(function selectedWhisper(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'whisper.cpp';

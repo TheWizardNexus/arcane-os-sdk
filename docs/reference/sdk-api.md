@@ -8442,15 +8442,16 @@ Construction selects no model and installs no runtime or transport.
 ### Signature and result
 
 ```text
-createCoreLocalAIProvider({client,id='llama.cpp'}={})
+createCoreLocalAIProvider({client,id='llama.cpp',prepareModel}={})
 ```
 
 Import it from `arcane-os/ai/core-local`. The provider implements
 `arcane-ai-provider/2` and exposes `catalog`, `status`, `inspect`, `load`,
 `request`, `unload` and `dispose`. Register it with the shared AI provider runtime,
 select the exact provider/model with `localOnly:true`, and load that selection.
-Requests wait for the requested model's actual readiness, preserve complete
-payloads and parsed streaming chunks, and cancel on observed readiness loss.
+`load()` waits for the selected model's actual readiness; inference requests
+require that load to have completed successfully. Requests preserve complete
+payloads and parsed streaming chunks and cancel on observed readiness loss.
 Missing Core reports unavailability; it does not choose a browser or cloud route.
 Dispose/unregister at the caller's owning lifecycle boundary.
 
@@ -8463,6 +8464,17 @@ Disposal releases only an actually retained selection through its captured
 client, so never-loaded and already-unloaded providers send no native unload.
 The provider/2 runtime reconciles status at its operation boundaries; this
 does not add an idle role-state subscription.
+
+Optional `prepareModel({selection,signal,progress})` runs at actual load and
+returns `{assetProjectionId,resourcePaths,executionTarget,release?}`. Direct
+`load` fields with those names override preparation when defined; an explicit
+`executionTarget:null` requests the runtime default. Preparation release is
+awaited after native load settles, including failure, cancellation and late
+preparation results. The current successfully completed load owns readiness
+and inference; a failed replacement cannot reuse an older model's ready state.
+Native cleanup owns the last dispatched selection, while preparation alone
+creates no native unload obligation. `status().execution` forwards native
+execution diagnostics, including configured and observed targets separately.
 
 ```javascript
 import {createCoreLocalAIProvider} from 'arcane-os/ai/core-local';
@@ -8486,7 +8498,7 @@ separate states; prompts, models and application policy remain caller-owned.
 ### Signature and result
 
 ```text
-createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare}={})
+createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})
 ```
 
 Import it from `arcane-os/core/local-ai`. `configuration` is the authored local-AI
@@ -8518,6 +8530,19 @@ Explicit load retains startup and exact catalog-membership checks.
 `llama.chunk` and `ollama.chunk`
 carry original parsed chunks with `streamId`; terminal responses remain complete.
 There is no background health polling or implicit model choice.
+
+For managed llama.cpp loading, `llama.load` also accepts `assetProjectionId`,
+`resourcePaths:{model}` and `executionTarget`. The existing model-assets owner
+retains the exact projected GGUF through actual server exit. An omitted target
+retains the same model's selection or configured default; `null` requests the
+runtime default. `{deviceId}` uses this computer's execution-device catalog.
+Windows NVIDIA selection resolves that physical device to its CUDA identity;
+unsupported or unavailable targets report their actual failure. Runtime
+`execution` reports requested, resolved and configured targets with
+`observedTarget:null`; configuration does not establish physical execution.
+An optional `executionDevices` catalog is borrowed by ONNX and llama.cpp; its
+supplying owner retains disposal responsibility. Existing external listeners
+retain their own model/device selection and reject managed reconfiguration.
 
 ```javascript
 import {createLocalAIService} from 'arcane-os/core/local-ai';

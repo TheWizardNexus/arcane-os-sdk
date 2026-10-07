@@ -163,7 +163,9 @@
                 "properties": {
                   "id": { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp"] },
                   "version": { "type": "string" },
-                  "url": { "type": "string" }
+                  "url": { "type": "string" },
+                  "backend": { "type": "string", "description": "llama.cpp: auto, cpu or cuda. Image runtimes: auto, metal or cpu." },
+                  "companionUrl": { "type": "string", "description": "Explicit CUDA runtime companion archive for a custom llama.cpp CUDA URL." }
                 }
               },
               { "$ref": "#/$defs/whisperRuntime" }
@@ -175,6 +177,13 @@
           "properties": {
             "url": { "type": "string" },
             "model": { "type": "string" },
+            "alias": { "type": "string" },
+            "executionTarget": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "object", "required": ["deviceId"], "properties": { "deviceId": { "type": "string" } } }
+              ]
+            },
             "modelsDirectory": { "type": "string" },
             "args": { "type": "array", "items": { "type": "string" } }
           }

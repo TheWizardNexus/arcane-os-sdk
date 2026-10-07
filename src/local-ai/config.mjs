@@ -10,6 +10,21 @@ import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
 const is = new Is(false);
 export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp', 'whisper.cpp'];
 
+/** Select a llama distribution without discovering hardware or acquiring it. */
+export function normalizeLlamaRuntimeRequirement(record) {
+    const backend = record.backend ?? 'auto';
+    if (!['auto', 'cpu', 'cuda'].includes(backend)) {
+        throw new ArcaneError(ERROR_CODES.usage, `Unknown llama.cpp backend: ${String(backend)}.`);
+    }
+    if (record.companionUrl !== undefined && (!is.string(record.companionUrl) || !record.companionUrl)) {
+        throw new ArcaneError(ERROR_CODES.usage, 'llama.cpp companionUrl must be a nonempty string.');
+    }
+    if (record.url && backend === 'cuda' && !record.companionUrl) {
+        throw new ArcaneError(ERROR_CODES.usage, 'A custom llama.cpp CUDA archive requires an explicit companionUrl for its CUDA runtime libraries.');
+    }
+    return {...record, backend};
+}
+
 /** Image requirements describe assets without acquiring or loading a model. */
 export function normalizeImageRuntimeRequirement(record) {
     const backend = record.backend ?? 'auto';
@@ -61,6 +76,7 @@ export function normalizeLocalAIConfig(value) {
         if (!record || !LOCAL_AI_RUNTIME_IDS.includes(record.id)) {
             throw new ArcaneError(ERROR_CODES.usage, `Unknown local AI runtime: ${String(record?.id ?? item)}.`);
         }
+        if (record.id === 'llama.cpp') return normalizeLlamaRuntimeRequirement(record);
         if (record.id === 'stable-diffusion.cpp') return normalizeImageRuntimeRequirement(record);
         if (record.id === 'whisper.cpp') return normalizeWhisperRuntimeRequirement(record);
         return {...record};

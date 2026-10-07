@@ -4,6 +4,7 @@ import Is from 'strong-type';
 import {ArcaneError,ERROR_CODES,errorRecord,normalizeError,throwIfAborted} from '../errors.mjs';
 import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
+import {resolveLlamaExecution} from './llama-execution.mjs';
 
 const is=new Is(false);
 
@@ -48,17 +49,21 @@ async function probeServer(id,url,signal){
     return observed;
 }
 
-export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,onEvent,onState}={}){
+export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,onEvent,onState,onExit,executionDevices,requireManaged=false}={}){
     if(!['llama.cpp','ollama'].includes(id)){
         throw new ArcaneError(ERROR_CODES.usage,`Unsupported local AI server: ${String(id)}.`);
     }
     const url=localAIServerURL(id,configuration);
     const endpoint=new URL(url);
+    const managedSelection=requireManaged||(id==='llama.cpp'&&(configuration.executionTarget!==undefined
+        ||(runtime?.requestedBackend&&runtime.requestedBackend!=='auto')));
     const controller=new AbortController();
     const operationSignal=signal?AbortSignal.any([signal,controller.signal]):controller.signal;
     const events=createEventQueue(onEvent,{onFailure:fail});
     let current={id,url,state:'starting',available:false,owned:false};
     let owned=false;
+    let external=false;
+    let execution;
     let processTask=null;
     let processObservation=null;
     let startupTask=null;
@@ -70,6 +75,8 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
     let terminalFailure=null;
     let resolveReady;
     let rejectReady;
+    let resolveManagement;
+    const management=new Promise(function discoverManagement(resolve){resolveManagement=resolve;});
     const output={stdout:'',stderr:''};
     const ready=new Promise(function createReadiness(resolve,reject){
         resolveReady=resolve;
@@ -80,7 +87,9 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
     void ready.catch(function observeReadinessFailure(){return undefined;});
 
     async function publishState(state,error){
-        current={id,url,state,available:state==='ready',owned,...(error?{error:errorRecord(error)}:{})};
+        current={id,url,state,available:state==='ready',owned,
+            managed:!external&&Boolean(runtime?.executable),
+            ...(id==='llama.cpp'?{execution:execution??null}:{}),...(error?{error:errorRecord(error)}:{})};
         await onState?.(current);
         await events.send({
             type:`local-ai.server.${state}`,
@@ -147,6 +156,8 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
             // endpoint at this actual launch boundary rather than presenting
             // that earlier installation-selection snapshot as current health.
             const observed=await probeServer(id,url,operationSignal);
+            external=true;
+            resolveManagement(false);
             if(runtime?.requestedVersion&&runtime.requestedVersion!=='latest'){
                 const requested=runtime.requestedVersion.replace(/^v/u,'');
                 if(!is.string(observed.version)||observed.version.replace(/^v/u,'')!==requested){
@@ -158,10 +169,18 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
             throwIfAborted(operationSignal);
             // An HTTP error is an existing service's state. Only a refused
             // connection allows starting the selected local executable.
-            if(!localAIConnectionRefused(error))throw error;
+            if(!localAIConnectionRefused(error)){
+                external=true;
+                resolveManagement(false);
+                throw error;
+            }
             if(!localHostname(endpoint.hostname))throw error;
         }
         if(existing){
+            external=true;
+            if(managedSelection){
+                throw new ArcaneError('LOCAL_AI_EXTERNAL_SELECTION_UNSUPPORTED','The existing llama.cpp server owns its model and device selection. Use an available listener for SDK-managed model loading.');
+            }
             await publishState('ready');
             throwIfAborted(operationSignal);
             settleReady();
@@ -170,6 +189,7 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
         if(!runtime?.executable){
             throw new ArcaneError(ERROR_CODES.prerequisiteMissing,`No installed ${id} executable was supplied.`);
         }
+        resolveManagement(true);
         if(endpoint.protocol!=='http:'){
             throw new ArcaneError(ERROR_CODES.usage,`${id} managed startup requires its direct HTTP listener URL.`);
         }
@@ -187,12 +207,19 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
         throwIfAborted(operationSignal);
         const host=endpoint.hostname.replace(/^\[|\]$/gu,'');
         const port=endpoint.port||'80';
+        const selected=id==='llama.cpp'?await resolveLlamaExecution({
+            executionTarget:configuration.executionTarget,executionDevices,runtime,signal:operationSignal,onEvent:events.send
+        }):null;
+        if(selected)execution=selected.execution;
         const arguments_=id==='ollama'?['serve',...args]:[
             '--host',host,'--port',port,'--jinja',
+            ...(managedSelection?args:[]),
             ...(configuration.model?['--model',path.resolve(appRoot,configuration.model)]:['--models-dir',modelsDirectory]),
-            ...args
+            ...(!managedSelection?args:[]),
+            ...(configuration.alias?['--alias',configuration.alias]:[]),
+            ...selected.args
         ];
-        const env=id==='ollama'?{OLLAMA_HOST:endpoint.origin,OLLAMA_MODELS:modelsDirectory}:undefined;
+        const env=id==='ollama'?{OLLAMA_HOST:endpoint.origin,OLLAMA_MODELS:modelsDirectory}:selected.env;
         owned=true;
         await publishState('starting');
         throwIfAborted(operationSignal);
@@ -215,7 +242,7 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
                 return;
             }
             await fail(error);
-        });
+        }).finally(async function releaseProcessResources(){await onExit?.();});
         void processObservation.catch(function observeProcessCallbackFailure(error){
             current={...current,state:'error',available:false,error:errorRecord(error)};
             settleReady(error);
@@ -250,7 +277,10 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
         });
     }
 
-    startupTask=start().catch(fail);
+    startupTask=start().catch(fail).finally(async function releaseUnstartedResources(){
+        resolveManagement(false);
+        if(!processTask)await onExit?.();
+    });
     void startupTask.catch(function observeStartupCallbackFailure(error){
         current={...current,state:'error',available:false,error:errorRecord(error)};
         settleReady(error);
@@ -258,5 +288,5 @@ export function createLocalAIServer({id,configuration={},runtime,appRoot,signal,
     operationSignal.addEventListener('abort',observeLifetimeAbort,{once:true});
     if(operationSignal.aborted)observeLifetimeAbort();
 
-    return {ready,url,close,get owned(){return owned;},get current(){return current;}};
+    return {ready,management,url,close,get owned(){return owned;},get external(){return external;},get current(){return current;}};
 }

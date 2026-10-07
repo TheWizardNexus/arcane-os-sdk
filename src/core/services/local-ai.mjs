@@ -130,6 +130,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     const owner = {};
     const events = createArcaneEventSource(owner, {source: 'core-local-ai', eventTypes: ['localai.state']});
     let context;
+    let modelAssetOwner;
     let closed = false;
     let onnx;
     let onnxRecovery;
@@ -334,17 +335,31 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
 
     function restartEngine(engine) {
         if (engine.recovering) return engine.recovering;
+        const selecting = engine.selecting;
         const recovering = Promise.resolve().then(async function recoverSelectedEngine() {
             lifetimeSignal.throwIfAborted();
+            if (selecting) await selecting;
+            const previous = engine.launch ?? engine.selection;
+            // Keep a second use across replacement, before the old process
+            // releases its own use on exit.
+            const projection = previous?.assetProjectionId
+                ? modelAssetOwner.retain(previous.assetProjectionId) : undefined;
+            const replacement = previous ? {...previous, projection} : undefined;
             engine.controller.abort();
-            await engine.server.close();
-            await Promise.allSettled([...engine.loads.values()]);
-            lifetimeSignal.throwIfAborted();
-            engine.models = [];
-            engine.modelChanges.clear();
-            engine.revision = 0;
-            engine.released = false;
-            startEngine(engine);
+            try {
+                await engine.server.close();
+                await Promise.allSettled([...engine.loads.values()]);
+                lifetimeSignal.throwIfAborted();
+                engine.models = [];
+                engine.modelChanges.clear();
+                engine.revision = 0;
+                engine.released = false;
+                startEngine(engine, replacement);
+            } catch (error) {
+                try { await projection?.release(); }
+                catch (cleanupError) { throw new AggregateError([error, cleanupError], 'llama.cpp recovery and model release failed.', {cause: error}); }
+                throw error;
+            }
         });
         engine.recovering = recovering;
         function releaseRecovery() {
@@ -360,6 +375,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         if (!engine) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', `${id} is not selected in this application's localAI configuration.`);
         if (engine.recovering) await awaitReadiness(engine.recovering, signal);
         if (engine.stopping) await awaitReadiness(engine.stopping, signal);
+        if (engine.selecting) await awaitReadiness(engine.selecting, signal);
         // An external server exposes no readiness subscription during initial
         // loading. A new explicit load makes one fresh attempt, without polling.
         if (retryLoading && engine.state.state === 'loading') {
@@ -431,7 +447,115 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         return {...engine.state, models: [...engine.models]};
     }
 
-    async function loadLlama({model}, request) {
+    async function activateLlamaSelection(engine, parameters, request) {
+        const {model, assetProjectionId, resourcePaths} = parameters;
+        const signal = AbortSignal.any([lifetimeSignal, request.signal]);
+        signal.throwIfAborted();
+        const previous = engine.launch ?? engine.selection;
+        const retained = previous?.model === model ? previous : undefined;
+        const projectionId = assetProjectionId ?? retained?.assetProjectionId;
+        const memberPath = resourcePaths?.model ?? (projectionId === retained?.assetProjectionId ? retained?.memberPath : undefined);
+        const executionTarget = parameters.executionTarget !== undefined
+            ? parameters.executionTarget : retained ? retained.executionTarget : config.llamaCpp?.executionTarget;
+        if (executionTarget !== undefined && executionTarget !== null
+            && (!is.string(executionTarget.deviceId) || !executionTarget.deviceId)) {
+            throw new TypeError('A llama.cpp execution target needs its host deviceId, or null for the configured default.');
+        }
+        if (projectionId !== undefined && (!is.string(memberPath) || !memberPath)) {
+            throw failure('LOCAL_AI_MODEL_RESOURCE_REQUIRED', 'Projected llama.cpp loading needs resourcePaths.model.');
+        }
+        if (resourcePaths !== undefined && projectionId === undefined) {
+            throw failure('LOCAL_AI_MODEL_PROJECTION_REQUIRED', 'resourcePaths needs its retained assetProjectionId.');
+        }
+        if (retained && retained.assetProjectionId === projectionId && retained.memberPath === memberPath
+            && (retained.executionTarget?.deviceId ?? null) === (executionTarget?.deviceId ?? null)
+            && engine.state.available) {
+            return prepareLlamaModel(engine, model, signal);
+        }
+        if (!await awaitReadiness(engine.server.management, signal)) {
+            if (engine.server.external) {
+                throw failure('LOCAL_AI_EXTERNAL_SELECTION_UNSUPPORTED', 'The existing llama.cpp server owns its model and device selection. Use an available listener for SDK-managed model loading.');
+            }
+            await engine.ready;
+            throw failure('LOCAL_AI_RUNTIME_UNAVAILABLE', 'No managed llama.cpp executable is available.');
+        }
+        let projection;
+        let launch;
+        function cancelSelectedLoad() {
+            if (engine.launch === launch) engine.controller.abort(signal.reason);
+        }
+        try {
+            const configuration = {...config.llamaCpp, executionTarget};
+            if (projectionId !== undefined) {
+                const assets = modelAssetOwner ?? await context.getService('model-assets');
+                if (!assets) throw failure('LOCAL_AI_MODEL_ASSETS_UNAVAILABLE', 'The Core model-assets service is unavailable.');
+                signal.throwIfAborted();
+                modelAssetOwner = assets;
+                projection = assets.retain(projectionId);
+                const member = projection.members.find(function selectedMember(value) { return value.path === memberPath; });
+                if (!member) throw failure('LOCAL_AI_MODEL_RESOURCE_UNAVAILABLE', `The projection does not contain ${memberPath}.`);
+                configuration.model = member.nativePath;
+                configuration.alias = model;
+            }
+            launch = {model, assetProjectionId: projectionId, memberPath, executionTarget, configuration, projection};
+            // One server owns this listener. Only its replacement is serialized;
+            // ordinary router model loads keep their independent existing flow.
+            signal.throwIfAborted();
+            engine.controller.abort();
+            await engine.server.close();
+            await Promise.allSettled([...engine.loads.values()]);
+            signal.throwIfAborted();
+            engine.models = [];
+            engine.modelChanges.clear();
+            engine.revision = 0;
+            engine.released = false;
+            startEngine(engine, launch);
+            signal.addEventListener('abort', cancelSelectedLoad, {once: true});
+            if (signal.aborted) cancelSelectedLoad();
+            await engine.ready;
+            signal.throwIfAborted();
+            const result = await prepareLlamaModel(engine, model, signal);
+            signal.throwIfAborted();
+            return result;
+        } catch (error) {
+            try {
+                if (launch && engine.launch === launch) {
+                    engine.controller.abort(error);
+                    await engine.server.close();
+                }
+                await projection?.release();
+            } catch (cleanupError) {
+                throw new AggregateError([error, cleanupError], 'llama.cpp loading and model release failed.', {cause: error});
+            }
+            throw error;
+        } finally {
+            signal.removeEventListener('abort', cancelSelectedLoad);
+        }
+    }
+
+    function selectLlamaModel(parameters, request) {
+        const engine = engines.get('llama.cpp');
+        if (!engine) throw failure('LOCAL_AI_RUNTIME_NOT_SELECTED', "llama.cpp is not selected in this application's localAI configuration.");
+        const preceding = engine.selecting;
+        const recovering = engine.recovering;
+        const stopping = engine.stopping;
+        const task = (async function replaceSelectedLlamaModel() {
+            if (preceding) await Promise.allSettled([preceding]);
+            if (recovering) await recovering;
+            if (stopping) await stopping;
+            return activateLlamaSelection(engine, parameters, request);
+        })();
+        engine.selecting = task;
+        function releaseSelection() { if (engine.selecting === task) engine.selecting = null; }
+        task.then(releaseSelection, releaseSelection);
+        return task;
+    }
+
+    async function loadLlama(parameters, request) {
+        const {model} = parameters;
+        if (parameters.assetProjectionId !== undefined || parameters.resourcePaths !== undefined || parameters.executionTarget !== undefined) {
+            return selectLlamaModel(parameters, request);
+        }
         const engine = await engineReady('llama.cpp', request.signal, {retryLoading: true});
         let task = engine.loads.get(model);
         if (!task) {
@@ -449,6 +573,17 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             task.then(releaseLoad, releaseLoad);
         }
         return awaitReadiness(task, request.signal);
+    }
+
+    async function releaseLlamaServer(engine) {
+        engine.controller.abort();
+        engine.stopping = engine.server.close();
+        await engine.stopping;
+        engine.stopping = null;
+        engine.released = true;
+        engine.models = engine.models.map(function unloadedModel(value) { return {...value, loaded: false}; });
+        publish();
+        return {...engine.state, models: [...engine.models], released: true, unloaded: true};
     }
 
     async function chatLlama({model, payload, stream = false, streamId}, request) {
@@ -556,17 +691,38 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         return result;
     }
 
-    function startEngine(engine) {
+    function startEngine(engine, launch) {
+        if (!launch && engine.selection) {
+            // A stopped selected projection may have been released by its
+            // preparation owner. Retaining it either succeeds or reports that
+            // it must be prepared again; never start a different default model.
+            const projection = engine.selection.assetProjectionId
+                ? modelAssetOwner.retain(engine.selection.assetProjectionId) : undefined;
+            launch = {...engine.selection, projection};
+        }
+        if (launch) {
+            const {projection, ...selection} = launch;
+            engine.selection = selection;
+        }
         engine.controller = new AbortController();
         engine.signal = AbortSignal.any([lifetimeSignal, engine.controller.signal]);
         engine.ollamaRevision = 0;
         engine.ollamaAppliedRevision = 0;
         const signal = engine.signal;
+        engine.launch = launch;
         engine.server = createLocalAIServer({
             id: engine.id, appRoot, runtime: runtimes.find(function runtimeRecord(record) { return record.id === engine.id; }),
-            configuration: engine.id === 'llama.cpp' ? config.llamaCpp : config.ollama,
-            signal, onEvent,
-            onState(state) { engine.state = {...engine.state, ...state, error: state.error ?? null}; publish(); }
+            configuration: engine.id === 'llama.cpp' ? launch?.configuration ?? config.llamaCpp : config.ollama,
+            signal, onEvent, executionDevices, requireManaged: Boolean(launch),
+            onState(state) { engine.state = {...engine.state, ...state, error: state.error ?? null}; publish(); },
+            async onExit() {
+                await launch?.projection?.release();
+                if (launch && engine.launch === launch) {
+                    engine.launch = undefined;
+                    engine.models = engine.models.map(function releasedModel(model) { return {...model, loaded: false}; });
+                    if (!closed) publish();
+                }
+            }
         });
         engine.ready = engine.server.ready.then(async function prepareModelCatalog() {
             await refreshModels(engine, signal);
@@ -671,20 +827,25 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             },
             'llama.load': loadLlama,
             'llama.unload': async function unloadLlama({model}, request) {
+                const selected = engines.get('llama.cpp');
+                if (selected?.launch?.model === model && selected.selecting) {
+                    selected.controller.abort(failure('LOCAL_AI_MODEL_UNLOADED', `The application unloaded ${model}.`));
+                }
+                if (selected?.selecting) await Promise.allSettled([selected.selecting]);
+                request.signal.throwIfAborted();
+                // A failed or cancelled projected startup may already have
+                // stopped. Release joins its cleanup rather than replaying the
+                // rejected readiness promise as a new unload failure.
+                if (selected?.selection?.model === model && !selected.state.available && !selected.server.external) {
+                    return releaseLlamaServer(selected);
+                }
                 const engine = await engineReady('llama.cpp', request.signal, {resumeReleased: false});
                 if (engine.released) return {...engine.state, models: [...engine.models], released: true, unloaded: true};
                 engine.loadControllers.get(model)?.abort(failure('LOCAL_AI_MODEL_UNLOADED', `The application unloaded ${model}.`));
                 if (engine.loads.has(model)) await Promise.allSettled([engine.loads.get(model)]);
                 if (!engine.router) {
                     if (!engine.server.owned) return {...engine.state, models: [...engine.models], released: true, unloaded: false};
-                    engine.controller.abort();
-                    engine.stopping = engine.server.close();
-                    await engine.stopping;
-                    engine.stopping = null;
-                    engine.released = true;
-                    engine.models = engine.models.map(function unloadedModel(value) { return {...value, loaded: false}; });
-                    publish();
-                    return {...engine.state, models: [...engine.models], released: true, unloaded: true};
+                    return releaseLlamaServer(engine);
                 }
                 await requestLocalJSON({url: engine.server.url, path: '/models/unload', method: 'POST', payload: {model}, signal: request.signal});
                 return refreshModels(engine, request.signal);
@@ -712,7 +873,7 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
             ]);
             stopONNXSubscription?.();
             await Promise.allSettled([...jobs, ...(onnxRecovery ? [onnxRecovery] : []), ...[...engines.values()].flatMap(function pendingWork(engine) {
-                return [...engine.loads.values(), ...(engine.recovering ? [engine.recovering] : [])];
+                return [...engine.loads.values(), ...(engine.recovering ? [engine.recovering] : []), ...(engine.selecting ? [engine.selecting] : [])];
             })]);
             events.dispose();
             const failures = results.filter(function failed(result) { return result.status === 'rejected'; }).map(function cause(result) { return result.reason; });

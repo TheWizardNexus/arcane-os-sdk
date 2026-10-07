@@ -47,8 +47,8 @@ export function createDevelopmentLocalAI({
     const imageSelected = selected.runtimes.some(function selectedImageRuntime(requirement) {
         return requirement.id === 'stable-diffusion.cpp';
     });
-    if (imageSelected || selected.runtimes.some(function selectedONNXRuntime(requirement) {
-        return requirement.id === 'onnx';
+    if (imageSelected || selected.runtimes.some(function selectedProjectedRuntime(requirement) {
+        return ['onnx', 'llama.cpp'].includes(requirement.id);
     })) {
         modelAssets = createModelAssetService({appRoot});
         definitions.push(modelAssets);
