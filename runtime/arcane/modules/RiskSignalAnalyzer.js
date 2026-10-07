@@ -8,12 +8,8 @@ const DEFAULT_LEVELS=[
     {minimum:0,id:'low'},
 ];
 
-function normalizeText(value){
-    return String(value??'').normalize('NFKC');
-}
-
 export function analyzeRiskSignals(input,{signals=[],levels=DEFAULT_LEVELS}={}){
-    const text=normalizeText(input);
+    const text=String(input??'');
     const matches=[];
     let score=0;
 

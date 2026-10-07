@@ -1201,7 +1201,7 @@
       "summary": "Matches configured risk signals and levels against complete text.",
       "availability": "Cross-host",
       "protocol": "In-process only",
-      "normalization": "Fully normalized.",
+      "normalization": "Complete literal text; existing non-string conversion only.",
       "surface": "`DEFAULT_LEVELS`, `analyzeRiskSignals()`."
     },
     {

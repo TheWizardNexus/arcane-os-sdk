@@ -469,8 +469,8 @@ console.log(await store.set('A1000',{status:'reviewed',notes:'Checked.'}));`
     {
         name:'RiskSignalAnalyzer.js',
         classification:'public-first-party',
-        lifecycleSideEffects:'Pure NFKC scan of the complete supplied text; resets each supplied RegExp lastIndex before testing and does not mutate the input.',
-        paramsResults:'DEFAULT_LEVELS; analyzeRiskSignals(input,{signals:[{id,pattern,weight,label?,guidance?}],levels?}) returns mutable {level,matches,score,textLength} for the complete input.',
+        lifecycleSideEffects:'Scans String(input ?? "") without Unicode normalization or whitespace changes; resets each supplied RegExp lastIndex before testing and does not mutate the input.',
+        paramsResults:'DEFAULT_LEVELS; analyzeRiskSignals(input,{signals:[{id,pattern,weight,label?,guidance?}],levels?}) returns mutable {level,matches,score,textLength} for the complete input. textLength is the unchanged JavaScript string length after existing non-string conversion; null and undefined become an empty string.',
         events:[],
         errors:['Normally none; malformed custom iterables/levels can produce standard JavaScript errors.'],
         capabilitiesCore:'None.',

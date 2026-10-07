@@ -128,7 +128,7 @@ own asynchronous work, cancellation, and backpressure.
 | [`RecordLinkIndex.js`](#recordlinkindexjs) | esm | Parses record links and builds their normalized index. | Cross-host | Fully normalized. |
 | [`RecordPassageIndex.js`](#recordpassageindexjs) | esm | Indexes text lines, page markers, dates, rules, and excerpts for record review. | Cross-host | Fully normalized. |
 | [`RecordReviewStore.js`](#recordreviewstorejs) | esm | Stores normalized record-review decisions through native storage or app-scoped local fallback. | Browser/native hybrid | Complete records preserved; unreadable stored content fails observably. |
-| [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Fully normalized. |
+| [`RiskSignalAnalyzer.js`](#risksignalanalyzerjs) | esm | Matches configured risk signals and levels against complete text. | Cross-host | Complete literal text; existing non-string conversion only. |
 | [`ScamRiskPolicy.js`](#scamriskpolicyjs) | esm | Combines deterministic scam signals with optional Arcane blocked-domain evidence and safety guidance. | Cross-host | Complete mutable results; blocked-domain policy requires `secure:true`. |
 | [`ScopedOPFSCache.js`](#scopedopfscachejs) | esm | Provides a narrow exact-key JSON cache inside one app-owned OPFS namespace. | Browser / native WebView | Filename-safe keys, complete JSON values, and malformed-cache cleanup normalized; storage errors mixed. |
 | [`ScreenCapture.js`](#screencapturejs) | esm | Captures a display surface as image, video, or GIF with explicit lifecycle events. | Browser / native WebView | State/events normalized; permission and codec errors mixed. |
@@ -4014,9 +4014,11 @@ Matches configured risk signals and levels against complete text.
 
 Exact exports: `DEFAULT_LEVELS`, `analyzeRiskSignals`.
 
+`analyzeRiskSignals(input, {signals, levels})` scans the complete `String(input ?? '')` without Unicode normalization or whitespace changes. Fullwidth characters and decomposed characters remain as supplied. Each signal's `RegExp.lastIndex` resets before testing; signal order, weights and selected levels determine the mutable `{level, matches, score, textLength}` result. `textLength` is the JavaScript string length after the existing non-string conversion; `null` and `undefined` become an empty string. Ordinary `ScamRiskPolicy.assessScamRisk()` uses this same literal-text path.
+
 ### Availability and normalization
 
-**Cross-host.** Fully normalized. Transport: In-process only. [Deep protocol details](protocols.md).
+**Cross-host.** Complete literal text; existing non-string conversion only. Transport: In-process only. [Deep protocol details](protocols.md).
 
 ### Example
 
