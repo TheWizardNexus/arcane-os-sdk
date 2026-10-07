@@ -1,0 +1,28 @@
+--- a/third_party/CMakeLists.txt
++++ b/third_party/CMakeLists.txt
+@@ -236,6 +236,25 @@
+ endfunction()
+ 
+ function(AddSubdirectoryDXC)
++    if (DAWN_DXC_RUNTIME_DIR)
++        # Reuse the matching ONNX Runtime distribution's public DXC companion.
++        # Keep the ordinary Dawn DXC feature and dynamic-loading paths enabled.
++        add_library(dxcompiler SHARED IMPORTED GLOBAL)
++        set_target_properties(dxcompiler PROPERTIES
++            IMPORTED_IMPLIB "${DAWN_DXC_IMPORT_LIBRARY}"
++            IMPORTED_LOCATION "${DAWN_DXC_RUNTIME_DIR}/dxcompiler.dll"
++        )
++        add_custom_target(copy_dxil_dll
++            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/$<CONFIG>"
++            COMMAND ${CMAKE_COMMAND} -E copy_if_different
++                "${DAWN_DXC_RUNTIME_DIR}/dxil.dll" "${CMAKE_BINARY_DIR}/$<CONFIG>/dxil.dll"
++            COMMAND ${CMAKE_COMMAND} -E copy_if_different
++                "${DAWN_DXC_RUNTIME_DIR}/dxcompiler.dll" "${CMAKE_BINARY_DIR}/$<CONFIG>/dxcompiler.dll"
++            VERBATIM
++        )
++        return()
++    endif()
++
+     # We use a CMake function so that all these (non-cache) variables are scoped
+     # only to this function.
+     set(HLSL_OPTIONAL_PROJS_IN_DEFAULT OFF)

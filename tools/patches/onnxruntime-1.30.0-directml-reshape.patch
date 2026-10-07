@@ -1,0 +1,67 @@
+--- a/onnxruntime/core/providers/dml/OperatorAuthorHelper/OperatorHelper.cpp
++++ b/onnxruntime/core/providers/dml/OperatorAuthorHelper/OperatorHelper.cpp
+@@ -2346,42 +2346,34 @@ namespace OperatorHelper
+         DimensionType inElementCount = ComputeElementCountFromDimensions(inputDimensions);
+         bool allowZero = shapeInfo.template GetOptionalAttribute<int32_t>(AttrName::AllowZero, 0);
+ 
+-        if (allowZero)
++        // allowzero changes only the meaning of 0; -1 always requests inference.
++        for (int i = 0, ci = gsl::narrow_cast<int>(m_shapeDims.size()); i < ci; ++i)
+         {
+-            // Just take the shape directly (no special handling for 0).
+-            for (int i = 0, ci = gsl::narrow_cast<int>(m_shapeDims.size()); i < ci; ++i)
++            switch (m_shapeDims[i])
+             {
++            case -1:
++                ML_CHECK_VALID_ARGUMENT(inferDim == -1, "Only one dimension can be inferred.");
++                inferDim = i;
++                break;
++
++            case 0:
++                ML_CHECK_VALID_ARGUMENT(allowZero || gsl::narrow_cast<size_t>(i) < inputDimensions.size(), "A copied dimension must exist in the input.");
++                outputDimensions[i] = allowZero ? 0 : inputDimensions[i];
++                outElementCount *= outputDimensions[i];
++                break;
++
++            default:
+                 outputDimensions[i] = m_shapeDims[i];
++                outElementCount *= outputDimensions[i];
++                break;
+             }
+         }
+-        else
+-        {
+-            // Special handling where 0 size means to copy the corresponding input tensor dimension.
+-            for (int i = 0, ci = gsl::narrow_cast<int>(m_shapeDims.size()); i < ci; ++i)
+-            {
+-                switch (m_shapeDims[i])
+-                {
+-                case -1:
+-                    ML_CHECK_VALID_ARGUMENT(inferDim == -1, "Only one dimension can be inferred.");
+-                    inferDim = i;
+-                    break;
+-
+-                case 0:
+-                    outputDimensions[i] = inputDimensions[i];
+-                    outElementCount *= outputDimensions[i];
+-                    break;
+ 
+-                default:
+-                    outputDimensions[i] = m_shapeDims[i];
+-                    outElementCount *= outputDimensions[i];
+-                    break;
+-                }
+-            }
+-
+-            if (inferDim != -1)
+-            {
+-                outputDimensions[inferDim] = inElementCount / outElementCount;
+-            }
++        if (inferDim != -1)
++        {
++            ML_CHECK_VALID_ARGUMENT(outElementCount != 0, "Cannot infer a dimension with a zero known element count.");
++            ML_CHECK_VALID_ARGUMENT(inElementCount % outElementCount == 0, "The inferred dimension must preserve the element count.");
++            outputDimensions[inferDim] = inElementCount / outElementCount;
+         }
+ 
+         return { EdgeShapes(outputDimensions) };

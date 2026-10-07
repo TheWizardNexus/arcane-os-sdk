@@ -5,6 +5,7 @@ import {createRequire} from 'node:module';
 import path from 'node:path';
 import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
+import packageMetadata from '../../package.json' with {type:'json'};
 import {ArcaneError,ERROR_CODES,normalizeError,throwIfAborted} from '../errors.mjs';
 import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
@@ -15,6 +16,17 @@ import {bundledWhisperRuntime, installedWhisperRuntime, installWhisperDistributi
 
 const is=new Is(false);
 const installations=new Map();
+const onnxWindowsDistribution={
+    version:'1.30.0',
+    revision:'1.30.0-directml-reshape-1',
+    asset:'arcane-onnx-runtime-windows-x64.tar.gz'
+};
+
+function selectedONNXNativeDistribution(runtime,platform,architecture){
+    if(runtime.id!=='onnx'||runtime.url||platform!=='win32'||architecture!=='x64')return null;
+    return (runtime.version??onnxWindowsDistribution.version)===onnxWindowsDistribution.version
+        ?onnxWindowsDistribution:null;
+}
 
 function selectRuntimes(runtimes){
     if(!is.array(runtimes)){
@@ -467,6 +479,8 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
             }
             if(runtime.id==='onnx'){
                 if(!is.string(record.root)||!is.string(record.modulePath))continue;
+                const distribution=selectedONNXNativeDistribution(runtime,platform,architecture);
+                if(distribution&&record.nativeDistributionRevision!==distribution.revision)continue;
                 const locations=await onnxRuntimeModule(record.root,platform,architecture,signal);
                 return {...record,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
             }
@@ -567,7 +581,7 @@ async function onnxRuntimeModule(root,platform,architecture,signal){
 }
 
 async function installONNXPackage(runtime,{root,directory,platform,architecture,signal,onEvent}){
-    const version=runtime.version??'1.30.0';
+    const version=runtime.version??onnxWindowsDistribution.version;
     await onEvent({type:'local-ai.install.installing',message:`Installing onnxruntime-node ${version} for ${platform}/${architecture}.`,data:{id:runtime.id,version,platform,architecture}});
     await mkdir(root,{recursive:true});
     await writeFile(path.join(root,'package.json'),'{"private":true}\n',{flag:'wx',signal});
@@ -576,7 +590,22 @@ async function installONNXPackage(runtime,{root,directory,platform,architecture,
         '--no-audit','--no-fund','--foreground-scripts','--registry=https://registry.npmjs.org/',
         '--cache',path.join(directory,'npm-cache'),`onnxruntime-node@${runtime.url??version}`
     ],{cwd:root,env:{ONNXRUNTIME_NODE_INSTALL:'skip'},signal,onEvent});
-    return onnxRuntimeModule(root,platform,architecture,signal);
+    const distribution=selectedONNXNativeDistribution(runtime,platform,architecture);
+    if(distribution){
+        const archive=path.join(path.dirname(root),distribution.asset);
+        const nativeDirectory=path.join(root,'node_modules','onnxruntime-node','bin','napi-v6',platform,architecture);
+        const url=`https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/${packageMetadata.version}/${distribution.asset}`;
+        await onEvent({type:'local-ai.install.downloading',message:`Downloading ${distribution.asset}.`,data:{id:runtime.id,asset:distribution.asset,nativeDistributionRevision:distribution.revision}});
+        const response=await upstreamResponse(url,signal);
+        await pipeline(Readable.fromWeb(response.body),createWriteStream(archive,{flags:'wx'}),{signal});
+        await onEvent({type:'local-ai.install.extracting',message:`Preparing ${distribution.asset}.`,data:{id:runtime.id,asset:distribution.asset,nativeDistributionRevision:distribution.revision}});
+        // This is the new attempt's package. Running installations retain their
+        // original trees; the same-version JavaScript and binding stay intact.
+        await extractLocalAIArchive({archive,directory:nativeDirectory,signal,onEvent});
+        await unlink(archive);
+    }
+    const locations=await onnxRuntimeModule(root,platform,architecture,signal);
+    return {...locations,...(distribution?{nativeDistributionRevision:distribution.revision}:{})};
 }
 
 async function installRuntime(runtime,{directory,platform,architecture,signal,onEvent}){
