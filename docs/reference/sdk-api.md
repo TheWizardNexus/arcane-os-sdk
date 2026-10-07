@@ -1868,6 +1868,17 @@ whole-tree replacement. The mutable result includes the installed-package
 location, materialized workspace runtime paths, and `workspaceLock` path and
 document. It does not install dependencies or merge application source.
 
+Ordinary acquisition automatically recovers a workspace-operation lock when
+the recorded owner process is confirmed absent, without waiting solely for its
+six-hour expiry. Retry this public operation normally; `workspaceOperationLease`
+is for active nested SDK work and cannot be reconstructed from the lock JSON.
+Live or indeterminate owners remain `ARCANE_WORKSPACE_BUSY`; an indeterminate
+process-probe error is retained as the cause. Existing published lock documents
+remain readable. Recovery rechecks cancellation, the captured nonce and PID,
+and owner presence after asynchronous observation, preserving a replacement
+detected there. This cooperative read-then-remove protocol does not provide an
+atomic compare-and-delete across competing processes.
+
 Replacement removes files absent from the selected runtime content and restores
 the prior tree if commit fails. `signal` and
 `onEvent` remain caller-owned before commit. Once the atomic replacement starts,

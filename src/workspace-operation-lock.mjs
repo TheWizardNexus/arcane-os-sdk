@@ -98,17 +98,20 @@ async function ensureLockDirectory(workspace){
     return physicalDirectory(directory,'Workspace operation-lock directory',{create:true});
 }
 
-function ownerIsAlive(pid){
+function ownerIsAbsent(pid){
     if(!is.safeInteger(pid)||pid<1)return false;
     try{
         process.kill(pid,0);
-        return true;
+        return false;
     }catch(error){
-        return error?.code==='EPERM';
+        if(error?.code==='ESRCH')return true;
+        const busyError=workspaceBusy('The recorded Arcane workspace operation owner could not be determined.');
+        busyError.cause=error;
+        throw busyError;
     }
 }
 
-function lockDocument(value,{workspaceRoot,now=Date.now()}={}){
+function lockDocument(value,{workspaceRoot}={}){
     if(!value||!is.object(value)||is.array(value)
         ||value.schemaVersion!==1
         ||value.kind!=='arcane-workspace-operation-lock'
@@ -124,7 +127,7 @@ function lockDocument(value,{workspaceRoot,now=Date.now()}={}){
     }
     const expiresAt=Date.parse(value.expiresAt);
     if(!is.finite(expiresAt))return null;
-    return {...value,expired:expiresAt<=now};
+    return value;
 }
 
 async function readLock(lockPath,workspaceRoot){
@@ -145,16 +148,24 @@ async function readLock(lockPath,workspaceRoot){
     return lockDocument(value,{workspaceRoot});
 }
 
-async function recoverExpiredLock(lockPath,workspaceRoot,onEvent){
+async function recoverAbsentOwnerLock(lockPath,workspaceRoot,onEvent,signal){
+    throwIfAborted(signal);
     const document=await readLock(lockPath,workspaceRoot);
-    if(!document?.expired||ownerIsAlive(document.owner.pid))return false;
+    throwIfAborted(signal);
+    if(!document||!ownerIsAbsent(document.owner.pid))return false;
     await onEvent?.({
         type:'workspace.operation.stale-recovered',
         workspaceRoot,
         lockPath,
-        previousOwner:document.owner,
+        previousOwner:{...document.owner},
         previousOperation:document.operation
     });
+    throwIfAborted(signal);
+    const current=await readLock(lockPath,workspaceRoot);
+    throwIfAborted(signal);
+    // Observers may replace the record; their completion does not retain ownership.
+    if(current?.nonce!==document.nonce||current?.owner.pid!==document.owner.pid
+        ||!ownerIsAbsent(current.owner.pid))return false;
     await rm(lockPath);
     return true;
 }
@@ -254,15 +265,17 @@ async function acquire({
         lockPath=path.join(directory.canonical,LOCK_NAME);
         let recovered=false;
         for(;;){
+            throwIfAborted(signal);
             try{
                 handle=await open(lockPath,OPEN_EXCLUSIVE,0o600);
                 break;
             }catch(error){
                 if(error?.code!=='EEXIST')throw error;
-                if(recovered||!(await recoverExpiredLock(
+                if(recovered||!(await recoverAbsentOwnerLock(
                     lockPath,
                     workspace.canonical,
-                    onEvent
+                    onEvent,
+                    signal
                 ))){
                     fail(
                         `Workspace is locked by another Arcane operation: ${lockPath}. `

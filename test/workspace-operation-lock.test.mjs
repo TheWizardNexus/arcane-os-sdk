@@ -27,6 +27,16 @@ function deferred(){
     return {promise,resolve};
 }
 
+function replaceOwnerProbe(t,pid,probe){
+    const original=process.kill;
+    process.kill=function probeRecordedOwner(selectedPid,signal){
+        if(selectedPid!==pid)return original.call(process,selectedPid,signal);
+        assert.equal(signal,0);
+        return probe();
+    };
+    t.after(()=>{process.kill=original;});
+}
+
 async function capturedDocument(workspaceRoot){
     let document;
     await withWorkspaceOperationLock({workspaceRoot,operation:'capture'},async()=>{
@@ -159,6 +169,148 @@ test('an expired lock with an absent owner is recovered by its logical record',a
     await assertLockAbsent(workspaceRoot);
 });
 
+test('an unexpired published lock with an absent owner is recovered without waiting for its TTL',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-dead-'});
+    const lockPath=path.join(workspaceRoot,LOCK_RELATIVE);
+    const template=await capturedDocument(workspaceRoot);
+    const ownerPid=2_147_483_646;
+    replaceOwnerProbe(t,ownerPid,()=>{
+        throw Object.assign(new Error('The fixture owner is absent.'),{code:'ESRCH'});
+    });
+    const abandoned={...template,operation:'abandoned-run',owner:{pid:ownerPid}};
+    assert.equal(abandoned.staleRecovery,
+        'After expiresAt, confirm the recorded owner process is absent, preserve workspace changes, '
+        +'and remove only this exact cooperative lock.');
+    assert.ok(Date.parse(abandoned.expiresAt)>Date.now());
+    await writeFile(lockPath,`${JSON.stringify(abandoned,null,2)}\n`,'utf8');
+
+    const events=[];
+    const result=await withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'resumed-run',
+        onEvent:event=>events.push(event)
+    },async lease=>{
+        const current=JSON.parse(await readFile(lockPath,'utf8'));
+        assert.equal(current.owner.pid,process.pid);
+        assert.equal(current.nonce,lease.nonce);
+        assert.notEqual(current.nonce,abandoned.nonce);
+        return 'resumed';
+    });
+    assert.equal(result,'resumed');
+    assert.deepEqual(events.map(event=>event.type),[
+        'workspace.operation.stale-recovered',
+        'workspace.operation.locked',
+        'workspace.operation.released'
+    ]);
+    assert.deepEqual(events[0].previousOwner,{pid:ownerPid});
+    assert.equal(events[0].previousOperation,'abandoned-run');
+    await assertLockAbsent(workspaceRoot);
+});
+
+test('unknown owner probe failures preserve the complete lock and original error',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-unknown-'});
+    const lockPath=path.join(workspaceRoot,LOCK_RELATIVE);
+    const template=await capturedDocument(workspaceRoot);
+    const ownerPid=2_147_483_646;
+    let probeError;
+    replaceOwnerProbe(t,ownerPid,()=>{throw probeError;});
+    for(const code of ['EPERM','EACCES','EINVAL',undefined]){
+        probeError=Object.assign(new Error('The fixture cannot determine this owner.'),{code});
+        const content=`${JSON.stringify({...template,owner:{pid:ownerPid}},null,2)}\n`;
+        await writeFile(lockPath,content,'utf8');
+        await assert.rejects(
+            withWorkspaceOperationLock({workspaceRoot,operation:'unknown-owner'},async()=>{
+                assert.fail('Work must not start while the recorded owner is unknown.');
+            }),
+            error=>error?.code==='ARCANE_WORKSPACE_BUSY'&&error.cause===probeError
+        );
+        assert.equal(await readFile(lockPath,'utf8'),content);
+    }
+});
+
+test('a replacement lock written during recovery observation is preserved',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-replaced-'});
+    const lockPath=path.join(workspaceRoot,LOCK_RELATIVE);
+    const template=await capturedDocument(workspaceRoot);
+    const ownerPid=2_147_483_646;
+    replaceOwnerProbe(t,ownerPid,()=>{
+        throw Object.assign(new Error('The fixture owner is absent.'),{code:'ESRCH'});
+    });
+    await writeFile(lockPath,JSON.stringify({...template,owner:{pid:ownerPid}}),'utf8');
+    const replacement={...template,operation:'new-owner',nonce:'new-owner-nonce'};
+    const replacementContent=`${JSON.stringify(replacement,null,2)}\n`;
+    const events=[];
+    await assert.rejects(withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'stale-contender',
+        async onEvent(event){
+            events.push(event.type);
+            if(event.type==='workspace.operation.stale-recovered'){
+                await writeFile(lockPath,replacementContent,'utf8');
+            }
+        }
+    },async()=>{assert.fail('The contender must not take the replacement owner.');}),
+    error=>error?.code==='ARCANE_WORKSPACE_BUSY');
+    assert.deepEqual(events,['workspace.operation.stale-recovered']);
+    assert.equal(await readFile(lockPath,'utf8'),replacementContent);
+});
+
+test('recovery rechecks owner presence after asynchronous observation',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-owner-returned-'});
+    const lockPath=path.join(workspaceRoot,LOCK_RELATIVE);
+    const template=await capturedDocument(workspaceRoot);
+    const ownerPid=2_147_483_646;
+    let absent=true;
+    replaceOwnerProbe(t,ownerPid,()=>{
+        if(absent)throw Object.assign(new Error('The fixture owner is absent.'),{code:'ESRCH'});
+        return true;
+    });
+    const content=JSON.stringify({...template,owner:{pid:ownerPid}});
+    await writeFile(lockPath,content,'utf8');
+    await assert.rejects(withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'reused-owner',
+        async onEvent(event){
+            if(event.type==='workspace.operation.stale-recovered')absent=false;
+        }
+    },async()=>{assert.fail('A now-present owner must be preserved.');}),
+    error=>error?.code==='ARCANE_WORKSPACE_BUSY');
+    assert.equal(await readFile(lockPath,'utf8'),content);
+});
+
+test('cancellation and observer failure during recovery preserve the old record',async t=>{
+    const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-recovery-cancel-'});
+    const lockPath=path.join(workspaceRoot,LOCK_RELATIVE);
+    const template=await capturedDocument(workspaceRoot);
+    const ownerPid=2_147_483_646;
+    replaceOwnerProbe(t,ownerPid,()=>{
+        throw Object.assign(new Error('The fixture owner is absent.'),{code:'ESRCH'});
+    });
+    const content=`${JSON.stringify({...template,owner:{pid:ownerPid}},null,2)}\n`;
+    await writeFile(lockPath,content,'utf8');
+    const controller=new AbortController();
+    const cancelled=Object.assign(new Error('Cancelled during recovery observation.'),{code:'ARCANE_CANCELLED'});
+    await assert.rejects(withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'cancelled-recovery',
+        signal:controller.signal,
+        async onEvent(event){
+            if(event.type==='workspace.operation.stale-recovered')controller.abort(cancelled);
+        }
+    },async()=>{assert.fail('Cancelled recovery must not start work.');}),error=>error===cancelled);
+    assert.equal(await readFile(lockPath,'utf8'),content);
+
+    const observerError=new Error('Recovery observer failed with complete detail.');
+    await assert.rejects(withWorkspaceOperationLock({
+        workspaceRoot,
+        operation:'failed-observer',
+        async onEvent(event){
+            if(event.type==='workspace.operation.stale-recovered')throw observerError;
+        }
+    },async()=>{assert.fail('Failed recovery observation must not start work.');}),error=>error===observerError);
+    assert.equal(await readFile(lockPath,'utf8'),content);
+});
+
 test('an unreadable or live lock is preserved and reported busy',async t=>{
     const workspaceRoot=await temporaryDirectory(t,{prefix:'arcane-operation-busy-'});
     const template=await capturedDocument(workspaceRoot);
@@ -181,6 +333,14 @@ test('an unreadable or live lock is preserved and reported busy',async t=>{
         error=>error?.code==='ARCANE_WORKSPACE_BUSY'
     );
     assert.equal(JSON.parse(await readFile(lockPath,'utf8')).operation,'live-test');
+
+    const expiredLive={...template,operation:'expired-live',expiresAt:new Date(0).toISOString()};
+    await writeFile(lockPath,JSON.stringify(expiredLive),'utf8');
+    await assert.rejects(
+        withWorkspaceOperationLock({workspaceRoot,operation:'expired-still-live'},async()=>{}),
+        error=>error?.code==='ARCANE_WORKSPACE_BUSY'
+    );
+    assert.deepEqual(JSON.parse(await readFile(lockPath,'utf8')),expiredLive);
 });
 
 test('caller cancellation before acquisition creates no lock',async t=>{

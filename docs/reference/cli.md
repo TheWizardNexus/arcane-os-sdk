@@ -405,6 +405,16 @@ not package the app or produce `dist` output. With PWA enabled, the server
 generates the installation and offline manifests directly; see
 [PWA development and versioning](pwa.md#development-and-hosting).
 
+Ordinary operation acquisition can recover a workspace-operation lock whose
+recorded process is confirmed absent, including before its six-hour expiry.
+Retry the intended command through its usual public entrypoint; no separate
+unlock command or caller-created lease is needed. A live or indeterminate owner
+remains `ARCANE_WORKSPACE_BUSY`, with an indeterminate process-probe error
+retained as the cause. Recovery rechecks cancellation, nonce, PID and owner
+presence after asynchronous observation, preserving a replacement detected
+there. This cooperative read-then-remove protocol does not provide an
+atomic compare-and-delete across competing processes.
+
 The startup URL remains the selected app entry. At `/`, the server serves an
 existing authored host-root `index.html` and suppresses the app-entry redirect
 and PWA alias. A root outside the selected app mapping is served unchanged only
