@@ -45,6 +45,13 @@ retain their separate [app-control contract](native-app-control.md).
 
 ## Attach existing renderer owners
 
+SDK 0.86.1 adds the public `arcane-os/ai/model-observation` export to normal
+generated browser import maps. Development applications keep `arcane-os` on
+`latest`; after updating through their existing dependency workflow, run
+`arcane import-map` before building or serving. The mapping uses the same
+published browser module and changes no observation runtime behavior. Regenerate
+through the public command rather than editing map entries by hand.
+
 ```js
 import * as aiRuntimeState from 'arcane-os/ai-runtime-state';
 import {attachModelObservation} from 'arcane-os/ai/model-observation';
