@@ -65,6 +65,8 @@
     "./core/stdio": "./src/core/stdio.mjs",
     "./core/host": "./src/core/host.mjs",
     "./core/app-control": "./src/core/app-control.mjs",
+    "./core/native-diagnostics": "./browser-runtime/core/native-diagnostics.mjs",
+    "./core/native-diagnostics-source": "./src/core-native-diagnostics-source.mjs",
     "./codex/app-server": "./src/codex/app-server.mjs",
     "./mcp/stdio": "./src/mcp/stdio-server.mjs",
     "./core/repositories": "./src/core/repositories.mjs",

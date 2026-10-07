@@ -15,6 +15,7 @@ export async function connectAppControl({endpoint, signal, onError = reportAppCo
         endpoint,
         closed: connection.closed,
         status(options) { return client.invoke('app.control.status', {}, options); },
+        diagnostics(parameters = {}, options) { return client.invoke('app.control.diagnostics', parameters, options); },
         inspect(parameters = {}, options) { return client.invoke('app.control.inspect', parameters, options); },
         capture(parameters = {}, options) { return client.invoke('app.control.capture', parameters, options); },
         act(parameters, options) { return client.invoke('app.control.act', parameters, options); },

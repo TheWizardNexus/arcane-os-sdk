@@ -24,6 +24,7 @@ namespace Arcane.Core.Hosts.Windows
         public string Title { get; set; }
         public string IconPath { get; set; }
         public string ClassicClientSource { get; set; }
+        public string NativeDiagnosticsSource { get; set; }
         public string AppControlEndpoint { get; set; }
         public string AppControlSource { get; set; }
         public string CoreExecutable { get; set; }
@@ -102,6 +103,7 @@ namespace Arcane.Core.Hosts.Windows
         private readonly Action<string> onDiagnostic;
         private readonly Action<Exception> onError;
         private readonly WebView2 webView;
+        private readonly ArcaneNativeDiagnostics nativeDiagnostics;
         private readonly object stateLock = new object();
         private readonly Queue<CoreDelivery> pending = new Queue<CoreDelivery>();
         private readonly Dictionary<string, long> requestGenerations = new Dictionary<string, long>();
@@ -123,6 +125,8 @@ namespace Arcane.Core.Hosts.Windows
         private Task iconLoading;
         private Icon applicationIcon;
         private string injectedScript;
+        private string nativeDiagnosticsScript;
+        private bool nativeDiagnosticsRegistered;
         private Exception transportFailure;
         private long generation;
         private long nextGeneration;
@@ -148,6 +152,7 @@ namespace Arcane.Core.Hosts.Windows
             this.options = options;
             this.onDiagnostic = onDiagnostic;
             this.onError = onError;
+            nativeDiagnostics = new ArcaneNativeDiagnostics(Report);
             ready.Task.ContinueWith(ObserveReportedFailure, TaskContinuationOptions.OnlyOnFaulted);
             completion.Task.ContinueWith(ObserveReportedFailure, TaskContinuationOptions.OnlyOnFaulted);
             Text = options.Title;
@@ -498,6 +503,10 @@ namespace Arcane.Core.Hosts.Windows
                 browser.SetVirtualHostNameToFolderMapping(options.OriginHost, applicationRoot,
                     CoreWebView2HostResourceAccessKind.Allow);
                 InstallDocumentBridge(generation);
+                // Register the diagnostic observer first so failures in the
+                // ordinary client itself use an ingress independent of Core.
+                await InstallNativeDiagnosticsAsync(browser);
+                if (closing) return;
                 // The selected generator uses replayRuntimeState:true. Both RPC
                 // installation and the shared event owner remain SDK-owned.
                 Task scripts = Task.WhenAll(InstallClassicClientAsync(browser), InstallAppControlAsync(browser));
@@ -525,6 +534,15 @@ namespace Arcane.Core.Hosts.Windows
         private async Task InstallClassicClientAsync(CoreWebView2 browser)
         {
             injectedScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(options.ClassicClientSource);
+        }
+
+        private async Task InstallNativeDiagnosticsAsync(CoreWebView2 browser)
+        {
+            if (String.IsNullOrEmpty(options.NativeDiagnosticsSource)) return;
+            browser.AddHostObjectToScript("arcaneDiagnostics", nativeDiagnostics);
+            nativeDiagnosticsRegistered = true;
+            nativeDiagnosticsScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(options.NativeDiagnosticsSource);
+            nativeDiagnostics.Installed();
         }
 
         private void NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
@@ -1154,6 +1172,7 @@ namespace Arcane.Core.Hosts.Windows
         {
             if (closing) return;
             lock (stateLock) closing = true;
+            nativeDiagnostics.Stop();
             if (!started) initialized.TrySetResult(null);
             if (bridge != null) bridge.Stop(new InvalidOperationException("The application window is closing."));
             if (activeBridge != null) activeBridge.Stop(new InvalidOperationException("The application window is closing."));
@@ -1215,6 +1234,8 @@ namespace Arcane.Core.Hosts.Windows
                 if (!browserProcessExited && webView.CoreWebView2 != null)
                 {
                     webView.CoreWebView2.RemoveHostObjectFromScript("arcaneBridge");
+                    if (nativeDiagnosticsRegistered) webView.CoreWebView2.RemoveHostObjectFromScript("arcaneDiagnostics");
+                    if (nativeDiagnosticsScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(nativeDiagnosticsScript);
                     if (injectedScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(injectedScript);
                     if (appControlScript != null) webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(appControlScript);
                 }

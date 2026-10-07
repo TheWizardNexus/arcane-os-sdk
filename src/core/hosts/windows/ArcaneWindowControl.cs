@@ -38,7 +38,7 @@ namespace Arcane.Core.Hosts.Windows
         {
             if (appControl == null) return;
             appControlScript = await browser.AddScriptToExecuteOnDocumentCreatedAsync(
-                "globalThis[" + AppControlDocumentKey + "] = globalThis.crypto.randomUUID();");
+                "globalThis[" + AppControlDocumentKey + "] ??= globalThis.crypto.randomUUID();");
             if (closing) return;
             browser.NavigationStarting += AppControlNavigationStarting;
             browser.NavigationCompleted += AppControlNavigationCompleted;
@@ -140,7 +140,7 @@ namespace Arcane.Core.Hosts.Windows
                 { "url", webView.Source == null ? null : webView.Source.AbsoluteUri },
                 { "documentGeneration", appControlGeneration }, { "ready", AppControlDocumentReady() },
                 { "window", AppControlWindow() },
-                { "operations", new string[] { "status", "inspect", "capture", "act", "key", "resize" } }
+                { "operations", new string[] { "status", "diagnostics", "inspect", "capture", "act", "key", "resize" } }
             };
         }
 
@@ -158,6 +158,7 @@ namespace Arcane.Core.Hosts.Windows
         {
             cancellation.ThrowIfCancellationRequested();
             if (method == "app.control.status") return AppControlStatus();
+            if (method == "app.control.diagnostics") return nativeDiagnostics.Snapshot(parameters);
             if (method != "app.control.inspect" && method != "app.control.capture" && method != "app.control.act"
                 && method != "app.control.key" && method != "app.control.resize")
                 throw new ArgumentException("Unknown app-control method: " + method);

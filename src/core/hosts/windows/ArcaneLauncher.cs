@@ -101,6 +101,7 @@ namespace Arcane.Core.Hosts.Windows
                     InitialWindowState = OptionalWindowState(windowOptions),
                     IconPath = String.IsNullOrEmpty(icon) ? null : Path.Combine(directory, icon),
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
+                    NativeDiagnosticsSource = File.ReadAllText(Path.Combine(directory, "arcane-native-diagnostics.js")),
                     AppControlEndpoint = appControl == null ? null : RequiredString(appControl, "endpoint"),
                     AppControlSource = appControl == null ? null : File.ReadAllText(Path.Combine(directory, "arcane-app-control.js")),
                     CoreExecutable = Path.Combine(directory, "runtime", "ArcaneCore.exe"),

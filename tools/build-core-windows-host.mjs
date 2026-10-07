@@ -3,6 +3,7 @@ import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {runAppControl} from '../browser-runtime/core/app-control.mjs';
+import {createNativeDiagnosticsSource} from '../src/core-native-diagnostics-source.mjs';
 
 /** Compile reusable Windows x64 host assets once; application assembly copies them. */
 export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, compiler, outputRoot,
@@ -40,6 +41,7 @@ export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, co
         path.join(source, 'ArcaneLauncher.cs'), path.join(source, 'ArcaneHost.cs'), path.join(source, 'ArcaneCoreProcess.cs'),
         path.join(source, 'ArcaneFrameTransport.cs'), path.join(source, 'ArcaneAppControl.cs'),
         path.join(source, 'ArcaneWindowControl.cs'), path.join(source, 'ArcaneNotifications.cs'),
+        path.join(source, 'ArcaneNativeDiagnostics.cs')
     ];
 
     // Compiler and copying use separate files. Observe both before reporting a
@@ -55,6 +57,9 @@ export async function buildCoreWindowsHost({webViewPackageRoot, seaDirectory, co
         }),
         ...copies.map(function copyHostAsset([from, to]) { return copyFile(from, to); }),
         writeFile(path.join(directory, 'arcane-app-control.js'), runAppControl.toString(), {flag: 'wx'}),
+        createNativeDiagnosticsSource().then(function writeDiagnosticObserver(source) {
+            return writeFile(path.join(directory, 'arcane-native-diagnostics.js'), source, {flag: 'wx'});
+        }),
         writeFile(path.join(directory, 'Arcane.exe.config'), [
             '<?xml version="1.0" encoding="utf-8"?>',
             '<configuration>',
