@@ -981,7 +981,7 @@
       ],
       "availability": "Browser and supported native WebViews",
       "transport": "HTMLImport + DOM; injected Arcane/provider modules where listed",
-      "normalization": "Preference/native appearance behavior mixed; selected button background, text and outline remain visible during hover while the hover fill applies only to unselected enabled buttons; no component-ready contract"
+      "normalization": "Preference/native appearance behavior mixed; selected button background, text and outline remain visible during hover while the hover fill applies only to unselected enabled buttons; no component-ready contract; pending choices expose aria-disabled and ignore repeated activation while staying in the keyboard focus flow; completion and failure do not move focus, and an unavailable Skin choice retains native disabling"
     },
     {
       "file": "runtime/arcane/components/unified-inbox.html",

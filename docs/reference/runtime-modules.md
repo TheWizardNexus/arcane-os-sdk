@@ -1386,7 +1386,11 @@ transcription-model load.
 **Cross-host state contract.** States are `unavailable`, `unloaded`, `loading`,
 `recovering`, `ready`, `unloading`, `error`, and `disposed`. Recovery remains
 `loaded: false`; `recovering` and `error` may retain `busy: true` with an actual
-`operationId` until the pending request settles. Revisions increase monotonically.
+`operationId` until the pending request settles. During `unloading`, an already
+loaded role may retain `busy: true` with its actual `operationId` while captured
+requests settle. That observation grants no readiness or permission for a new
+request and is not a `continuesAIRuntimeOperation` recovery state.
+Revisions increase monotonically.
 The events `arcane-ai-runtime-state`, `arcane-ai-runtime-intent`, and
 `arcane-ai-runtime-startup-settled` normalize observation only: receiving one
 does not grant a native capability, prove browser support, or load a provider.
