@@ -107,6 +107,53 @@ test('Git snapshot preserves complete ordered text, paths, BOM, CRLF, NUL and sp
     assert.equal(state.calls.some(function checkout(call) { return call.args.includes('checkout'); }), false);
 });
 
+test('snapshot remoteBase captures the local locator before cwd and caller changes', async function snapshotRemoteBase(t) {
+    const parent = path.resolve('.arcane/test/git-text-snapshot');
+    await mkdir(parent, {recursive: true});
+    const root = await mkdtemp(path.join(parent, 'remote-base-'));
+    t.after(async function removeOwnedCache() { await rm(root, {recursive: true, force: true}); });
+    const cacheDirectory = path.join(root, 'cache');
+    const remote = path.join('..', 'Moon # % 🧀', 'wire.git');
+    const remoteBase = path.join('catalog', 'connections');
+    const calls = [];
+    let failure;
+    const configuration = {cacheDirectory, remote, remoteBase, ref: 'refs/heads/main',
+        selectPath: function selectAll() { return true; },
+        run: async function fakeGit(command, args) {
+            assert.equal(command, 'git');
+            calls.push(args);
+            if (args[2] === 'fetch' && failure) throw failure;
+            let stdout = '';
+            if (args[2] === 'rev-parse') stdout = args[3] === '--is-bare-repository' ? 'true\n' : 'selected-revision\n';
+            return {code: 0, stdout, stderr: 'Complete diagnostic.'};
+        }};
+    const previousDirectory = process.cwd();
+    let owner;
+    try {
+        process.chdir(root);
+        owner = createGitTextSnapshot(configuration);
+    } finally {
+        process.chdir(previousDirectory);
+    }
+    t.after(async function drainOwner() { await owner.close(); });
+    configuration.remote = 'later-remote';
+    configuration.remoteBase = 'later-base';
+    configuration.ref = 'refs/heads/later';
+    assert.equal(calls.length, 0);
+    assert.deepEqual(await owner.refresh(), {revision: 'selected-revision', files: []});
+    assert.deepEqual(await owner.refresh(), {revision: 'selected-revision', files: []});
+    assert.deepEqual(calls.filter(function fetched(args) { return args[2] === 'fetch'; }), [
+        ['--git-dir', cacheDirectory, 'fetch', '--no-tags', '--no-write-fetch-head', '--',
+            path.resolve(root, remoteBase, remote), '+refs/heads/main:refs/arcane/text-snapshot'],
+        ['--git-dir', cacheDirectory, 'fetch', '--no-tags', '--no-write-fetch-head', '--',
+            path.resolve(root, remoteBase, remote), '+refs/heads/main:refs/arcane/text-snapshot']
+    ]);
+    assert.equal(calls.filter(function listed(args) { return args[2] === 'ls-tree'; }).length, 1);
+    failure = new Error('Complete local repository fetch failure.');
+    failure.details = {code: 128, stdout: 'Complete stdout.\n', stderr: 'Complete stderr.\n'};
+    await assert.rejects(owner.refresh(), function actualFailure(error) { return error === failure; });
+});
+
 test('snapshot identity covers bare initialization and fetch while retaining shared acquisition', async function snapshotIdentity(t) {
     const gate = deferred();
     const gitIdentity = {name: 'Moon Dispatcher', email: 'moon@example.invalid', username: 'moon-account'};

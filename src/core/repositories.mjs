@@ -4,7 +4,7 @@ import path from 'node:path';
 import Is from 'strong-type';
 import {ArcaneError, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
-import {captureRepositoryTarget, repositoryConfiguration, repositoryPull, repositoryPush,
+import {captureRepositoryRemote, captureRepositoryTarget, repositoryConfiguration, pullRepositoryTarget, pushRepositoryTarget,
     repositoryPushArguments, repositoryStatus} from '../repository.mjs';
 import {createGitIdentityRunner} from '../git-identity.mjs';
 
@@ -45,7 +45,7 @@ export function resolveArcaneDataPaths({dataRoot} = {}) {
 
 /** One connected checkout, composed into an application's own Core service. */
 export function createRepositoryWorkspace(
-    {name, directory, dataRoot, remote, branch, longPaths, cloneIdentity = {}, gitIdentity, onEvent, run = runProcess} = {}
+    {name, directory, dataRoot, remote, remoteBase, branch, longPaths, cloneIdentity = {}, gitIdentity, onEvent, run = runProcess} = {}
 ) {
     let selected = directory;
     if (selected === undefined) {
@@ -57,6 +57,7 @@ export function createRepositoryWorkspace(
     }
     requireString(selected, 'directory');
     if (remote !== undefined) requireString(remote, 'remote');
+    const remoteArgument = captureRepositoryRemote(remote, remoteBase);
     if (branch !== undefined) requireString(branch, 'branch');
     if (longPaths !== undefined && !is.boolean(longPaths)) {
         throw new TypeError('longPaths must be a boolean when supplied.');
@@ -119,7 +120,7 @@ export function createRepositoryWorkspace(
         }
         arguments_.push(...cloneConfiguration);
         if (branch !== undefined) arguments_.push('--branch', branch);
-        arguments_.push('--', remote, repositoryDirectory);
+        arguments_.push('--', remoteArgument, repositoryDirectory);
         const result = await prepareRun(
             'git',
             arguments_,
@@ -187,7 +188,7 @@ export function createRepositoryWorkspace(
         return accept(
             async function pullRepository() {
                 await prepare(signal);
-                return repositoryPull({workspaceRoot: repositoryDirectory, target: selectedTarget, signal, onEvent, run: execute});
+                return pullRepositoryTarget(selectedTarget, {workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
             },
             signal
         );
@@ -200,7 +201,7 @@ export function createRepositoryWorkspace(
         return accept(
             async function pushRepository() {
                 await prepare(signal);
-                return repositoryPush({workspaceRoot: repositoryDirectory, target: selectedTarget, signal, onEvent, run: execute});
+                return pushRepositoryTarget(selectedTarget, {workspaceRoot: repositoryDirectory, signal, onEvent, run: execute});
             },
             signal
         );
@@ -246,7 +247,7 @@ export function createRepositoryWorkspace(
             async function writeRepositoryFiles() {
                 const outcome = {
                     directory: repositoryDirectory,
-                    ...(selectedTarget === undefined ? {} : {target: {...selectedTarget}}),
+                    ...(selectedTarget === undefined ? {} : {target: {...selectedTarget.target}}),
                     state: 'local',
                     stage: 'prepare',
                     paths: selectedFiles.map(function selectedPath(file) { return file.path; }),

@@ -56,20 +56,33 @@ export async function readGitText(args, {
     }
 }
 
-/** Capture a caller-selected operation target without changing its strings. */
+/** Derive a Git argument only when the caller explicitly selects a local base. */
+export function captureRepositoryRemote(remote, remoteBase) {
+    if (remoteBase === undefined) return remote;
+    if (!is.string(remoteBase) || !remoteBase.isWellFormed() || remoteBase.includes('\0')) {
+        throw new TypeError('remoteBase must be text representable as a native filesystem path.');
+    }
+    return remote === undefined ? undefined : path.resolve(remoteBase, remote);
+}
+
+/** Keep original selection text separate from the accepted command argument. */
 export function captureRepositoryTarget(target) {
     if (target === undefined) return undefined;
-    const {remote, ref} = target;
+    const {remote, ref, remoteBase} = target;
     for (const [name, value] of Object.entries({remote, ref})) {
         if (!is.string(value) || value === '' || !value.isWellFormed() || value.includes('\0')) {
             throw new TypeError(`target.${name} must be nonempty text representable as a native process argument.`);
         }
     }
-    return {remote, ref};
+    return {
+        target: {remote, ref, ...(remoteBase === undefined ? {} : {remoteBase})},
+        remoteArgument: captureRepositoryRemote(remote, remoteBase)
+    };
 }
 
-export function repositoryPushArguments(target) {
-    return target === undefined ? ['push'] : ['push', '--no-follow-tags', '--', target.remote, `HEAD:${target.ref}`];
+export function repositoryPushArguments(selection) {
+    return selection === undefined ? ['push']
+        : ['push', '--no-follow-tags', '--', selection.remoteArgument, `HEAD:${selection.target.ref}`];
 }
 
 /** Observe an existing workspace without initializing or refreshing it. */
@@ -167,6 +180,12 @@ export async function repositoryPull({
 }={}){
     throwIfAborted(signal);
     const selectedTarget=captureRepositoryTarget(target);
+    return pullRepositoryTarget(selectedTarget,{workspaceRoot,signal,onEvent,run});
+}
+
+/** Internal workspace path: its target was already captured before queueing. */
+export async function pullRepositoryTarget(selectedTarget,{workspaceRoot,signal,onEvent,run=runProcess}){
+    throwIfAborted(signal);
     const before=await repositoryStatus({workspaceRoot,signal,onEvent,run});
     if(!before.clean){
         throw new ArcaneError(
@@ -176,14 +195,14 @@ export async function repositoryPull({
         );
     }
     const args=selectedTarget===undefined?['pull','--ff-only']
-        :['pull','--ff-only','--',selectedTarget.remote,`${selectedTarget.ref}:`];
+        :['pull','--ff-only','--',selectedTarget.remoteArgument,`${selectedTarget.target.ref}:`];
     const result=await git(args,{cwd:workspaceRoot,signal,onEvent,run});
     return {
         action:'pull',
         repositoryRoot:before.repositoryRoot,
         branch:before.branch,
         output:result.stdout.trim(),
-        ...(selectedTarget===undefined?{}:{target:selectedTarget,stdout:result.stdout,stderr:result.stderr})
+        ...(selectedTarget===undefined?{}:{target:selectedTarget.target,stdout:result.stdout,stderr:result.stderr})
     };
 }
 
@@ -196,6 +215,12 @@ export async function repositoryPush({
 }={}){
     throwIfAborted(signal);
     const selectedTarget=captureRepositoryTarget(target);
+    return pushRepositoryTarget(selectedTarget,{workspaceRoot,signal,onEvent,run});
+}
+
+/** Internal workspace path: its target was already captured before queueing. */
+export async function pushRepositoryTarget(selectedTarget,{workspaceRoot,signal,onEvent,run=runProcess}){
+    throwIfAborted(signal);
     const before=await repositoryStatus({workspaceRoot,signal,onEvent,run});
     if(!before.branch){
         throw new ArcaneError(
@@ -209,7 +234,7 @@ export async function repositoryPush({
         repositoryRoot:before.repositoryRoot,
         branch:before.branch,
         output:(result.stdout||result.stderr).trim(),
-        ...(selectedTarget===undefined?{}:{target:selectedTarget,stdout:result.stdout,stderr:result.stderr})
+        ...(selectedTarget===undefined?{}:{target:selectedTarget.target,stdout:result.stdout,stderr:result.stderr})
     };
 }
 

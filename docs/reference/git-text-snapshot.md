@@ -33,11 +33,26 @@ policy stable for the lifetime of its snapshot owner.
 
 ## API and lifecycle
 
-`createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run})`
+`createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run})`
 returns `{refresh,close,drain,dispose}`. `run` defaults to the SDK's existing
 `runProcess`; applications normally omit it. It is the same process adapter
 contract, not a second process supervisor. `onEvent` is the ordinary SDK event
 callback and follows its asynchronous completion/error contract.
+
+Optional `remoteBase` explicitly selects `remote` as a local filesystem locator.
+The owner derives its native absolute Git argument once during construction
+using `path.resolve(remoteBase, remote)`, independently of the cache location
+and later working-directory changes. A relative base is captured against the
+construction-time working directory; `''` explicitly selects that directory.
+The caller's original locator and options remain unchanged. Without this field,
+every existing Git remote string keeps its ordinary meaning; the SDK does not
+guess whether a name, URL, colon or slash describes a local path.
+
+Use the same app-selected absolute base for snapshot, workspace clone and each
+explicit pull/push/write target. Factory clone inputs do not become operation
+targets. See [relative local repository locators](core-repositories.md#relative-local-repository-locators)
+for the shared contract, original target outcomes and example. This option adds
+no I/O, remote probe, configuration change, retry or empty-remote success path.
 
 Optional `gitIdentity:{name?,email?,username?}` uses the shared
 [Git identity configuration contract](core-repositories.md#git-identity-configuration).

@@ -47,7 +47,7 @@ const status = await repository.status({signal});
 await repository.close();
 ```
 
-`createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})`
+`createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})`
 returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. The `directory`
 property is the absolute selected working path.
 
@@ -63,6 +63,10 @@ property is the absolute selected working path.
   `branch`, when supplied, is passed unchanged to Git's `clone --branch` option;
   otherwise Git selects the remote's default branch. Existing checkouts keep
   their own branch, remote, tracked files, untracked files and local changes.
+- Supplying `remoteBase` explicitly declares this initial-clone `remote` to be
+  a local filesystem locator. Its native absolute command argument is captured
+  during construction. Omission leaves Git's original string interpretation
+  unchanged. See [relative local repository locators](#relative-local-repository-locators).
 - Optional `longPaths` is a boolean for newly cloned Windows checkouts. Explicit
   `true` or `false` supplies `clone --config core.longpaths=<value>`, so Git
   writes that choice to the new repository before its first checkout. Omission
@@ -173,13 +177,13 @@ commands for an attached local branch, or three otherwise. Results are not a
 transaction with later work or external Git activity. The app owns any decision
 that the current checkout corresponds to its selected repository and branch.
 
-The optional `target:{remote,ref}` on `pull`, `push` and `write` selects that
-operation's Git destination. Both fields are nonempty strings representable by
+The optional `target:{remote,ref,remoteBase?}` on `pull`, `push` and `write` selects
+that operation's Git destination. `remote` and `ref` are nonempty strings representable by
 the native process transport. The SDK captures their exact strings when the
 call is accepted; later edits to the target object or UI selection cannot
 redirect queued or active work. Git owns ref parsing, URL interpretation,
 credentials, hooks and remote outcomes. This target is independent of the
-factory's `remote`/`branch`, which remain initial-clone inputs only.
+factory's `remote`/`remoteBase`/`branch`, which remain initial-clone inputs only.
 
 ```javascript
 const observed = await repository.configuration({signal});
@@ -207,6 +211,54 @@ selection, retry, reset, force, reversal or recommit. The app decides when to
 observe, refresh, write and publish. See Git's [pull](https://git-scm.com/docs/git-pull),
 [push](https://git-scm.com/docs/git-push) and [configuration](https://git-scm.com/docs/git-config)
 contracts.
+
+### Relative local repository locators
+
+`remoteBase` is an explicit local-path choice, not a hint for a URL parser.
+With it, the SDK derives the Git remote argument using the host's native
+`path.resolve(remoteBase, remote)`. A relative base, including `''` for the
+current directory, is resolved once when a workspace/snapshot owner is
+constructed or a targeted operation is accepted. Later working-directory or
+options-object changes cannot redirect that accepted operation. Base text
+must be representable as a native filesystem path; invalid non-string, NUL or
+unpaired-surrogate input reports `TypeError` without changing the supplied text.
+
+Use the same selected absolute base for owners created at different times:
+
+```javascript
+import {createGitTextSnapshot} from 'arcane-os';
+import {createRepositoryWorkspace} from 'arcane-os/core/repositories';
+
+const remote = connection.locator; // Keep the original catalog string.
+const remoteBase = connection.localBaseDirectory; // App-selected absolute base.
+const repository = createRepositoryWorkspace({name: connection.name, remote, remoteBase});
+const snapshot = createGitTextSnapshot({
+    cacheDirectory: connection.cacheDirectory,
+    remote, remoteBase, ref: connection.ref, selectPath: applicationSelectPath
+});
+const target = {remote, remoteBase, ref: connection.ref};
+await repository.write({files: selectedFiles, message, target, signal});
+// This reader wants the newly published selection, so refresh after the write.
+await snapshot.refresh({signal});
+```
+
+The original locator and ref remain unchanged. Public targeted results and
+writer failure outcomes also retain the explicitly supplied original
+`remoteBase`, including its relative spelling or empty string; the derived
+absolute argument stays with the Git invocation. No catalog/configuration
+rewrite, directory change or extra Git command is introduced. The existing
+Git clone may save its supplied remote argument as its ordinary origin setting.
+
+Omit `remoteBase` for configured names such as `origin`, URLs, SCP-like addresses,
+remote-helper syntax, or any other string Git should interpret normally. With
+an explicit base, even `origin` means the local path under that base. The SDK
+does not infer intent from slashes, colons or platform path spelling. Factory
+`remoteBase` affects only cloning; an individual pull/push/write uses only its
+own `target.remoteBase`. Omitting `target` retains configured Git behavior.
+The public `repositoryPull` and `repositoryPush` functions accept the same
+target field and capture it before their first asynchronous status operation.
+Actual filesystem, Git, credential and remote failures retain their existing
+complete diagnostics; this option adds no fallback, retry or unborn-state rule.
 
 ## Git identity configuration
 
@@ -438,8 +490,8 @@ Successful completion returns:
 
 Each output record retains complete stdout/stderr. `code` and the process
 termination `signal` are included when a completed process result is available.
-When supplied, `target:{remote,ref}` is included in the result or failure outcome
-with the original accepted strings.
+When supplied, `target:{remote,ref,remoteBase?}` is included in the result or
+failure outcome with the original accepted strings.
 An in-progress write also records its current `path` on a failure outcome.
 `writtenPaths` records successful filesystem writes in input order; `written`
 becomes true only after every requested write succeeds. The other booleans

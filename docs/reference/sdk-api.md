@@ -3831,12 +3831,21 @@ async repositoryPull({ workspaceRoot=process.cwd(), target, signal, onEvent, run
 
 Import it from `arcane-os`. The signature above states whether settlement is synchronous or promise-based. The overview and owning group define result authority, side effects, callbacks, events, cancellation, and lifecycle.
 
-Optional `target:{remote,ref}` captures exact nonempty native-representable
-strings before any wait and selects `git pull --ff-only -- <remote> <ref>:`.
+Optional `target:{remote,ref,remoteBase?}` captures the exact nonempty
+native-representable `remote` and `ref` strings before any wait and selects
+`git pull --ff-only -- <remote> <ref>:`.
 The current clean branch receives a fast-forward-only integration; the SDK
 never switches branches, resets or changes configuration. Without a target,
 the existing configured pull and result remain unchanged. Targeted results
 add `target`, complete `stdout` and `stderr` to the existing pull result.
+
+Supplying `target.remoteBase` explicitly selects a local filesystem locator:
+only the Git remote argument becomes `path.resolve(remoteBase, remote)`, captured
+once at acceptance before status work. Relative bases, including `''`, use the
+working directory at that moment. The returned target retains the original
+`remote`, `ref` and supplied base text. Omission preserves Git remote names,
+URLs, SCP-like addresses and remote-helper strings without guessed parsing.
+Unrepresentable base text reports `TypeError` without transformation.
 See [checkout configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets).
 
 ### Availability and normalization
@@ -3877,12 +3886,20 @@ detached HEAD, then, without `target`, runs plain `git push`; the repository's c
 configured upstream/remote, Git credentials, hooks, and server policy remain
 authoritative. Unlike `repositoryPull()`, this function does **not** require a
 clean worktree. It does not create a commit or choose an application destination.
-Optional `target:{remote,ref}` captures the original nonempty
-native-representable strings before any wait and runs
+Optional `target:{remote,ref,remoteBase?}` captures the original nonempty
+native-representable `remote` and `ref` strings before any wait and runs
 `git push --no-follow-tags -- <remote> HEAD:<ref>`. This publishes current HEAD
 to the caller-selected ref without force or implicit configured tag following.
 It changes no branch or Git configuration; credentials, URL interpretation,
 hooks and remote rejection remain Git-owned.
+
+Supplying `target.remoteBase` explicitly selects a local filesystem locator:
+only the Git remote argument becomes `path.resolve(remoteBase, remote)`, captured
+once at acceptance before status work. Relative bases, including `''`, use the
+working directory at that moment. Later directory or target-object changes do
+not redirect accepted work. Omission preserves Git remote names, URLs, SCP-like
+addresses and remote-helper strings without guessed parsing. Unrepresentable
+base text reports `TypeError` without transformation.
 
 The promise resolves to
 `{action:'push', repositoryRoot, branch, output}`. `output` is trimmed stdout,
@@ -3890,7 +3907,8 @@ or trimmed stderr when stdout is empty. A missing Git executable, failed status
 probe, rejected/nonzero push, cancellation, or event-callback failure rejects
 with the normalized process error. Cancellation stops the local process tree;
 it cannot prove that a remote accepted no objects before the interruption.
-Targeted results also contain the captured `target` and complete
+Targeted results also contain the captured `target`, retaining original
+`remote`, `ref` and any supplied `remoteBase`, and complete
 `stdout`/`stderr`; omitting the target preserves the existing result shape.
 See [checkout configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets).
 
@@ -5367,7 +5385,7 @@ a dedicated bare Git cache. It does not create or alter a working checkout.
 ### Signature, lifecycle, and result
 
 ```text
-createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})
+createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Import from `arcane-os`. The application owns the cache location, remote, ref,
@@ -5378,6 +5396,16 @@ ends only that wait. `close()`, `drain()` and `dispose()` stop acceptance and
 await accepted refresh/process cleanup. Errors remain observable instead of
 returning stale or partial success. See [Git text snapshots](git-text-snapshot.md)
 for complete inputs, text semantics, errors, events and Core service composition.
+
+Optional `remoteBase` explicitly selects `remote` as a local filesystem locator.
+Only its Git fetch argument is derived using `path.resolve(remoteBase, remote)`,
+once at construction, independently of the cache location and later changes to
+the working directory. Relative bases, including `''`, use the construction-time
+working directory. Original locator/options remain unchanged. Omission preserves
+Git remote names, URLs, SCP-like addresses and remote-helper strings without
+guessed parsing. Unrepresentable base text reports `TypeError` without
+transformation; actual Git failures retain their existing error behavior.
+See [relative local repository locators](core-repositories.md#relative-local-repository-locators).
 
 Optional `gitIdentity:{name?,email?,username?}` captures a child-process-only
 selection for init/fetch and subsequent Git commands, preserving shared refresh
@@ -8348,7 +8376,7 @@ explicit existing path. The application owns the remote, branch and Core API.
 ### Signature and result
 
 ```text
-createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
+createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. Construction does
@@ -8358,6 +8386,16 @@ Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the [complete inputs, results,
 errors and lifecycle](core-repositories.md#one-connected-working-checkout).
+
+Optional factory `remoteBase` explicitly selects the initial-clone `remote` as
+a local filesystem locator. Only its Git argument is derived through the host's
+native `path.resolve(remoteBase, remote)`, once at construction. Relative bases,
+including `''`, use the construction-time working directory. The caller's
+original locator remains unchanged; Git clone may save the derived argument as
+its ordinary origin setting. Omission preserves Git remote names, URLs, SCP-like
+addresses and remote-helper strings without guessed parsing. Unrepresentable
+base text reports `TypeError` without transformation.
+See [relative local repository locators](core-repositories.md#relative-local-repository-locators).
 
 Optional `longPaths` captures a boolean for new Windows clones. Explicit true
 or false supplies clone-local `core.longpaths` before the first checkout and
@@ -8394,11 +8432,15 @@ reports `ARCANE_GIT_CONFIGURATION_NOT_TEXT` with full diagnostics.
 
 `pull({target,signal})`, `push({target,signal})` and
 `write({files:[{path,content}],message,target,signal})` accept optional
-`target:{remote,ref}`, captured as original strings at acceptance. The target
+`target:{remote,ref,remoteBase?}`, captured as original strings at acceptance. The target
 selects a fast-forward-only pull into the current branch or a non-force push
 of current HEAD to the selected ref, without switching branches or changing
-configuration. It is independent of initial-clone `remote`/`branch`; omission
-preserves ordinary configured behavior. See the [complete configuration and
+configuration. An operation's own `remoteBase` declares local-path intent and
+captures the native absolute Git argument once at acceptance, before queueing.
+It is independent of initial-clone `remote`/`remoteBase`/`branch`; omission of
+`target` preserves ordinary configured behavior. Targeted pull/push results and
+writer results/failure outcomes retain original `remote`, `ref` and any supplied
+`remoteBase`, including relative or empty base text. See the [complete configuration and
 target contract](core-repositories.md#existing-checkout-configuration-and-selected-targets).
 
 `write` snapshots the exact selected

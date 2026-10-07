@@ -5,6 +5,7 @@ import {runProcess} from './process.mjs';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
 import {createGitIdentityRunner} from './git-identity.mjs';
+import {captureRepositoryRemote} from './repository.mjs';
 
 const is = new Is(false);
 const snapshotRef = 'refs/arcane/text-snapshot';
@@ -14,11 +15,12 @@ const snapshotRef = 'refs/arcane/text-snapshot';
  * One application service owns each dedicated cache directory. Construction
  * performs no I/O; refresh coalesces callers and close drains accepted work.
  */
-export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, gitIdentity, onEvent, run = runProcess} = {}) {
+export function createGitTextSnapshot({cacheDirectory, remote, remoteBase, ref, selectPath, gitIdentity, onEvent, run = runProcess} = {}) {
     for (const [name, value] of Object.entries({cacheDirectory, remote, ref})) {
         if (!is.string(value) || value === '') throw new TypeError(`${name} must be a nonempty string.`);
     }
     if (!is.function(selectPath)) throw new TypeError('selectPath must be a function.');
+    const remoteArgument = captureRepositoryRemote(remote, remoteBase);
     const execute = createGitIdentityRunner(run, gitIdentity);
     const directory = path.resolve(cacheDirectory);
     let prepared = false;
@@ -68,7 +70,7 @@ export function createGitTextSnapshot({cacheDirectory, remote, ref, selectPath, 
         try {
             await events.send({type: 'git.snapshot.refreshing', message: 'Refreshing the selected repository revision.', data: {ref}});
             await prepare(events);
-            await git(['fetch', '--no-tags', '--no-write-fetch-head', '--', remote, `+${ref}:${snapshotRef}`], {onEvent: events.send});
+            await git(['fetch', '--no-tags', '--no-write-fetch-head', '--', remoteArgument, `+${ref}:${snapshotRef}`], {onEvent: events.send});
             const selected = await git(['rev-parse', '--verify', `${snapshotRef}^{commit}`], {onEvent: events.send});
             const revision = selected.stdout.trim();
             if (retained?.revision === revision) {

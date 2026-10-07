@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import {createRepositoryWorkspace, readGitIdentity, resolveArcaneDataPaths} from '../src/core/repositories.mjs';
 import {createGitIdentityRunner} from '../src/git-identity.mjs';
+import {repositoryPull, repositoryPush} from '../src/repository.mjs';
 import {ArcaneError} from '../src/errors.mjs';
 
 const fixtures = fileURLToPath(new URL('../.arcane/core-repositories-fixtures/', import.meta.url));
@@ -544,6 +545,55 @@ test('clone-local identity preserves the original clone failure and partial dest
     await repository.close();
 });
 
+test('clone remoteBase captures local-path intent before later cwd and option changes', async function cloneRemoteBase(t) {
+    const root = await fixture(t);
+    const directory = path.join(root, 'working checkout');
+    const remote = path.join('..', 'Moon # % 🧀', 'wire.git');
+    const remoteBase = path.join('catalog', 'connections');
+    const expectedRemote = path.resolve(root, remoteBase, remote);
+    const calls = [];
+    const options = {directory, remote, remoteBase, branch: 'main', cloneIdentity: {name: 'Moon Dispatcher'},
+        run: async function clone(command, args, execution) {
+            calls.push({command, args, execution});
+            return processResult('  Complete clone result 🧀\r\n', 'Complete clone diagnostic.\n');
+        }};
+    const previousDirectory = process.cwd();
+    let repository;
+    try {
+        process.chdir(root);
+        repository = createRepositoryWorkspace(options);
+    } finally {
+        process.chdir(previousDirectory);
+    }
+    options.remote = 'later-locator';
+    options.remoteBase = 'later-base';
+    assert.equal(calls.length, 0);
+    const opened = await repository.open();
+    assert.equal(opened.stdout, '  Complete clone result 🧀\r\n');
+    assert.equal(opened.stderr, 'Complete clone diagnostic.\n');
+    assert.deepEqual(calls[0].args, ['clone', '--progress', '--config', 'user.name=Moon Dispatcher',
+        '--branch', 'main', '--', expectedRemote, directory]);
+    assert.equal(calls[0].execution.cwd, root);
+    assert.equal(calls.length, 1);
+    await repository.close();
+});
+
+test('omitted remoteBase leaves configured names and every Git transport spelling unchanged', async function ordinaryRemoteStrings(t) {
+    const root = await fixture(t);
+    const remotes = ['origin', '../moon.git', './local:path', 'git@example.invalid:moon/wire.git',
+        'https://example.invalid/Moon%20Cheese/wire.git', 'transport::complete-locator',
+        'C:\\Moon Cheese\\wire.git', '\\\\moon-server\\share\\wire.git'];
+    for (const [index, remote] of remotes.entries()) {
+        const directory = path.join(root, String(index));
+        const calls = [];
+        const repository = createRepositoryWorkspace({directory, remote,
+            run: async function clone(command, args) { calls.push(args); return processResult(); }});
+        await repository.open();
+        assert.deepEqual(calls, [['clone', '--progress', '--', remote, directory]]);
+        await repository.close();
+    }
+});
+
 test('same-directory owners clone once with complete remote, branch and output, while distinct names stay distinct', async function oneClone(t) {
     const dataRoot = await fixture(t);
     const calls = [];
@@ -742,11 +792,97 @@ test('targeted pull and push capture original selections while queued and retain
     await repository.close();
 });
 
+test('target remoteBase is captured before queueing without applying factory clone inputs', async function queuedRemoteBase(t) {
+    const directory = await fixture(t);
+    await writeFile(path.join(directory, 'existing.md'), 'Existing content.');
+    const started = deferred();
+    const released = deferred();
+    const calls = [];
+    async function run(command, args) {
+        calls.push(args);
+        if (args[0] === 'rev-parse' && args[1] === '--is-inside-work-tree') {
+            started.resolve();
+            await released.promise;
+            return processResult('true\n\n');
+        }
+        if (args[0] === 'rev-parse') return processResult(`${directory}\n`);
+        if (args[0] === 'branch') return processResult('main\n');
+        if (args[0] === 'status') return processResult('## main\n');
+        return processResult('  Complete output 🧀\r\n', '  Complete diagnostic\n');
+    }
+    const repository = createRepositoryWorkspace({directory, remote: 'clone-only', remoteBase: 'clone-only-base', run});
+    const opening = repository.open();
+    await started.promise;
+    const target = {remote: 'origin', ref: 'refs/heads/main', remoteBase: 'catalog'};
+    const expected = {...target};
+    const expectedRemote = path.resolve(directory, target.remoteBase, target.remote);
+    const previousDirectory = process.cwd();
+    let pulling;
+    let pushing;
+    try {
+        process.chdir(directory);
+        pulling = repository.pull({target});
+        pushing = repository.push({target});
+    } finally {
+        process.chdir(previousDirectory);
+    }
+    target.remote = 'later-remote';
+    target.ref = 'refs/heads/later';
+    target.remoteBase = 'later-base';
+    released.resolve();
+    const [, pulled, pushed] = await Promise.all([opening, pulling, pushing]);
+    assert.deepEqual(calls.filter(function selected(args) { return args[0] === 'pull' || args[0] === 'push'; }), [
+        ['pull', '--ff-only', '--', expectedRemote, `${expected.ref}:`],
+        ['push', '--no-follow-tags', '--', expectedRemote, `HEAD:${expected.ref}`]
+    ]);
+    for (const result of [pulled, pushed]) {
+        assert.deepEqual(result.target, expected);
+        assert.equal(result.stdout, '  Complete output 🧀\r\n');
+        assert.equal(result.stderr, '  Complete diagnostic\n');
+    }
+    await repository.push({target: {remote: 'origin', ref: 'refs/heads/main'}});
+    assert.deepEqual(calls.at(-1), ['push', '--no-follow-tags', '--', 'origin', 'HEAD:refs/heads/main']);
+    await repository.push();
+    assert.deepEqual(calls.at(-1), ['push']);
+    await repository.close();
+});
+
+test('public repository pull and push capture a target base before status work', async function publicRemoteBase(t) {
+    const directory = await fixture(t);
+    for (const operation of [repositoryPull, repositoryPush]) {
+        const target = {remote: 'wire.git', ref: 'refs/heads/main', remoteBase: ''};
+        const expected = {...target};
+        const calls = [];
+        async function run(command, args) {
+            calls.push(args);
+            target.remoteBase = 'later-base';
+            target.remote = 'later-remote';
+            if (args[0] === 'rev-parse') return processResult(`${directory}\n`);
+            if (args[0] === 'branch') return processResult('main\n');
+            if (args[0] === 'status') return processResult('## main\n');
+            return processResult('Complete output.', 'Complete diagnostic.');
+        }
+        const previousDirectory = process.cwd();
+        let pending;
+        try {
+            process.chdir(directory);
+            pending = operation({workspaceRoot: directory, target, run});
+        } finally {
+            process.chdir(previousDirectory);
+        }
+        const result = await pending;
+        assert.deepEqual(result.target, expected);
+        assert.equal(calls.at(-1).at(-2), path.join(directory, 'wire.git'));
+    }
+});
+
 test('targeted writer retains captured destination through success and uncertain push failure', async function targetWriter(t) {
-    for (const fails of [false, true]) {
+    for (const [fails, local] of [[false, false], [true, false], [false, true], [true, true]]) {
         const directory = await fixture(t);
         await writeFile(path.join(directory, 'existing.md'), 'Existing content.');
-        const target = {remote: 'https://example.invalid/wire.git', ref: 'refs/heads/main'};
+        const target = local
+            ? {remote: 'wire.git', ref: 'refs/heads/main', remoteBase: path.join(directory, 'catalog')}
+            : {remote: 'https://example.invalid/wire.git', ref: 'refs/heads/main'};
         const expected = {...target};
         const failure = new ArcaneError('ARCANE_OPERATION_FAILED', 'Complete push failure.',
             {details: {code: 1, stdout: '', stderr: 'Complete remote diagnostic.'}});
@@ -756,6 +892,7 @@ test('targeted writer retains captured destination through success and uncertain
             if (args[0] === 'rev-parse') {
                 target.remote = 'changed-after-acceptance';
                 target.ref = 'refs/heads/changed';
+                target.remoteBase = 'changed-after-acceptance';
                 return processResult('true\n\n');
             }
             if (fails && args[0] === 'push') throw failure;
@@ -777,7 +914,8 @@ test('targeted writer retains captured destination through success and uncertain
             assert.deepEqual(result.target, expected);
             assert.equal(result.pushed, true);
         }
-        assert.deepEqual(calls.at(-1), ['push', '--no-follow-tags', '--', expected.remote, `HEAD:${expected.ref}`]);
+        assert.deepEqual(calls.at(-1), ['push', '--no-follow-tags', '--',
+            local ? path.resolve(expected.remoteBase, expected.remote) : expected.remote, `HEAD:${expected.ref}`]);
         assert.equal(await readFile(path.join(directory, 'message.md'), 'utf8'), 'Complete message.\n');
         await repository.close();
     }
