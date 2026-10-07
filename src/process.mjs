@@ -3,6 +3,7 @@ import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {ArcaneError,ERROR_CODES,throwIfAborted} from './errors.mjs';
 import {createEventQueue} from './event-queue.mjs';
+import {windowsGitEnvironment} from './windows-git-executable.mjs';
 
 const is = new Is(false);
 
@@ -195,6 +196,29 @@ export async function runProcess(command,args=[],{
     });
     throwIfAborted(signal);
 
+    let childEnvironment=env?{...process.env,...env}:process.env;
+    if(process.platform==='win32'&&command==='git'){
+        try{
+            childEnvironment=await windowsGitEnvironment(childEnvironment,{
+                run:runProcess,signal,
+                onEvent:function discoveryEvent(event){
+                    return events.send({
+                        ...event,type:event.type.replace(/^process\./u,'process.git.discovery.')
+                    });
+                }
+            });
+        }catch(error){
+            throwIfAborted(signal);
+            if(events.error)throw events.error;
+            await events.send({
+                type:'process.git.discovery.unavailable',
+                message:'Registered Git discovery was unavailable; using the existing command environment.',
+                data:{error}
+            });
+        }
+        throwIfAborted(signal);
+    }
+
     return new Promise((resolve,reject)=>{
         let stdout=outputEncodings.stdout!==null&&outputSelected(captureOutput,'stdout')?'':null;
         let stderr=outputEncodings.stderr!==null&&outputSelected(captureOutput,'stderr')?'':null;
@@ -369,7 +393,7 @@ export async function runProcess(command,args=[],{
         try{
             child=spawn(executable,executableArgs,{
                 cwd,
-                env:env?{...process.env,...env}:process.env,
+                env:childEnvironment,
                 shell:false,
                 detached:process.platform!=='win32',
                 windowsHide:true,

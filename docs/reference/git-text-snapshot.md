@@ -4,8 +4,11 @@
 from one fetched Git revision. It uses a dedicated **bare object cache**, not a
 clone with a working checkout. It never reads uncommitted application files,
 checks out files, modifies a user checkout/index, or creates another worktree.
-Construction performs no I/O. The native host needs Git available on its PATH;
-Git owns remote access, authentication and its actual failures.
+Construction performs no I/O. The native host needs Git available on its PATH
+or an installed Git for Windows registration discoverable by the default
+[process runner](sdk-api.md#runprocess). Discovery extends only that Git child's
+PATH after its existing entries. Git owns remote access, authentication and
+its actual failures; custom process adapters retain their own execution.
 
 ```js
 import {createGitTextSnapshot} from 'arcane-os';

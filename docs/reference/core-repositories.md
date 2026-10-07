@@ -81,7 +81,11 @@ property is the absolute selected working path.
   keep Git's ordinary inheritance; existing checkouts retain their configuration.
   See [clone-local author selection](#clone-local-author-selection).
 - `onEvent` and optional `run` use the existing SDK process owner. The default
-  adapter is `runProcess`; Git must be available on PATH. Credentials and
+  adapter is `runProcess`; Git can be available on PATH or through an installed
+  Git for Windows registration. The default Windows runner appends that
+  installation's `cmd` directory only to the Git child's PATH, preserving
+  existing command lookup priority. See [Windows Git discovery](sdk-api.md#runprocess).
+  Custom `run` adapters retain their own execution behavior. Credentials and
   authentication remain with Git and the native host. The SDK adds no download,
   credential store, polling, network retry or process supervisor.
 

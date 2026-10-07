@@ -5484,6 +5484,28 @@ once and stdin remains open until cancellation or a callback/input failure
 requests shutdown. On Microsoft NT, `npm` and `npx` are normalized to their Node
 CLI entrypoints.
 
+For the literal `git` command on Windows, the default runner reads Git for
+Windows' registered `InstallPath` in the current-user and machine registry
+views. When that installation's `cmd/git.exe` exists, its `cmd` directory is
+appended only to this child's effective PATH. Existing entries and native
+command lookup retain priority; duplicate `Path`/`PATH` spellings follow Node's
+lexical selection. Other environment fields, explicit executable paths,
+custom process adapters, other commands and other platforms keep their existing
+behavior. No global environment or registry setting is changed, and no Git
+download, installation or command retry occurs.
+
+One successful location is retained in memory for this process while its
+executable remains present. A removed executable triggers fresh discovery;
+absent, failed and cancelled lookups are not retained. Concurrent cold callers
+own independent discovery and cancellation. The standard Windows registry
+helper uses the existing process owner; its lifecycle callbacks have
+`process.git.discovery.*` event names, and its captured metadata is separate
+from the requested command's output. Missing registration leaves ordinary
+lookup unchanged. Discovery failure emits `process.git.discovery.unavailable`
+with the complete error before ordinary lookup continues. Cancellation or an
+event-callback failure stops the operation before Git starts. Normal Git
+errors and missing-working-directory errors remain actual command failures.
+
 An `AsyncIterable` input instead feeds stdin with awaited writes and closes it
 when the producer finishes. Its `return()` must cooperate with cancellation of
 an outstanding `next()`; the process owner drains both input and output work.
