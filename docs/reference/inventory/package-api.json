@@ -654,7 +654,7 @@
       "summary": "Explicit-load Laya and Julia-1 decisions with caller-selected precision, complete inputs and graph results.",
       "availability": "Browser module Workers and the selected Transformers.js backend; import/construction starts no model load",
       "protocol": "Caller-owned state/question/options rows; five-input decision graph; native Worker request/result lifecycle",
-      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes the complete selected runtime entry and actual loader resources through fetchResource outside cloned Worker configuration. Each activation materializes unchanged entry source with JavaScript MIME and retains its original configured URL for later loads; its object URL is revoked after Worker termination. Stored mode disables competing model caches, preserves complete HTTP responses and joins runtime-entry/resource cleanup before outstanding calls settle. Runtime-entry HTTP failures retain error.response. Custom stored entries must support an object URL and changed import.meta.url; native absolute dependencies and custom factory imports outside upstream preloads remain browser-owned. Omission retains direct native module and upstream model loading; no decision-result persistence or precision fallback"
+      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes actual loader resources through fetchResource outside cloned Worker configuration. By default stored activation also materializes the unchanged runtime entry as a JavaScript object URL, retains its configured URL for later loads and revokes the object URL after Worker termination. Explicit runtime.local:true instead imports same-deployment moduleUrl and wasmPaths.mjs/wasm directly, defaulting to ai/decisions-runtime installed by browserDecisions:true materialization; only those exact executable URLs bypass the model store. It disables upstream executable WASM caching/proxy and selects one WASM thread, preserving the requested inference backend. Stored mode disables competing model caches, preserves complete HTTP responses and joins resource cleanup before outstanding calls settle. Default runtime-entry HTTP failures retain error.response; custom stored entries must support an object URL and changed import.meta.url. Omission retains existing browser behavior; no decision-result persistence or precision fallback"
     },
     {
       "id": "root:acceptWebSocket",
@@ -1734,7 +1734,7 @@
       "name": "materializeInstalledSdkRuntime",
       "displayName": "materializeInstalledSdkRuntime()",
       "kind": "function",
-      "signature": "async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})",
+      "signature": "async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,browserDecisions=false,workspaceOperationLease,signal,onEvent}={})",
       "entrypoints": [
         "arcane-os"
       ],
@@ -1743,14 +1743,14 @@
       "summary": "Materializes the complete installed SDK runtime and browser runtime, then replaces semantic arcane.lock.json metadata from the actual installed dependency and package.",
       "availability": "Node",
       "protocol": "Installed SDK runtime materialization",
-      "normalization": "Complete installed runtime content and a mutable materialization result"
+      "normalization": "Complete installed runtime content and a mutable materialization result. Explicit browserDecisions:true acquires the upstream bundled Transformers.js 4.3.0 and matched ONNX Runtime 1.31.0-dev.20260914-8d85527a0 asyncify module/WASM plus licenses into arcane/sdk/ai/decisions-runtime before replacement. The optional workspaceRuntime.browserDecisions result contains directory, versions and filenames. Default false performs no optional acquisition. Progress counts completed files; signal, HTTP and observer failures abort/join acquisition and preserve the previous projection. Select the option on each refresh that should retain the closure; model/tokenizer data remain upstream/cache-owned"
     },
     {
       "id": "root:materializeWorkspaceRuntimeContent",
       "name": "materializeWorkspaceRuntimeContent",
       "displayName": "materializeWorkspaceRuntimeContent()",
       "kind": "function",
-      "signature": "async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), 'runtime'),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),signal,onEvent}={})",
+      "signature": "async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), 'runtime'),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),sdkVersion=SDK_VERSION,browserDecisions=false,signal,onEvent}={})",
       "entrypoints": [
         "arcane-os"
       ],
@@ -1759,7 +1759,7 @@
       "summary": "Replaces one workspace's complete projected runtime and browser-runtime content from selected source roots.",
       "availability": "Node",
       "protocol": "Workspace runtime materialization",
-      "normalization": "Complete workspace runtime content and a mutable materialization result"
+      "normalization": "Complete workspace runtime content and a mutable materialization result. browserDecisions:true adds the same explicit upstream browser executable acquisition as materializeInstalledSdkRuntime; the optional browserDecisions result contains directory, transformersVersion, onnxRuntimeVersion and files. Default false leaves acquisition disabled. Complete distribution content is copied without source rewriting, with cancellation/error cleanup before staged replacement and no model/tokenizer packaging"
     },
     {
       "id": "root:NATIVE_BUILD_PLAN_PROTOCOL",

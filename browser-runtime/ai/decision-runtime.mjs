@@ -221,6 +221,13 @@ export async function loadDecisionRuntime(configuration, report, resourceFetch =
     if (runtime.wasmPaths !== undefined) {
         namespace.env.backends.onnx.wasm.wasmPaths = runtime.wasmPaths;
     }
+    if (runtime.local) {
+        // MV3 executes the packaged module directly. Its upstream cache and
+        // nested WASM workers would otherwise create executable Blob URLs.
+        namespace.env.useWasmCache = false;
+        namespace.env.backends.onnx.wasm.proxy = false;
+        namespace.env.backends.onnx.wasm.numThreads = 1;
+    }
     const {AutoTokenizer, AutoModel, PreTrainedModel, Tensor} = namespace;
     const options = {revision, device, dtype};
     // No progress_callback: upstream 4.3 otherwise performs file-size

@@ -74,6 +74,7 @@ async function writeWorkspaceLock(lockPath,lock){
 export async function materializeInstalledSdkRuntime({
     workspaceRoot,
     sdkPackageSource,
+    browserDecisions=false,
     workspaceOperationLease,
     signal,
     onEvent
@@ -93,6 +94,7 @@ export async function materializeInstalledSdkRuntime({
             runtimeRoot:authority.installation.runtimeRoot,
             browserRuntimeRoot:authority.installation.browserRuntimeRoot,
             sdkVersion:authority.installation.packageVersion,
+            browserDecisions,
             signal,
             onEvent
         });

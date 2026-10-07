@@ -201,8 +201,21 @@ test('installed SDK materialization copies the complete alias runtime without by
 
     const stalePath=path.join(workspaceRoot,'arcane','stale-runtime-file.txt');
     await writeFile(stalePath,'stale\n');
-    const refreshed=await materializeInstalledSdkRuntime({workspaceRoot});
+    const originalFetch=globalThis.fetch;
+    const acquired=[];
+    globalThis.fetch=async function selectedBrowserDistribution(url){
+        acquired.push(url);
+        return new Response('complete installed SDK browser distribution fixture\n');
+    };
+    t.after(()=>{globalThis.fetch=originalFetch;});
+    const refreshed=await materializeInstalledSdkRuntime({workspaceRoot,browserDecisions:true});
     assert.equal(refreshed.status,'materialized');
+    assert.equal(acquired.length,5);
+    assert.equal(refreshed.workspaceRuntime.browserDecisions.transformersVersion,'4.3.0');
+    assert.equal(await readFile(path.join(
+        refreshed.workspaceRuntime.browserDecisions.directory,'transformers.min.js'
+    ),'utf8'),'complete installed SDK browser distribution fixture\n');
+    assert.deepEqual(JSON.parse(await readFile(workspaceRuntimeLock,'utf8')),refreshedLock);
     await assert.rejects(lstat(stalePath),{code:'ENOENT'});
     assert.equal(
         await readFile(preservedWorkspaceEntry,'utf8'),

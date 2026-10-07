@@ -68,14 +68,16 @@ it does not substitute a quantized graph or another model.
 | `revision` | Upstream revision, default `main`; select a stable revision when repeatable model selection is needed. |
 | `device` | Transformers.js backend, default `webgpu`; an explicit supported alternative is caller-owned. No automatic backend fallback. |
 | `dtype` | Exact upstream precision selection; defaults to `fp16` for Laya and `fp32` for Julia. For Laya FP32, supply `dtype: 'fp32'`. Unsupported selections fail at the selected upstream loader rather than being replaced. |
-| `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. An explicit compatible public runtime URL may be supplied. With `store`, the SDK stores and materializes the complete selected entry for that activation. |
-| `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. |
-| `store` | Optional existing SDK DBOPFS model or speech artifact store exposing `fetchResource()`. The store remains outside Worker configuration; the SDK uses it for the runtime entry and bridges the loader's actual resource requests to it. |
+| `runtime.local` | Default `false`. Explicit `true` selects deployment-local executable modules/WASM without executable Blob preparation; see the MV3 section below. |
+| `runtime.moduleUrl` | Defaults to the self-contained CDN entry `https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js`, or `./decisions-runtime/transformers.min.js` relative to this SDK module in local mode. The `.web.js` build expects a bundler to resolve its bare ONNX Runtime import and is unsuitable for a native module Worker. Explicit compatible URLs are retained; local mode requires files in the SDK Worker's deployment. With `store` and ordinary non-local mode, the SDK stores and materializes the complete entry for that activation. |
+| `runtime.wasmPaths` | Optional upstream ONNX WASM location passed to the selected runtime's public environment API. Local mode defaults to the matching asyncify module/WASM under `./decisions-runtime/`; it accepts a directory URL or explicit `{mjs, wasm}` URLs resolved relative to this SDK module. |
+| `store` | Optional existing SDK DBOPFS model or speech artifact store exposing `fetchResource()`. It remains outside Worker configuration and owns actual model resources. Ordinary stored mode also owns the runtime entry; local mode loads only the exact selected executable files directly. |
 
 Without `store`, the runtime, tokenizer and weights use normal upstream loading
 and caching. With `store`, the selected loader still owns filenames and model
 selection while model resources persist through that existing SDK store. The
-SDK does not redistribute upstream runtimes or models. Browser
+SDK package does not contain upstream runtimes or models; the explicit local
+materializer below acquires its selected executable distribution. Browser
 network, cross-origin and backend availability still apply. WebGPU needs a
 compatible browser/device context. Unsupported precision or backend errors
 are returned, not replaced with a different model, backend or precision.
@@ -90,6 +92,85 @@ Julia selects `dtype: 'fp32'`, loading root `model.onnx` with the exact
 `model.onnx.data` external-data name. Its custom five-input graph is loaded
 through the public generic `PreTrainedModel` API, not a text-generation
 pipeline. Existing Wllama, cloud, speech and chat APIs are unchanged.
+
+## Extension-local executables (Manifest V3)
+
+During the application's ordinary SDK materialization, opt into the upstream
+browser distribution through the public Node API:
+
+```js
+import {materializeInstalledSdkRuntime} from 'arcane-os';
+
+await materializeInstalledSdkRuntime({
+    workspaceRoot: process.cwd(),
+    browserDecisions: true
+});
+```
+
+This acquires the official bundled Transformers.js `4.3.0`
+`transformers.min.js`, matching ONNX Runtime
+`1.31.0-dev.20260914-8d85527a0` `ort-wasm-simd-threaded.asyncify.mjs` and
+`ort-wasm-simd-threaded.asyncify.wasm`, plus `TRANSFORMERS-LICENSE` and
+`ONNX-RUNTIME-LICENSE`. The five complete files are staged under
+`arcane/sdk/ai/decisions-runtime/` before replacing the projected runtime.
+Retain the supplied licenses with the distribution. No bundler, Node engine
+dependency tree, model graph or tokenizer is installed by this option.
+Repeat `browserDecisions: true` on each materialization that should retain
+this closure; whole-tree replacement removes files absent from a later selection.
+
+The result's `workspaceRuntime.browserDecisions` contains `directory`,
+`transformersVersion`, `onnxRuntimeVersion` and `files`. The lower-level
+`materializeWorkspaceRuntimeContent()` accepts the same option and returns
+that record directly as `result.browserDecisions`. Omission performs no
+optional network acquisition. The fixed distribution files are acquired
+concurrently, once each per selected materialization. Events
+`workspace.decisions.started` and `workspace.decisions.progress` expose
+`completed`/`total` file counts; each progress event also has `file` and `url`.
+Cancellation and HTTP or observer failure abort/join pending acquisition and
+preserve the prior runtime. An HTTP failure retains the complete response as
+`error.response` (`url`, `status`, `statusText`, `headers`, `content`), including
+inside `AggregateError.errors` when several operations fail.
+
+Load from an extension-owned module script, using the deployed SDK path:
+
+```js
+import {createBrowserDecisionModel} from './arcane/sdk/ai/browser-decisions.mjs';
+
+const decisions = createBrowserDecisionModel({
+    family: 'laya',
+    model: 'onnx-community/laya-typed-decisions-ONNX',
+    dtype: 'fp16',
+    device: 'webgpu',
+    runtime: {local: true},
+    store // The application's existing SDK DBOPFS model store.
+});
+await decisions.load();
+```
+
+For Julia-1, change the family/model to `julia` /
+`SupersonicLabs/Julia-1-ONNX` and select `dtype: 'fp32'`. Model and tokenizer
+data remain upstream resources served through the same store, preserving its
+complete response, persistent cache, progress and cancellation behavior.
+Construction stays lazy. Only the exact configured local executable URLs use
+native fetch/module loading outside that store; other resources, including
+other same-deployment URLs, retain the model resource bridge.
+
+Local mode directly imports the deployment's module and explicit asyncify
+factory, disables the upstream executable WASM cache and proxy, and selects
+one WASM thread to avoid nested executable Blob workers. This leaves
+`device: 'webgpu'` unchanged; it is not a CPU/backend fallback. Compatible
+custom `runtime.moduleUrl` and `runtime.wasmPaths: {mjs, wasm}` selections must
+share the SDK module's protocol and host. Relative selections resolve against
+that module. A `wasmPaths` directory URL selects the same two asyncify filenames.
+
+Use external module scripts in extension pages. Chrome's MV3 extension-page
+CSP permits WebAssembly with `script-src 'self' 'wasm-unsafe-eval'; object-src
+'self'`; executable scripts and Workers remain packaged locally. The extension
+owns the permissions required for its selected upstream model-data endpoints.
+See [Chrome's extension CSP contract](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy).
+This source integration does not establish an actual Chrome extension load,
+WebGPU inference, or application acceptance; those outcomes require execution
+in the selected extension environment.
 
 ## Shared DBOPFS model resources
 
@@ -111,7 +192,7 @@ await decisions.load();
 
 The same `store` may serve other SDK model clients. The application supplies no
 tokenizer/configuration/graph manifest and performs no file routing. Explicit
-activation first opens `runtime.moduleUrl` through `store.fetchResource()`.
+activation without `runtime.local` first opens `runtime.moduleUrl` through `store.fetchResource()`.
 The SDK materializes the complete stored entry as a JavaScript object URL for
 the dedicated Worker, without rewriting its content. The configured source URL
 is retained for later activations, so they reuse the same stored resource rather
@@ -122,7 +203,8 @@ actual selected tokenizer, configuration, ONNX graph and external-data requests
 to `store.fetchResource(input, options)`. Its competing browser, custom and
 filesystem model caches are disabled only for this explicit stored mode. The
 default upstream ONNX WASM binary and factory preloads use this same hook.
-Native support-file fetches in the dedicated Worker also use the store. The
+Native support-file fetches in the dedicated Worker also use the store, except
+for the exact deployment-local executable selections in local mode. The
 default runtime entry is self-contained. Entry materialization does not rewrite
 dependency imports in custom modules or preserve their original `import.meta.url`
 base. Custom stored entries must work from an object URL; relative imports or
@@ -148,7 +230,7 @@ url}`. `completed` counts closed persistent shards; `total` is `null` until the
 resource finishes. This progress carries no network-size, rate or ETA fields.
 Cancellation aborts the owned fetch and joins reader/writer cleanup before the
 resource owner becomes available to a later request. Interrupted closed shards
-are retained. Each activation owns its runtime object URL and revokes it after
+are retained. Each non-local stored activation owns its runtime object URL and revokes it after
 terminating the Worker on cancellation, failure, unload or disposal. A cancelled
 runtime-entry fetch is joined before its waiting calls settle; a late response
 cannot activate a replacement Worker. Runtime-entry HTTP failures retain the

@@ -40,11 +40,17 @@ async function handleDecisionOperation(event) {
     try {
         if (op === 'load') {
             if (event.data.storedResources) {
+                const localExecutables = payload.runtime.local
+                    ? new Set(
+                        [payload.runtime.moduleUrl, payload.runtime.wasmPaths.mjs, payload.runtime.wasmPaths.wasm]
+                    )
+                    : null;
                 // Cover native ONNX support-file fetches as well as env.fetch.
                 // Native module imports remain the browser module loader's job.
                 globalThis.fetch = function fetchDecisionSupport(input, options) {
                     const url = new URL(is.string(input) ? input : input.url ?? input.href, globalThis.location.href);
                     if (url.protocol === 'blob:' || url.protocol === 'data:') return nativeFetch(input, options);
+                    if (localExecutables?.has(url.href)) return nativeFetch(input, options);
                     return resources.fetch(input, options);
                 };
             }
@@ -55,7 +61,9 @@ async function handleDecisionOperation(event) {
                         {id, progress}
                     );
                 },
-                event.data.storedResources ? resources.fetch : null
+                event.data.storedResources
+                    ? payload.runtime.local ? globalThis.fetch : resources.fetch
+                    : null
             );
             globalThis.postMessage(
                 {id, result: {loaded: true}}

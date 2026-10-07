@@ -725,44 +725,174 @@ test('without a store the selected runtime URL keeps direct Worker loading', asy
     assert.deepEqual(urls.revoked, []);
 });
 
-test('decision resource store stays outside Worker configuration and receives cancellation', async function decisionStore(context) {
+test('local executable mode keeps model storage without preparing an executable Blob', async function localRuntimeEntry(context) {
     const fixture = createWorkerFixture(context);
-    let aborted;
-    let finish;
-    let started;
-    const downloading = new Promise(function observeDownload(resolve) { started = resolve; });
-    const cancellation = new Promise(function observeAbort(resolve) { aborted = resolve; });
-    const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+    const urls = createRuntimeUrlFixture(context, fixture.workers);
+    const calls = [];
     const store = {
-        async fetchResource(input, {signal}) {
-            if (input === 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js') {
-                return storedRuntimeResponse();
-            }
-            assert.equal(input, 'https://models.example.test/dragon/model.onnx_data');
-            signal.addEventListener('abort', function resourceAborted() { aborted(); }, {once: true});
-            started();
-            await cancellation;
-            await cleanup;
-            throw signal.reason;
+        async fetchResource(input) {
+            calls.push(input);
+            return storedRuntimeResponse();
         }
     };
-    const client = fixture.createClient('laya', store);
-    assert.equal(fixture.workers.length, 0);
+    const client = fixture.createClient('laya', store, {runtime: {local: true}});
     const loading = client.load();
-    const failed = assert.rejects(loading, /unloaded/u);
     const worker = fixture.workers[0];
-    await worker.waitForLoad();
+    const runtime = worker.messages[0].payload.runtime;
+    const distribution = new URL('../browser-runtime/ai/decisions-runtime/', import.meta.url);
+    assert.equal(runtime.moduleUrl, new URL('transformers.min.js', distribution).href);
+    assert.deepEqual(runtime.wasmPaths, {
+        mjs: new URL('ort-wasm-simd-threaded.asyncify.mjs', distribution).href,
+        wasm: new URL('ort-wasm-simd-threaded.asyncify.wasm', distribution).href
+    });
     assert.equal(worker.messages[0].storedResources, true);
-    assert.equal(Object.hasOwn(worker.messages[0].payload, 'store'), false);
-    worker.reply({arcaneModelResource: true, resourceId: 1, op: 'fetch',
-        request: {url: 'https://models.example.test/dragon/model.onnx_data', options: {}}});
-    await downloading;
-    client.unload();
-    await cancellation;
-    assert.equal(worker.terminated, true);
-    finish();
-    await failed;
+    assert.equal(worker.messages[0].payload.dtype, 'fp16');
+    assert.deepEqual(calls, []);
+    finishFixtureLoad(worker);
+    await loading;
+    await client.dispose();
+    assert.deepEqual(urls.created, []);
+    assert.deepEqual(urls.revoked, []);
+
+    const explicit = {
+        local: true,
+        moduleUrl: new URL('custom-transformers.js', distribution).href,
+        wasmPaths: {
+            mjs: new URL('custom-ort.mjs', distribution).href,
+            wasm: new URL('custom-ort.wasm', distribution).href
+        }
+    };
+    const julia = fixture.createClient('julia', null, {runtime: explicit});
+    const juliaLoading = julia.load();
+    const juliaWorker = fixture.workers[1];
+    assert.deepEqual(juliaWorker.messages[0].payload.runtime, explicit);
+    assert.equal(juliaWorker.messages[0].payload.dtype, 'fp32');
+    assert.equal(juliaWorker.messages[0].storedResources, false);
+    finishFixtureLoad(juliaWorker);
+    await juliaLoading;
+    assert.throws(function remoteLocalEntry() {
+        fixture.createClient('laya', store, {runtime: {local: true, moduleUrl: 'https://runtime.example.test/remote.js'}});
+    }, /local deployment/u);
 });
+
+test('local decision runtime disables executable Blob preparation only for the selected mode', async function localRuntimeEnvironment() {
+    const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#local-executables`;
+    const namespace = await import(moduleUrl);
+    const wasmPaths = {mjs: 'https://extension.example.test/ort.mjs', wasm: 'https://extension.example.test/ort.wasm'};
+    await loadDecisionRuntime(
+        {family: 'julia', model: 'fixture/julia', device: 'webgpu', dtype: 'fp32', runtime: {local: true, moduleUrl, wasmPaths}},
+        function observeProgress() {}
+    );
+    assert.equal(namespace.env.useWasmCache, false);
+    assert.equal(namespace.env.backends.onnx.wasm.proxy, false);
+    assert.equal(namespace.env.backends.onnx.wasm.numThreads, 1);
+    assert.equal(namespace.env.backends.onnx.wasm.wasmPaths, wasmPaths);
+    assert.deepEqual(namespace.fixture.loads[0].options, {revision: 'main'});
+    assert.equal(namespace.fixture.loads[1].options.device, 'webgpu');
+    assert.equal(namespace.fixture.loads[1].options.dtype, 'fp32');
+    assert.deepEqual(namespace.fixture.loads[1].options.session_options.externalData, [
+        {path: 'model.onnx.data', data: 'model.onnx.data'}
+    ]);
+});
+
+test('the actual decision Worker routes only selected local executables outside model storage', async function localWorkerRouting() {
+    const descriptors = new Map();
+    for (const name of ['fetch', 'location', 'addEventListener', 'postMessage']) {
+        descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    }
+    const nativeCalls = [];
+    const storedCalls = [];
+    const replies = [];
+    let handler;
+    const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#local-worker-routing`;
+    const wasmPaths = {mjs: 'https://extension.example.test/ort.mjs', wasm: 'https://extension.example.test/ort.wasm'};
+    try {
+        globalThis.fetch = async function nativeExecutable(input) {
+            nativeCalls.push(input);
+            return new Response('complete local executable fixture');
+        };
+        Object.defineProperty(globalThis, 'location', {configurable: true, value: {href: 'https://extension.example.test/decision-worker.mjs'}});
+        globalThis.addEventListener = function captureWorkerHandler(type, listener) {
+            assert.equal(type, 'message');
+            handler = listener;
+        };
+        globalThis.postMessage = function serveStoredResource(message) {
+            if (!message.arcaneModelResource) {
+                replies.push(message);
+                return;
+            }
+            assert.equal(message.op, 'fetch');
+            storedCalls.push(message.request.url);
+            void handler({data: {arcaneModelResource: true, resourceId: message.resourceId, op: 'result', result: {
+                file: new Blob(['complete model configuration: 雪\n']),
+                status: 200, statusText: 'OK', headers: [['content-type', 'application/json']],
+                url: message.request.url, redirected: false
+            }}});
+        };
+        await import('../browser-runtime/ai/decision-worker.mjs?local-routing-fixture');
+        await handler({data: {id: 1, op: 'load', storedResources: true, payload: {
+            family: 'laya', model: 'fixture/laya', runtime: {local: true, moduleUrl, wasmPaths}
+        }}});
+        assert.deepEqual(replies.at(-1), {id: 1, result: {loaded: true}});
+        const namespace = await import(moduleUrl);
+        const executable = await namespace.env.fetch(wasmPaths.wasm);
+        assert.equal(await executable.text(), 'complete local executable fixture');
+        const modelUrl = 'https://models.example.test/dragon/config.json';
+        const model = await namespace.env.fetch(modelUrl);
+        assert.equal(await model.text(), 'complete model configuration: 雪\n');
+        assert.equal(model.url, modelUrl);
+        const sameDeploymentModel = 'https://extension.example.test/models/config.json';
+        await namespace.env.fetch(sameDeploymentModel);
+        assert.deepEqual(nativeCalls, [wasmPaths.wasm]);
+        assert.deepEqual(storedCalls, [modelUrl, sameDeploymentModel]);
+    } finally {
+        for (const [name, descriptor] of descriptors) {
+            if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+            else delete globalThis[name];
+        }
+    }
+});
+
+for (const local of [false, true]) {
+    test(`decision resource store receives cancellation with local executables ${local}`, async function decisionStore(context) {
+        const fixture = createWorkerFixture(context);
+        let aborted;
+        let finish;
+        let started;
+        const downloading = new Promise(function observeDownload(resolve) { started = resolve; });
+        const cancellation = new Promise(function observeAbort(resolve) { aborted = resolve; });
+        const cleanup = new Promise(function delayCleanup(resolve) { finish = resolve; });
+        const store = {
+            async fetchResource(input, {signal}) {
+                if (input === 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js') {
+                    return storedRuntimeResponse();
+                }
+                assert.equal(input, 'https://models.example.test/dragon/model.onnx_data');
+                signal.addEventListener('abort', function resourceAborted() { aborted(); }, {once: true});
+                started();
+                await cancellation;
+                await cleanup;
+                throw signal.reason;
+            }
+        };
+        const client = fixture.createClient('laya', store, {runtime: {local}});
+        assert.equal(fixture.workers.length, 0);
+        const loading = client.load();
+        const failed = assert.rejects(loading, /unloaded/u);
+        const worker = fixture.workers[0];
+        await worker.waitForLoad();
+        assert.equal(worker.messages[0].storedResources, true);
+        assert.equal(Object.hasOwn(worker.messages[0].payload, 'store'), false);
+        worker.reply({arcaneModelResource: true, resourceId: 1, op: 'fetch',
+            request: {url: 'https://models.example.test/dragon/model.onnx_data', options: {}}});
+        await downloading;
+        client.unload();
+        await cancellation;
+        assert.equal(worker.terminated, true);
+        finish();
+        await failed;
+    });
+}
 
 test('decision stored mode selects env.fetch and disables competing model caches', async function decisionStoredRuntime() {
     const moduleUrl = `data:text/javascript,${encodeURIComponent(RUNTIME_FIXTURE_SOURCE)}#stored-resources`;
@@ -781,6 +911,8 @@ test('decision stored mode selects env.fetch and disables competing model caches
     assert.equal(namespace.env.useBrowserCache, false);
     assert.equal(namespace.env.useCustomCache, false);
     assert.equal(namespace.env.useFSCache, false);
+    assert.equal(namespace.env.useWasmCache, undefined);
+    assert.equal(namespace.env.backends.onnx.wasm.numThreads, undefined);
     const response = await namespace.env.fetch('https://models.example.test/dragon/config.json');
     assert.deepEqual(calls, ['https://models.example.test/dragon/config.json']);
     assert.equal(await response.text(), 'complete fixture configuration');

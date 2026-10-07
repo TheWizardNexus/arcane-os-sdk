@@ -475,6 +475,20 @@ the selected runtime content. The lock document describes the selected
 installation and projected roots; it is not a content-identity or admission
 record.
 
+Both runtime materializers accept explicit `browserDecisions: true` to acquire
+the upstream bundled Transformers.js 4.3.0 entry, matching ONNX Runtime
+1.31.0-dev.20260914-8d85527a0 asyncify module/WASM, and license files into
+`arcane/sdk/ai/decisions-runtime/` before replacement. Default `false` performs
+no optional acquisition. The complete selected files remain unchanged;
+`workspace.decisions.started`/`workspace.decisions.progress` count completed
+files. Cancellation, HTTP failures and observer failures join acquisition
+cleanup and preserve the previous projection. Retain the option on each refresh
+that needs the closure. The optional `browserDecisions` result describes its
+directory, versions and filenames; installed materialization nests it under
+`workspaceRuntime`. Model/tokenizer data remain upstream and cache-owned.
+See [extension-local decisions](ai/browser-decisions.md#extension-local-executables-manifest-v3)
+for the separate `runtime.local: true` browser selection.
+
 `upgradeApplication()` and `arcane upgrade` run the application's ordinary
 `npm upgrade` command. They do not independently reconcile the installed SDK
 projection, semantic Arcane lock, or managed import map.

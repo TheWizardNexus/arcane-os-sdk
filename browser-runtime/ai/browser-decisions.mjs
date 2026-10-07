@@ -88,16 +88,43 @@ class BrowserDecisionModel {
             throw new TypeError('store must expose fetchResource().');
         }
         this.#store = store;
+        const local = runtime.local ?? false;
+        if (!is.boolean(local)) throw new TypeError('runtime.local must be a boolean.');
         const moduleUrl = runtime.moduleUrl === undefined
-            ? DEFAULT_RUNTIME_MODULE
+            ? local
+                ? new URL('./decisions-runtime/transformers.min.js', import.meta.url).href
+                : DEFAULT_RUNTIME_MODULE
             : runtime.moduleUrl;
+        const selectedRuntime = {...runtime, moduleUrl: requiredText(moduleUrl, 'runtime.moduleUrl')};
+        if (local) {
+            const base = new URL(import.meta.url);
+            function localExecutableUrl(value, name) {
+                const url = new URL(requiredText(value, name), base);
+                if (url.protocol !== base.protocol || url.host !== base.host) {
+                    throw new TypeError(`${name} must use the decision Worker's local deployment in runtime.local mode.`);
+                }
+                return url.href;
+            }
+            const paths = runtime.wasmPaths ?? './decisions-runtime/';
+            const wasmPaths = is.string(paths)
+                ? {
+                    mjs: new URL('ort-wasm-simd-threaded.asyncify.mjs', new URL(paths, base)).href,
+                    wasm: new URL('ort-wasm-simd-threaded.asyncify.wasm', new URL(paths, base)).href
+                }
+                : paths;
+            selectedRuntime.moduleUrl = localExecutableUrl(moduleUrl, 'runtime.moduleUrl');
+            selectedRuntime.wasmPaths = {
+                mjs: localExecutableUrl(wasmPaths?.mjs, 'runtime.wasmPaths.mjs'),
+                wasm: localExecutableUrl(wasmPaths?.wasm, 'runtime.wasmPaths.wasm')
+            };
+        }
         this.#configuration = {
             family,
             model: requiredText(model, 'model'),
             revision: requiredText(revision, 'revision'),
             device: requiredText(device, 'device'),
             dtype: requiredText(dtype, 'dtype'),
-            runtime: {...runtime, moduleUrl: requiredText(moduleUrl, 'runtime.moduleUrl')}
+            runtime: selectedRuntime
         };
         this.#events = createArcaneEventSource(
             this,
@@ -266,7 +293,7 @@ class BrowserDecisionModel {
             }
             const id = this.#nextId++;
             activation.pending.set(id, activation.load);
-            if (this.#store) {
+            if (this.#store && !this.#configuration.runtime.local) {
                 activation.runtimeController = new AbortController();
                 // Retain the operation before a store progress callback can
                 // synchronously unload this activation.
@@ -315,7 +342,7 @@ class BrowserDecisionModel {
                 );
             } else {
                 worker.postMessage(
-                    {id, op: 'load', payload: this.#configuration, storedResources: false}
+                    {id, op: 'load', payload: this.#configuration, storedResources: this.#store !== null}
                 );
             }
         } catch (error) {

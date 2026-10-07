@@ -1857,7 +1857,7 @@ create `arcane.lock.json` before serving, refreshing app import maps, or packagi
 ### Signature and result
 
 ```text
-async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,workspaceOperationLease,signal,onEvent}={})
+async materializeInstalledSdkRuntime({workspaceRoot,sdkPackageSource,browserDecisions=false,workspaceOperationLease,signal,onEvent}={})
 ```
 
 Import it through the exact dependency key declared by the workspace: normally
@@ -1867,6 +1867,16 @@ workspace-operation lock and replaces the complete projection by staged
 whole-tree replacement. The mutable result includes the installed-package
 location, materialized workspace runtime paths, and `workspaceLock` path and
 document. It does not install dependencies or merge application source.
+
+Explicit `browserDecisions: true` also acquires the bundled Transformers.js
+4.3.0 entry and matching ONNX Runtime 1.31.0-dev.20260914-8d85527a0 asyncify
+module/WASM and license files from their upstream distributions into
+`arcane/sdk/ai/decisions-runtime/`. It returns their `directory`,
+`transformersVersion`, `onnxRuntimeVersion` and `files` under
+`workspaceRuntime.browserDecisions`. The default `false` performs no optional
+acquisition. Select this option on each refresh that should retain those files.
+The [extension-local decision guide](ai/browser-decisions.md#extension-local-executables-manifest-v3)
+describes `runtime.local: true`, complete resource ownership and MV3 usage.
 
 Ordinary acquisition automatically recovers a workspace-operation lock when
 the recorded owner process is confirmed absent, without waiting solely for its
@@ -1910,12 +1920,23 @@ the installed-package lock document owned by `materializeInstalledSdkRuntime()`.
 ### Signature and result
 
 ```text
-async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), 'runtime'),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),signal,onEvent}={})
+async materializeWorkspaceRuntimeContent({workspaceRoot,runtimeRoot=path.join(getSdkRoot(), 'runtime'),browserRuntimeRoot=getSdkBrowserRuntimeRoot(),sdkVersion=SDK_VERSION,browserDecisions=false,signal,onEvent}={})
 ```
 
 The operation stages the complete projection, replaces the prior tree at the
 commit boundary, restores it if commit fails, and removes paths absent from the
 selected sources.
+
+`browserDecisions: true` acquires the same upstream executable closure described
+by `materializeInstalledSdkRuntime()` before replacement. Its result is at
+`result.browserDecisions` because this lower-level operation returns the
+workspace runtime directly. Full downloaded content remains unchanged; model
+and tokenizer data are not materialized. `workspace.decisions.started` and
+`workspace.decisions.progress` report completed files and the fixed total.
+Cancellation, HTTP failures and throwing/rejecting observers abort and join
+pending acquisitions before returning; the prior runtime remains in place.
+An HTTP failure retains its complete response in `error.response`, or in the
+corresponding member of `AggregateError.errors` when several operations fail.
 
 ### Availability and normalization
 
@@ -10000,9 +10021,21 @@ selections report its failure without precision fallback. For Laya FP32, pass
 Cancellation terminates that client's Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.
 
+For explicitly selected extension-local execution, supply `runtime: {local:
+true}` after materializing with `browserDecisions: true`. The SDK directly
+imports its deployment-local `decisions-runtime/transformers.min.js` and
+matched asyncify module/WASM. Explicit `runtime.moduleUrl` and
+`runtime.wasmPaths: {mjs, wasm}` may select other compatible files in that same
+deployment; a directory string is also accepted for `wasmPaths`. This mode
+disables executable Blob preparation and upstream WASM cache/proxy creation,
+selects one WASM thread, and preserves the caller's model, precision and
+inference backend. With `store`, only the exact selected executable URLs bypass
+it; model, tokenizer, configuration and external-data resources retain that
+store. Local mode is opt-in; default browser behavior remains unchanged.
+
 Optional `store` is an existing SDK DBOPFS model or speech store exposing
 `fetchResource(input, options)`. It remains outside cloned Worker configuration.
-Explicit activation first stores the complete selected `runtime.moduleUrl`
+Without `runtime.local`, explicit activation first stores the complete selected `runtime.moduleUrl`
 entry and materializes it as a JavaScript object URL without rewriting source.
 The configured original URL remains the resource selection for later loads.
 The selected loader also routes its actual model/configuration/tokenizer
