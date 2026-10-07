@@ -6,7 +6,7 @@
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 308,
+  "memberCount": 314,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -165,6 +165,90 @@
       "availability": "Node Core runtime",
       "protocol": "arcane/1 service definition",
       "normalization": "Binding identity equals the named createNativeDecisionService export"
+    },
+    {
+      "id": "local-ai-kokoro:createNativeKokoroRuntime",
+      "name": "createNativeKokoroRuntime",
+      "displayName": "createNativeKokoroRuntime()",
+      "kind": "function",
+      "signature": "createNativeKokoroRuntime({onnx,modelAssets,runtime,prepare,modelId='kokoro',model=KOKORO_MODEL,revision=KOKORO_REVISION,dtype='fp32',paths,assetProjectionId,resourcePaths,sessionOptions,executionPreference='gpu',executionTarget,signal,onEvent}={})",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "Composes the selected Kokoro FP32 graph with the host's existing ONNX/model-resource owners and a persistent native phonemization/Opus helper.",
+      "availability": "Node with matching prepared helper/data and ONNX resources; SDK helper archive for Windows x64, other hosts require a matching custom helper distribution",
+      "protocol": "Replaying kokoro.state, retained ONNX activation and complete ordered native speech requests",
+      "normalization": "Returns current/subscribe/load/synthesize/unload/close; construction performs no preparation or inference. Explicit load selects a DBOPFS projection or complete native resource paths; synthesis retains complete ordered input, selected US/GB voice and 24kHz mono WAV or Ogg Opus output. Active cancellation joins owned helper/session retirement and preserves surviving queued work on the same configured provider; ONNX native interruption may wait for the current call. No alternate model, voice or provider retry is introduced. See native-speech.md for exact activation, selection and result contracts."
+    },
+    {
+      "id": "local-ai-kokoro:default",
+      "name": "default",
+      "displayName": "createNativeKokoroRuntime default export",
+      "kind": "function",
+      "signature": "default as createNativeKokoroRuntime",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "Default binding for the same native Kokoro engine factory.",
+      "availability": "Node with matching prepared native resources",
+      "protocol": "Native Kokoro engine lifecycle",
+      "normalization": "Binding identity equals the named createNativeKokoroRuntime export"
+    },
+    {
+      "id": "local-ai-kokoro:KOKORO_MODEL",
+      "name": "KOKORO_MODEL",
+      "displayName": "KOKORO_MODEL",
+      "kind": "constant",
+      "signature": "const KOKORO_MODEL",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "Identifies the Kokoro model implemented by the native frontend.",
+      "availability": "Node",
+      "protocol": "Native model selection",
+      "normalization": "Value is onnx-community/Kokoro-82M-v1.0-ONNX; constructor selection preserves this model's FP32 graph and resource contract"
+    },
+    {
+      "id": "local-ai-kokoro:KOKORO_REVISION",
+      "name": "KOKORO_REVISION",
+      "displayName": "KOKORO_REVISION",
+      "kind": "constant",
+      "signature": "const KOKORO_REVISION",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "Identifies the selected upstream Kokoro model revision.",
+      "availability": "Node",
+      "protocol": "Native model resource selection",
+      "normalization": "Value is 1939ad2a8e416c0acfeecc08a694d14ef25f2231; graph, tokenizer and voice resources use this same revision"
+    },
+    {
+      "id": "local-ai-kokoro:KOKORO_SAMPLE_RATE",
+      "name": "KOKORO_SAMPLE_RATE",
+      "displayName": "KOKORO_SAMPLE_RATE",
+      "kind": "constant",
+      "signature": "const KOKORO_SAMPLE_RATE",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "Native Kokoro PCM synthesis rate in samples per second.",
+      "availability": "Node",
+      "protocol": "Audio format",
+      "normalization": "Value is 24000; the selected output is mono WAV or Ogg Opus with the complete synthesized sample sequence"
+    },
+    {
+      "id": "local-ai-kokoro:KOKORO_VOICES",
+      "name": "KOKORO_VOICES",
+      "displayName": "KOKORO_VOICES",
+      "kind": "constant",
+      "signature": "const KOKORO_VOICES",
+      "entrypoints": ["arcane-os/local-ai/kokoro"],
+      "primaryImport": "arcane-os/local-ai/kokoro",
+      "group": "Core native speech",
+      "summary": "The 28 supported US and British English voice identifiers for the selected native Kokoro resources.",
+      "availability": "Node",
+      "protocol": "Native speech voice selection",
+      "normalization": "Complete ordered voice array exported by the frontend; af_heart is the omitted voice default. An unsupported explicit voice reports its actual incompatibility without substitution."
     },
     {
       "id": "local-ai-whisper:createWhisperRuntime",
@@ -345,8 +429,8 @@
       "group": "Core native speech",
       "summary": "Composes host-supplied transcription and synthesis engines with independent loading and role readiness.",
       "availability": "Node Core with explicitly supplied engines; engine platform, model and format support remain engine-owned",
-      "protocol": "arcane/1 speech.status/transcribe/synthesize with speech.state/progress",
-      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown; no engine installation or automatic provider selection"
+      "protocol": "arcane/1 speech.status/load/unload/transcribe/synthesize with speech.state/progress",
+      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown. Explicit load/unload require role stt or tts and forward the remaining activation fields and complete result through that role's configured engine; supported preparation remains with that engine. Startup waiting is independently owned from caller cancellation; no automatic provider selection is introduced."
     },
     {
       "id": "core-speech:default",
@@ -609,10 +693,10 @@
       "entrypoints": ["arcane-os/local-ai"],
       "primaryImport": "arcane-os/local-ai",
       "group": "Core local AI",
-      "summary": "Reuses selected managed native runtimes or installs complete llama.cpp/Ollama/image distributions, ONNX npm runtime trees with selected SDK native libraries, or NeMo libraries.",
+      "summary": "Reuses selected managed native runtimes or installs complete llama.cpp/Ollama/image distributions, ONNX npm runtime trees with selected SDK native libraries, NeMo libraries, or Kokoro native helper/data trees.",
       "availability": "Node; selected distribution platform and architecture assets determine runtime availability",
       "protocol": "Upstream release archives and selected ONNX/Koffi npm installations; corrected Windows x64 ONNX native libraries from the installed SDK numeric release",
-      "normalization": "Returns absolute runtime records, including image library/binding/variant/model metadata; Windows x64 ONNX with no explicit URL and omitted version or 1.30.0 adds nativeDistributionRevision 1.30.0-directml-reshape-1, reuses that revision or prepares a fresh installation while preserving older trees; explicit URLs and other ONNX versions/platforms retain their upstream package path; shares matching installs, preserves libraries, reports failures without changing global PATH or services and prepares no model files"
+      "normalization": "Returns absolute runtime records, including image library/binding/variant/model metadata; Windows x64 ONNX with no explicit URL and omitted version or 1.30.0 adds nativeDistributionRevision 1.30.0-directml-reshape-1, reuses that revision or prepares a fresh installation while preserving older trees; explicit URLs and other ONNX versions/platforms retain their upstream package path; shares matching installs, preserves libraries, reports failures without changing global PATH or services and prepares no model files. Kokoro returns helperExecutable, espeakDataDirectory and libraryDirectory for the complete selected helper tree; Windows x64 defaults to the installed SDK numeric release, while explicit url/helperRoot supplies another prepared distribution and preserves model/ONNX ownership."
     },
     {
       "id": "local-ai:bundleLocalAIRuntimes",
@@ -626,7 +710,7 @@
       "summary": "Copies selected complete runtime distributions into a fresh native artifact staging root.",
       "availability": "Node; supports bundling selected published platform assets independently of the build host",
       "protocol": "Artifact-relative runtime/local-ai layout",
-      "normalization": "Returns {runtimes,files} with artifact-relative runtime/variant paths and complete inventory; corrected Windows x64 ONNX retains nativeDistributionRevision and complete native libraries while modulePath becomes artifact-relative; image URL descriptors remain for post-launch preparation and external model working paths report portability incompatibility"
+      "normalization": "Returns {runtimes,files} with artifact-relative runtime/variant paths and complete inventory; corrected Windows x64 ONNX retains nativeDistributionRevision and complete native libraries while modulePath becomes artifact-relative; image URL descriptors remain for post-launch preparation and external model working paths report portability incompatibility. Kokoro retains the complete helper/data tree and relocates helperExecutable, espeakDataDirectory and libraryDirectory; ONNX and model resources retain their separate owners."
     },
     {
       "id": "root:WS",
@@ -4360,7 +4444,7 @@
       "summary": "Projects a Core client into the established application-facing Arcane namespace.",
       "availability": "Browser and native WebView JavaScript hosts with a Core client",
       "protocol": "arcane/1 compatibility facade",
-      "normalization": "Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.state({signal}?) reads the requesting window and window.setState({state},{signal}?) selects normal, maximized or fullscreen. The matching Windows host returns {platform:'windows',supported:true,state}, including observed minimized state, restores normal bounds/frame controls on leaving fullscreen and prevents activation/focus assignment during visible state transitions without changing TopMost, Core, origin or profile. Saved Settings remain application-owned; cancellation does not undo an applied change and unavailable hosts retain their actual errors without fallback. window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance. notifications.status/show/state/close forward complete caller requests and standard invoke options; status normalizes only METHOD_NOT_ALLOWED with core-namespace-unavailable while retaining the complete original error. Matching native window hosts retain complete notification records and ordered revisions across renderer navigation, with notifications.state events and subscribe-before-snapshot recovery. Submitted means native Show returned, not displayed or read; cancellation after submission does not remove an accepted notice, and explicit close retains its record. Recipient, text, trigger, deduplication and navigation policy remains application-owned"
+      "normalization": "Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.state({signal}?) reads the requesting window and window.setState({state},{signal}?) selects normal, maximized or fullscreen. The matching Windows host returns {platform:'windows',supported:true,state}, including observed minimized state, restores normal bounds/frame controls on leaving fullscreen and prevents activation/focus assignment during visible state transitions without changing TopMost, Core, origin or profile. Saved Settings remain application-owned; cancellation does not undo an applied change and unavailable hosts retain their actual errors without fallback. window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance. notifications.status/show/state/close forward complete caller requests and standard invoke options; status normalizes only METHOD_NOT_ALLOWED with core-namespace-unavailable while retaining the complete original error. Matching native window hosts retain complete notification records and ordered revisions across renderer navigation, with notifications.state events and subscribe-before-snapshot recovery. Submitted means native Show returned, not displayed or read; cancellation after submission does not remove an accepted notice, and explicit close retains its record. Recipient, text, trigger, deduplication and navigation policy remains application-owned. speech.load(request,options) and speech.unload(request,options) forward complete activation requests, cancellation and request observers with no elapsed-time cutoff; selected engines own preparation and native retirement."
     },
     {
       "id": "core-client:installCoreClient",

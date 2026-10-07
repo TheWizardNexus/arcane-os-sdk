@@ -156,10 +156,17 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'stable-diffusion.cpp';
     }) ?? false;
     const modelAssetsSelected = imageSelected || (localAI?.runtimes?.some(function selectedProjectedRuntime(requirement) {
-        return ['onnx', 'llama.cpp'].includes(typeof requirement === 'string' ? requirement : requirement.id);
+        return ['onnx', 'llama.cpp', 'kokoro-native'].includes(typeof requirement === 'string' ? requirement : requirement.id);
     }) ?? false);
     const whisperSelected = localAI?.runtimes?.some(function selectedWhisper(requirement) {
         return (typeof requirement === 'string' ? requirement : requirement.id) === 'whisper.cpp';
+    }) ?? false;
+    const kokoroRequirement = localAI?.runtimes?.find(function selectedKokoro(requirement) {
+        return (typeof requirement === 'string' ? requirement : requirement.id) === 'kokoro-native';
+    });
+    const kokoroSelected = kokoroRequirement !== undefined;
+    const onnxSelected = localAI?.runtimes?.some(function selectedONNX(requirement) {
+        return (typeof requirement === 'string' ? requirement : requirement.id) === 'onnx';
     }) ?? false;
     const imports = services.map(function serviceImport(service, index) {
         const specifier = '../app/' + service.module.split('/').map(encodeURIComponent).join('/');
@@ -174,7 +181,7 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             ...localAI,
             runtimes: localAI.runtimes.filter(function selectedChat(requirement) {
                 const id = typeof requirement === 'string' ? requirement : requirement.id;
-                return id !== 'stable-diffusion.cpp' && id !== 'whisper.cpp';
+                return id !== 'stable-diffusion.cpp' && id !== 'whisper.cpp' && id !== 'kokoro-native';
             })
         };
         imports.push({binding: '{createLocalAIService}', specifier: 'arcane-os/core/local-ai'});
@@ -189,9 +196,14 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         imports.push({binding: '{createLocalImageService}', specifier: 'arcane-os/core/image'});
         definitions.push(`    register(createLocalImageService(JSON.parse(${JSON.stringify(JSON.stringify(localAI))}), {...context, modelAssets}));`);
     }
-    if (whisperSelected) {
+    if (whisperSelected || kokoroSelected) {
         imports.push({binding: '{createSpeechService}', specifier: 'arcane-os/core/speech'});
+    }
+    if (whisperSelected) {
         imports.push({binding: '{createWhisperRuntime}', specifier: 'arcane-os/local-ai/whisper'});
+    }
+    if (kokoroSelected) {
+        imports.push({binding: '{createNativeKokoroRuntime}', specifier: 'arcane-os/local-ai/kokoro'});
     }
     if (packagedWeb) {
         imports.push({binding: '{createPackagedWebService}', specifier: 'arcane-os/core/packaged-web'});
@@ -228,7 +240,7 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         ...(localAI === undefined ? [] : [
             `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
             '        const resolved = {...runtime};',
-            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'decoderExecutable', 'decoderRoot']) {",
+            "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'espeakDataDirectory', 'decoderExecutable', 'decoderRoot']) {",
             '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
             '        }',
             '        if (runtime.variants) resolved.variants = runtime.variants.map(function nativeVariant(variant) {',
@@ -268,7 +280,7 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             ''
         ]),
         ...(packagedWeb ? ['let packagedWeb;', ''] : []),
-        'async function createServices(register) {',
+        kokoroSelected ? 'async function createServices(register, getService) {' : 'async function createServices(register) {',
         `    const [${imports.map(function binding(selection) { return selection.binding; }).join(', ')}] = await Promise.all([`,
         ...imports.map(function importService(selection) { return `        import(${JSON.stringify(selection.specifier)})`; }).map(
             function separateImport(line, index) { return line + (index < imports.length - 1 ? ',' : ''); }
@@ -289,8 +301,50 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             "            temporaryDirectory: path.join(context.stateRoot ?? path.join(context.appRoot, '.arcane'), 'speech', 'whisper'),",
             '            onEvent: context.onEvent',
             '        }',
-            '    );',
-            '    register(createSpeechService({stt, signal: context.signal}));'
+            '    );'
+        ] : []),
+        ...(kokoroSelected ? [
+            `    const kokoroRequirement = JSON.parse(${JSON.stringify(JSON.stringify(typeof kokoroRequirement === 'string' ? {} : kokoroRequirement))});`,
+            '    const tts = createNativeKokoroRuntime({',
+            '        modelId: kokoroRequirement.modelId,',
+            '        model: kokoroRequirement.model,',
+            '        revision: kokoroRequirement.revision,',
+            '        dtype: kokoroRequirement.dtype,',
+            '        paths: kokoroRequirement.paths,',
+            '        assetProjectionId: kokoroRequirement.assetProjectionId,',
+            '        resourcePaths: kokoroRequirement.resourcePaths,',
+            '        sessionOptions: kokoroRequirement.sessionOptions,',
+            '        executionPreference: kokoroRequirement.executionPreference,',
+            '        executionTarget: kokoroRequirement.executionTarget,',
+            '        modelAssets, signal: context.signal, onEvent: context.onEvent,',
+            '        async prepare({signal: activationSignal}) {',
+            '            activationSignal.throwIfAborted();',
+            ...(onnxSelected ? [] : [
+                "            throw Object.assign(new Error('Native Kokoro requires an explicitly selected onnx runtime.'), {code: 'ARCANE_TARGET_UNAVAILABLE'});"
+            ]),
+            '            let cancel;',
+            '            const cancelled = new Promise(function observePreparationCancellation(_resolve, reject) {',
+            '                cancel = function stopWaitingForONNX() { reject(activationSignal.reason); };',
+            "                activationSignal.addEventListener('abort', cancel, {once: true});",
+            '            });',
+            '            try {',
+            '                // This activation waits on the existing owner without cancelling its startup.',
+            "                const owner = await Promise.race([getService('local-ai'), cancelled]);",
+            '                activationSignal.throwIfAborted();',
+            '                return {',
+            '                    onnx: owner.getONNXRuntime(),',
+            '                    runtime: context.runtimes.find(function selectedKokoroRuntime(runtime) {',
+            "                        return runtime.id === 'kokoro-native';",
+            '                    })',
+            '                };',
+            '            } finally {',
+            "                activationSignal.removeEventListener('abort', cancel);",
+            '            }',
+            '        }',
+            '    });'
+        ] : []),
+        ...(whisperSelected || kokoroSelected ? [
+            `    register(createSpeechService({${whisperSelected ? 'stt, ' : ''}${kokoroSelected ? 'tts, ' : ''}signal: context.signal}));`
         ] : []),
         ...definitions,
         '}',
@@ -300,7 +354,9 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         'let listener;',
         'if (context.sharedHost === undefined) {',
         '    const services = [];',
-        '    await createServices(function register(service) { services.push(service); });',
+        kokoroSelected
+            ? '    await createServices(function register(service) { services.push(service); }, function getService(name) { return host.runtime.getService(name); });'
+            : '    await createServices(function register(service) { services.push(service); });',
         '    host = startCoreHost({application, version, services});',
         '    if (context.coreListener !== undefined) {',
         "        process.on('SIGINT', closeCore);",
@@ -338,7 +394,9 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         "} else if (process.argv.includes('--arcane-core-headless')) {",
         '    host = await runSharedCoreHost({',
         '        endpoint: context.sharedHost.endpoint, application, version,',
-        '        configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); },',
+        kokoroSelected
+            ? '        configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }, function getService(name) { return runtime.getService(name); }); },'
+            : '        configure(runtime) { return createServices(function register(service) { runtime.registerService(service); }); },',
         ...(packagedWeb ? [
             '        getReplayEvents() {',
             '            const current = packagedWeb?.current();',

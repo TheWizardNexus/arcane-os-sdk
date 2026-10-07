@@ -277,12 +277,12 @@
           "type": "array",
           "items": {
             "oneOf": [
-              { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp", "whisper.cpp"] },
+              { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp", "whisper.cpp", "kokoro-native"] },
               {
                 "type": "object",
                 "required": ["id"],
                 "properties": {
-                  "id": { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp"] },
+                  "id": { "enum": ["llama.cpp", "ollama", "onnx", "stable-diffusion.cpp", "kokoro-native"] },
                   "version": { "type": "string" },
                   "url": { "type": "string" },
                   "backend": { "type": "string", "description": "llama.cpp: auto, cpu or cuda. Image runtimes: auto, metal or cpu." },

@@ -400,7 +400,7 @@ test('portable Core entry composes only selected local AI with relocatable runti
     assert.ok(entry.includes([
         `    runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`,
         '        const resolved = {...runtime};',
-        "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'decoderExecutable', 'decoderRoot']) {",
+        "        for (const field of ['root', 'executable', 'modulePath', 'includeDirectory', 'libraryDirectory', 'binaryDirectory', 'cmakeDirectory', 'libraryPath', 'bindingModulePath', 'helperExecutable', 'helperRoot', 'espeakDataDirectory', 'decoderExecutable', 'decoderRoot']) {",
         '            if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);',
         '        }',
         '        if (runtime.variants) resolved.variants = runtime.variants.map(function nativeVariant(variant) {',
@@ -477,6 +477,73 @@ test('portable Core shares one model-assets owner for ONNX and image selections'
     }
     const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: ['llama.cpp']}});
     assert.equal(entry.includes('createModelAssetService'), true);
+});
+
+test('portable Kokoro preserves selected assets and relocated helper inputs while sharing actual Core owners', function nativeKokoroOwners() {
+    const kokoro = {
+        id: 'kokoro-native', modelId: 'kokoro', dtype: 'fp32',
+        assetProjectionId: 'the-complete-moon-choir',
+        resourcePaths: {
+            model: 'onnx/model.onnx', tokenizer: 'tokenizer.json', tokenizerConfig: 'tokenizer_config.json',
+            voices: {af_heart: 'voices/af_heart.bin'}, ownerContent: '  Café é\r\nEvery authored line. 🦑  '
+        },
+        executionPreference: 'gpu', executionTarget: null,
+        sessionOptions: {executionProviders: [{name: 'dml', deviceId: 2}, 'cpu']}
+    };
+    const localAI = {runtimes: [{id: 'onnx'}, kokoro, 'whisper.cpp'], ownerContent: '  Preserve this selection.  '};
+    const runtimes = [{
+        id: 'kokoro-native', root: 'runtime/local-ai/kokoro-native',
+        helperExecutable: 'runtime/local-ai/kokoro-native/bin/moon # % 🦑 helper.exe',
+        espeakDataDirectory: 'runtime/local-ai/kokoro-native/share',
+        libraryDirectory: 'runtime/local-ai/kokoro-native/bin',
+        ownerContent: '  All bundled metadata remains present.\r\n最後の行  '
+    }];
+    const entry = coreEntrySource(application, '1.2.3', [], {localAI, runtimes});
+    const chat = {...localAI, runtimes: [{id: 'onnx'}]};
+    assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify(JSON.stringify(chat))}), {...context, executionDevices})`));
+    assert.ok(entry.includes(`const kokoroRequirement = JSON.parse(${JSON.stringify(JSON.stringify(kokoro))});`));
+    assert.ok(entry.includes(`runtimes: JSON.parse(${JSON.stringify(JSON.stringify(runtimes))}).map(function runtimeLocation(runtime) {`));
+    assert.match(entry, /for \(const field of \[[^\n]*'libraryDirectory'[^\n]*'helperExecutable'[^\n]*'espeakDataDirectory'[^\n]*\]\)/);
+    assert.ok(entry.includes('if (runtime[field] !== undefined) resolved[field] = runtimePath(runtime[field]);'));
+    assert.equal([...entry.matchAll(/const modelAssets = createModelAssetService\(/g)].length, 1);
+    assert.equal([...entry.matchAll(/createNativeKokoroRuntime\(\{/g)].length, 1);
+    assert.equal([...entry.matchAll(/register\(createSpeechService\(/g)].length, 1);
+    assert.ok(entry.includes('register(createSpeechService({stt, tts, signal: context.signal}));'));
+    assert.ok(entry.includes('modelAssets, signal: context.signal, onEvent: context.onEvent,'));
+    assert.ok(entry.includes('assetProjectionId: kokoroRequirement.assetProjectionId,'));
+    assert.ok(entry.includes('resourcePaths: kokoroRequirement.resourcePaths,'));
+    assert.ok(entry.includes('executionTarget: kokoroRequirement.executionTarget,'));
+    assert.ok(entry.includes('async function createServices(register, getService) {'));
+    assert.ok(entry.includes('function getService(name) { return host.runtime.getService(name); }'));
+    assert.ok(entry.includes('function getService(name) { return runtime.getService(name); }'));
+    const preparation = entry.indexOf('async prepare({signal: activationSignal}) {');
+    const ownerWait = entry.indexOf("const owner = await Promise.race([getService('local-ai'), cancelled]);");
+    const releaseWait = entry.indexOf("activationSignal.removeEventListener('abort', cancel);");
+    assert.ok(preparation !== -1 && ownerWait > preparation && releaseWait > ownerWait);
+    assert.ok(entry.includes('onnx: owner.getONNXRuntime(),'));
+    assert.equal(entry.includes('createONNXRuntime('), false);
+    assert.equal(entry.includes('ensureLocalAIRuntimes('), false);
+    assert.equal(entry.includes('await tts.load('), false);
+    assert.equal(entry.includes('Native Kokoro requires an explicitly selected onnx runtime.'), false);
+    assert.ok(entry.includes("const appEntryFlag = process.argv.indexOf('--arcane-app-entry', 2);"));
+});
+
+test('portable speech keeps role selection independent and defers missing ONNX to Kokoro activation', function nativeSpeechSelection() {
+    const whisper = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: ['whisper.cpp']}});
+    assert.ok(whisper.includes('register(createSpeechService({stt, signal: context.signal}));'));
+    assert.equal(whisper.includes('createNativeKokoroRuntime'), false);
+    for (const selection of [['kokoro-native'], ['kokoro-native', 'whisper.cpp']]) {
+        const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: selection}});
+        assert.ok(entry.includes('const kokoroRequirement = JSON.parse("{}");'));
+        assert.ok(entry.includes('const modelAssets = createModelAssetService('));
+        const roles = selection.includes('whisper.cpp') ? 'stt, tts' : 'tts';
+        assert.ok(entry.includes(`register(createSpeechService({${roles}, signal: context.signal}));`));
+        assert.ok(entry.includes(`createLocalAIService(JSON.parse(${JSON.stringify('{"runtimes":[]}')}), {...context, executionDevices})`));
+        const preparation = entry.indexOf('async prepare({signal: activationSignal}) {');
+        const selectionError = entry.indexOf("throw Object.assign(new Error('Native Kokoro requires an explicitly selected onnx runtime.'), {code: 'ARCANE_TARGET_UNAVAILABLE'});");
+        assert.ok(preparation !== -1 && selectionError > preparation);
+        assert.equal(entry.includes('await tts.load('), false);
+    }
 });
 
 test('portable Core opts into one lazy shared host while retaining default stdio and current packaged origin replay', function sharedCoreEntry() {

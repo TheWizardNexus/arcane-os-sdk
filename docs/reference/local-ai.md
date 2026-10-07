@@ -1,13 +1,16 @@
 # Local AI through Core
 
 Core owns native llama.cpp and Ollama processes, ONNX worker sessions,
-selected local image generation and retained Whisper transcription. The browser retains its own
+selected local image generation, retained Whisper transcription and native
+Kokoro synthesis. The browser retains its own
 Wllama and ONNX implementations, and can also use an explicitly connected Core
 when that system service is available. Runtime installation, model loading and
 inference are separate operations.
 
 Native ONNX runs caller-selected graphs with complete named input/output tensors.
-Applications own preprocessing, tokenization and model-specific pipelines.
+Applications own preprocessing, tokenization and model-specific pipelines unless
+they explicitly select an SDK engine such as native Kokoro, which owns its
+versioned speech frontend.
 Browser ONNX continues through its existing browser implementation.
 
 ## Application requirements
@@ -113,6 +116,71 @@ the SDK does not guess a companion location. Installation records distinguish
 the distribution's `backend` from its `requestedBackend` execution mode.
 Selecting an unavailable distribution reports its actual error.
 
+### Native Kokoro selection
+
+Select both the existing ONNX runtime and the native speech helper:
+
+```json
+{
+  "runtimes": [
+    {"id": "onnx"},
+    {"id": "kokoro-native", "modelId": "kokoro"}
+  ]
+}
+```
+
+`kokoro-native` is the installable helper ID, `kokoro-onnx` is the speech
+provider ID, and `kokoro` is the default model alias. The requirement also
+preserves `model`, `revision`, `dtype`, prepared `paths`, `assetProjectionId`,
+`resourcePaths`, `sessionOptions`, `executionPreference` and `executionTarget`
+for the engine. The implemented model/revision, complete resource mapping,
+voices, synthesis formats and cancellation contract are in
+[native speech](native-speech.md#native-kokoro-engine).
+
+With no `helperRoot` or `url`, Windows x64 preparation selects
+`arcane-kokoro-windows-x64.tar.gz` from the installed SDK's numeric release:
+`https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/<sdk-version>/arcane-kokoro-windows-x64.tar.gz`.
+That SDK version selects the default helper release; an authored runtime
+`version` alone does not select another SDK release's helper.
+An explicit `url` selects a complete platform-matching archive, with optional
+`version` metadata. Alternatively, `helperRoot` supplies an already prepared
+complete tree copied into the new installation. Select one of these sources.
+Linux and macOS currently require that explicit archive or prepared tree;
+the native CMake source is available, with no claim of an exercised helper
+build on those platforms.
+
+The helper record accepts `helperExecutable`, `espeakDataDirectory` and
+`libraryDirectory` overrides within the selected tree. Defaults are
+`bin/arcane-kokoro.exe` on Windows (`bin/arcane-kokoro` elsewhere), `share`, and
+`bin`. The data field identifies the parent containing `espeak-ng-data`.
+Overrides are relative to the selected tree or absolute locations inside
+`helperRoot`; all three paths relocate with that complete tree. Installation
+prepares the helper and its matching data, independently of ONNX and without
+downloading model weights, tokenizer files or voices.
+
+Development and generated native composition register this engine as the TTS
+role of `createSpeechService`, sharing the existing model-assets service and
+the selected local-ai ONNX owner. Whisper, when selected, retains the separate
+STT role and device choice. Construction and no-assets startup leave Kokoro
+unloaded without helper preparation. An explicit activation with prepared
+resources acquires the helper in development and waits only for that existing
+ONNX owner. Native packaging has already bundled the helper. These waits stay
+inside speech activation; page rendering and independent services continue.
+Omitting the explicit `onnx` requirement reports unavailability on activation.
+After an explicit `localai.services.recover({runtimes: ['onnx']})` completes,
+the next explicit `speech.load({role: 'tts', ...selection})` reacquires the
+current ONNX owner through existing preparation, after prior activation cleanup.
+
+For saved browser assets, prepare the complete projection through the existing
+[`model-assets` owner](model-assets.md), then call
+`Arcane.speech.load({role: 'tts', modelId: 'kokoro', assetProjectionId,
+resourcePaths, executionTarget}, {signal})`. Core retains the incoming
+projection before replacing its activation and releases it only after native
+exit. Preparing/loading a model remains separate from installing the helper.
+Raw constructor `paths` are caller-prepared native paths; portable assembly
+does not turn external model paths or a prior process's projection ID into
+packaged resources. Prepare the intended model resources at their actual host.
+
 ## Development
 
 ```sh
@@ -125,6 +193,8 @@ configuration. Subsequent `arcane dev` runs reuse the saved requirements.
 application selects its `models` in the runtime record before requesting a
 load or generation. The development owner composes separate image and
 model-assets services alongside the existing chat/ONNX service.
+`--local-ai onnx,kokoro-native` records the native TTS requirements above;
+its model activation remains explicit when no assets are configured.
 Development checks selected endpoints and existing executable paths, then
 installs missing runtimes under the application's `.arcane/local-ai/runtimes`.
 Runtime preparation runs alongside HTTP serving. Browser rendering continues
@@ -174,8 +244,8 @@ processes. An already running external service remains running.
 handle with `ready`, `current()`, `handler()` and `close()`. Its `ready` promise
 means Core composition has started, not that installation or a selected model
 is ready. Runtime preparation continues at each owning service. `current()`
-includes separate `core`, `localAI` and optional `image` state; image status
-remains callable during preparation. Composition failures reject `ready`;
+includes separate `core`, `localAI` and optional `image` and `speech` state;
+image status remains callable during preparation. Composition failures reject `ready`;
 later service preparation failures remain on Core lifecycle and diagnostic
 events. Page rendering waits for neither.
 
@@ -227,7 +297,8 @@ owner; it neither prepares another runtime nor loads a model. An unselected
 engine reports `LOCAL_AI_RUNTIME_NOT_SELECTED`; an unavailable or recovering
 owner reports `LOCAL_AI_RUNTIME_UNAVAILABLE`, and an aborted service lifetime
 retains its abort reason. Development and generated native compositions register
-one shared model-assets service when ONNX or image generation is selected.
+one shared model-assets service when ONNX, llama.cpp, image generation or
+native Kokoro is selected.
 
 Reacquire `getONNXRuntime()` on each explicit model load because runtime recovery
 replaces that owner. Retain the acquired handle for that session's cleanup and
@@ -757,6 +828,11 @@ retains that metadata with the complete native libraries. Image records include
 `libraryPath`,
 `bindingModulePath`, requested `backend`, installed `variants` and selected
 `models` metadata. Variant records carry backend, runtime root and library path.
+Kokoro records include `helperExecutable`, `espeakDataDirectory` and
+`libraryDirectory`; bundling preserves the complete helper tree under
+`runtime/local-ai/kokoro-native` and makes all three paths artifact-relative.
+The generated entry resolves them on the destination host and obtains the
+existing ONNX owner when the selected TTS activation needs it.
 Bundle returns `{runtimes,files}`,
 with artifact-relative runtime paths and a complete emitted file inventory.
 Bundling requires a fresh native staging destination, preserving existing

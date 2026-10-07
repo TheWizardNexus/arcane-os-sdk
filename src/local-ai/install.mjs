@@ -10,7 +10,7 @@ import {ArcaneError,ERROR_CODES,normalizeError,throwIfAborted} from '../errors.m
 import {createEventQueue} from '../event-queue.mjs';
 import {runProcess} from '../process.mjs';
 import {extractLocalAIArchive} from './archive.mjs';
-import {normalizeImageRuntimeRequirement,normalizeLlamaRuntimeRequirement} from './config.mjs';
+import {normalizeImageRuntimeRequirement,normalizeKokoroRuntimeRequirement,normalizeLlamaRuntimeRequirement} from './config.mjs';
 import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
 import {bundledWhisperRuntime, installedWhisperRuntime, installWhisperDistribution, whisperRuntimeSelection} from './whisper/install.mjs';
 
@@ -28,6 +28,21 @@ function selectedONNXNativeDistribution(runtime,platform,architecture){
         ?onnxWindowsDistribution:null;
 }
 
+function kokoroRuntimeSelection(runtime) {
+    return JSON.stringify(
+        {
+            source: runtime.helperRoot ? 'directory' : runtime.url ? 'archive' : 'sdk-release',
+            version: runtime.version ?? null,
+            url: runtime.url ?? null,
+            helperRoot: runtime.helperRoot ? path.resolve(runtime.helperRoot) : null,
+            helperExecutable: runtime.helperExecutable ?? null,
+            espeakDataDirectory: runtime.espeakDataDirectory ?? null,
+            libraryDirectory: runtime.libraryDirectory ?? null,
+            sdkVersion: !runtime.helperRoot && !runtime.url ? packageMetadata.version : null
+        }
+    );
+}
+
 function selectRuntimes(runtimes){
     if(!is.array(runtimes)){
         throw new ArcaneError(ERROR_CODES.usage,'Local AI runtimes must be an array.');
@@ -37,13 +52,22 @@ function selectRuntimes(runtimes){
         const requirement=is.string(item)?{id:item}:item;
         const runtime=requirement?.id==='stable-diffusion.cpp'?normalizeImageRuntimeRequirement(requirement)
             :requirement?.id==='whisper.cpp'?normalizeWhisperRuntimeRequirement(requirement)
+            :requirement?.id==='kokoro-native'?normalizeKokoroRuntimeRequirement(requirement)
             :requirement?.id==='llama.cpp'?normalizeLlamaRuntimeRequirement(requirement):requirement;
-        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp','whisper.cpp'].includes(runtime.id)){
+        if(!runtime||!['llama.cpp','ollama','nemo-speech','onnx','stable-diffusion.cpp','whisper.cpp','kokoro-native'].includes(runtime.id)){
             throw new ArcaneError(ERROR_CODES.targetUnavailable,`Local AI runtime installation is unavailable for ${String(runtime?.id)}.`);
         }
         const prior=selected.get(runtime.id);
         if(prior&&runtime.id==='whisper.cpp'&&whisperRuntimeSelection(prior)!==whisperRuntimeSelection(runtime)){
             throw new ArcaneError(ERROR_CODES.usage,'Select one complete whisper.cpp runtime and model requirement for this operation.');
+        }
+        if (runtime.id === 'kokoro-native') {
+            if (runtime.helperRoot && runtime.url) {
+                throw new ArcaneError(ERROR_CODES.usage, 'Select either a kokoro-native helperRoot or an archive URL for this operation.');
+            }
+            if (prior && kokoroRuntimeSelection(prior) !== kokoroRuntimeSelection(runtime)) {
+                throw new ArcaneError(ERROR_CODES.usage, 'Select one complete kokoro-native helper requirement for this operation.');
+            }
         }
         if(prior&&(prior.version!==runtime.version||prior.url!==runtime.url
             ||(['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)&&prior.backend!==runtime.backend)
@@ -110,6 +134,20 @@ async function upstreamResponse(url,signal){
 async function selectRelease(runtime,platform,architecture,signal){
     if (runtime.id === 'stable-diffusion.cpp') {
         return selectImageRelease(runtime, platform, architecture, signal);
+    }
+    if (runtime.id === 'kokoro-native') {
+        if (runtime.helperRoot) return null;
+        if (!runtime.url) {
+            if (platform !== 'win32' || architecture !== 'x64') {
+                throw new ArcaneError(ERROR_CODES.targetUnavailable, `Supply a complete kokoro-native archive URL or helperRoot for ${platform}/${architecture}.`);
+            }
+            const name = 'arcane-kokoro-windows-x64.tar.gz';
+            return {
+                version: packageMetadata.version,
+                url: `https://github.com/TheWizardNexus/arcane-os-sdk/releases/download/${packageMetadata.version}/${name}`,
+                name
+            };
+        }
     }
     const backend=runtime.id==='llama.cpp'?llamaBackendCandidate(runtime,platform,architecture):undefined;
     if(runtime.url){
@@ -432,6 +470,7 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
             throw error;
         }
         if(installation.requestVersion!==(runtime.version??null)||installation.requestUrl!==(runtime.url??null))continue;
+        if (runtime.id === 'kokoro-native' && installation.requestKokoro !== kokoroRuntimeSelection(runtime)) continue;
         if (runtime.id === 'stable-diffusion.cpp' && installation.requestBackend !== runtime.backend) continue;
         if(runtime.id==='llama.cpp'&&((installation.requestBackend??'auto')!==runtime.backend
             ||(installation.requestCompanionUrl??null)!==(runtime.companionUrl??null)))continue;
@@ -445,6 +484,10 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
         if(record?.id!==runtime.id||record.platform!==platform||record.architecture!==architecture)continue;
         if(runtime.id==='llama.cpp'&&record.backend!==undefined&&record.backend!==llamaBackend)continue;
         try{
+            if (runtime.id === 'kokoro-native') {
+                if (await installedKokoroRuntime(record, signal)) return record;
+                continue;
+            }
             if(runtime.id==='whisper.cpp'){
                 if(await installedWhisperRuntime(record,signal,!reuseWhisper))return reuseWhisper?{runtime:record,requirement:whisperRequirement}:record;
                 continue;
@@ -505,6 +548,51 @@ async function installedRuntime(base,runtime,platform,architecture,signal,reuseW
         }
     }
     return null;
+}
+
+function kokoroRuntimeLocations(runtime, root, platform) {
+    const sourceRoot = runtime.helperRoot ? path.resolve(runtime.helperRoot) : root;
+    const defaults = {
+        helperExecutable: path.join('bin', `arcane-kokoro${platform === 'win32' ? '.exe' : ''}`),
+        espeakDataDirectory: 'share',
+        libraryDirectory: 'bin'
+    };
+    const locations = {};
+    for (const [field, fallback] of Object.entries(defaults)) {
+        const selected = path.resolve(sourceRoot, runtime[field] ?? fallback);
+        const relative = path.relative(sourceRoot, selected);
+        if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+            throw new ArcaneError(ERROR_CODES.usage, `kokoro-native ${field} must belong to the selected complete helper tree so it can be relocated.`);
+        }
+        locations[field] = path.join(root, relative);
+    }
+    return locations;
+}
+
+async function installedKokoroRuntime(record, signal) {
+    throwIfAborted(signal);
+    const locations = [record.helperExecutable, record.espeakDataDirectory, record.libraryDirectory];
+    const missingLocation = locations.some(
+        function missingKokoroLocation(location) {
+            return !is.string(location);
+        }
+    );
+    if (missingLocation) return false;
+    // eSpeak's data argument is the parent of its espeak-ng-data directory.
+    locations.push(path.join(record.espeakDataDirectory, 'espeak-ng-data'));
+    const entries = await Promise.all(
+        locations.map(
+            function inspectKokoroLocation(location) {
+                return stat(location);
+            }
+        )
+    );
+    throwIfAborted(signal);
+    return entries.every(
+        function kokoroLocationPresent(info, index) {
+            return index === 0 ? info.isFile() : info.isDirectory();
+        }
+    );
 }
 
 async function runtimeExecutable(root,id,platform,signal){
@@ -645,6 +733,22 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
                 release,
                 {root, directory, platform, architecture, signal, onEvent}
             );
+        } else if (runtime.id === 'kokoro-native' && runtime.helperRoot) {
+            const sourceRoot = path.resolve(runtime.helperRoot);
+            const destination = path.relative(sourceRoot, root);
+            if (destination !== '..' && !destination.startsWith(`..${path.sep}`) && !path.isAbsolute(destination)) {
+                throw new ArcaneError(ERROR_CODES.usage, 'The kokoro-native installation directory must be outside helperRoot so copying does not include its own output.');
+            }
+            locations = {version: runtime.version ?? 'custom', ...kokoroRuntimeLocations(runtime, root, platform)};
+            await onEvent(
+                {
+                    type: 'local-ai.install.copying',
+                    message: 'Copying the selected complete Kokoro helper tree.',
+                    data: {id: runtime.id, platform, architecture}
+                }
+            );
+            const files = [];
+            await copyRuntimeTree(sourceRoot, root, root, files, signal);
         }else{
             const assets=[{url:release.url,name:release.name,archive}];
             if(companionArchive){
@@ -679,13 +783,17 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
                 ...(runtime.id==='llama.cpp'?{backend:release.backend,requestedBackend:release.requestedBackend}:{}),
                 ...(runtime.id==='nemo-speech'
                 ?await nemoRuntimeDirectories(root,signal)
+                :runtime.id==='kokoro-native'?kokoroRuntimeLocations(runtime,root,platform)
                 :{executable:await runtimeExecutable(root,runtime.id,platform,signal)})};
         }
         const record={id:runtime.id,platform,architecture,root,...locations,...(runtime.version?{requestedVersion:runtime.version}:{})};
+        if (runtime.id === 'kokoro-native' && !await installedKokoroRuntime(record, signal)) {
+            throw new ArcaneError(ERROR_CODES.operationFailed, 'Kokoro preparation did not produce the selected helper executable, eSpeak data, and library directory.');
+        }
         throwIfAborted(signal);
         if(archive)await unlink(archive);
         if(companionArchive)await unlink(companionArchive);
-        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?{requestBackend:runtime.backend}:{}),...(runtime.id==='llama.cpp'?{requestCompanionUrl:runtime.companionUrl??null}:{}),...(runtime.id==='whisper.cpp'?{requestWhisper:whisperRuntimeSelection(runtime)}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
+        await writeFile(path.join(attempt,'installation.json'),`${JSON.stringify({requestVersion:runtime.version??null,requestUrl:runtime.url??null,...(['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?{requestBackend:runtime.backend}:{}),...(runtime.id==='llama.cpp'?{requestCompanionUrl:runtime.companionUrl??null}:{}),...(runtime.id==='whisper.cpp'?{requestWhisper:whisperRuntimeSelection(runtime)}:{}),...(runtime.id==='kokoro-native'?{requestKokoro:kokoroRuntimeSelection(runtime)}:{}),runtime:record},null,2)}\n`,{flag:'wx',signal});
         completed=true;
         await onEvent({type:'local-ai.install.completed',message:`${runtime.id} ${record.version} is available.`,data:record});
         return record;
@@ -705,7 +813,7 @@ async function installRuntime(runtime,{directory,platform,architecture,signal,on
 
 function shareInstallation(runtime,options){
     throwIfAborted(options.signal);
-    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?runtime.backend:null,runtime.id==='whisper.cpp'?whisperRuntimeSelection(runtime):null,runtime.id==='llama.cpp'?runtime.companionUrl??null:null]);
+    const key=JSON.stringify([options.directory,options.platform,options.architecture,runtime.id,runtime.version??null,runtime.url??null,['stable-diffusion.cpp','llama.cpp'].includes(runtime.id)?runtime.backend:null,runtime.id==='whisper.cpp'?whisperRuntimeSelection(runtime):null,runtime.id==='llama.cpp'?runtime.companionUrl??null:null,runtime.id==='kokoro-native'?kokoroRuntimeSelection(runtime):null]);
     let entry=installations.get(key);
     if(entry?.controller.signal.aborted){
         // The prior cancelled attempt owns its cleanup. A later request waits
@@ -855,7 +963,7 @@ export async function bundleLocalAIRuntimes({runtimes=[],directory,outputRoot,pl
         const relative=`runtime/local-ai/${runtime.id}`;
         const destination=path.join(root,relative);
         const bundled=runtime.id==='whisper.cpp'?bundledWhisperRuntime(runtime,relative):{...runtime,root:relative};
-        for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory','libraryPath','bindingModulePath']){
+        for(const field of ['executable','modulePath','includeDirectory','libraryDirectory','binaryDirectory','cmakeDirectory','libraryPath','bindingModulePath','helperExecutable','espeakDataDirectory']){
             if(runtime[field]===undefined)continue;
             bundled[field]=path.posix.join(relative,path.relative(runtime.root,runtime[field]).split(path.sep).join('/'));
         }

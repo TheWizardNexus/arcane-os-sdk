@@ -82,6 +82,7 @@ runtime layouts.
 | `arcane-os/core/image` | Native image Core service with independent runtime preparation and retained model ownership. |
 | `arcane-os/core/speech` | Independent injected STT/TTS engine loading, request cancellation and joined Core service lifetime. |
 | `arcane-os/local-ai/whisper` | Retained native Whisper model, complete recordings and joined helper lifetime. |
+| `arcane-os/local-ai/kokoro` | Retained native Kokoro synthesis using the existing ONNX/model-resource owners and a compiled phonemization/Opus helper. |
 | `arcane-os/local-ai/whisper/build` | First-party persistent helper build against selected installed Whisper headers and libraries. |
 | `arcane-os/local-ai/whisper/openvino-build` | Optional Windows x64 Intel NPU encoder runtime producer using selected installed sources and toolchain. |
 | `arcane-os/ai/core-model-assets` | Complete stored browser model members projected through Core into native working files. |
@@ -469,6 +470,12 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createLocalImageService()` | function | `arcane-os/core/image` | Core local images | Node Core with selected stable-diffusion.cpp requirements |
 | `createLocalImageService default export` | function | `arcane-os/core/image` | Core local images | Same native image service factory |
 | `createSpeechService()` | function | `arcane-os/core/speech` | Core native speech | Node Core with explicitly supplied speech engines |
+| `createNativeKokoroRuntime()` | function | `arcane-os/local-ai/kokoro` | Core native speech | Node with matching prepared helper/data, selected model resources and an existing ONNX owner |
+| `createNativeKokoroRuntime default export` | function | `arcane-os/local-ai/kokoro` | Core native speech | Same retained native Kokoro factory |
+| `KOKORO_MODEL` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Selected upstream model identifier |
+| `KOKORO_REVISION` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Selected upstream model revision |
+| `KOKORO_SAMPLE_RATE` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Native PCM sample rate |
+| `KOKORO_VOICES` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Complete 28-voice US/GB selection |
 | `createWhisperRuntime()` | function | `arcane-os/local-ai/whisper` | Core native speech | Node with a prepared matching helper, runtime, decoder and selected model |
 | `createWhisperRuntime default export` | function | `arcane-os/local-ai/whisper` | Core native speech | Same retained native engine factory |
 | `buildWhisperHelper()` | function | `arcane-os/local-ai/whisper/build` | Core native speech | Node with installed CMake/C++17 toolchain and matching Whisper source/runtime |
@@ -8842,6 +8849,118 @@ selected model and native engine.
 The default export from `arcane-os/core/image` is the same
 `createLocalImageService` factory and lifecycle described above.
 
+## createNativeKokoroRuntime()
+
+### Overview and signature
+
+The named export from `arcane-os/local-ai/kokoro` composes the selected Kokoro
+FP32 graph with the host's existing native ONNX owner, model-resource owner
+and prepared persistent phonemization/Opus helper. Construction starts no
+native work and acquires no model or runtime.
+
+```javascript
+createNativeKokoroRuntime({
+    onnx, modelAssets, runtime, prepare, modelId = 'kokoro',
+    model = KOKORO_MODEL, revision = KOKORO_REVISION, dtype = 'fp32',
+    paths, assetProjectionId, resourcePaths, sessionOptions,
+    executionPreference = 'gpu', executionTarget, signal, onEvent
+} = {})
+```
+
+Supply the existing `onnx` runtime or a `prepare` callback that provides it.
+`runtime` describes the matching native helper and data. `paths` supplies
+complete prepared graph/tokenizer/voice resources; a completed
+`assetProjectionId` instead retains projected resources through `modelAssets`.
+The selected model/revision/FP32 contract is fixed by this frontend.
+See [native Kokoro](native-speech.md) for exact resource mappings, preparation,
+runtime distribution and model ownership.
+
+### Members and results
+
+- `current()` returns complete model/lifecycle state, execution configuration,
+  current request, queue, progress, error, default voice and supported voices.
+- `subscribe(listener,{replay=true,signal}={})` returns an unsubscribe function
+  and replays current state by default.
+- `load(options={})` activates the selected resources, retaining omitted
+  selections. Explicit projection/resource mapping or execution-target changes
+  join prior native retirement before loading the new activation.
+- `synthesize(request,{signal,onProgress,requestId=null}={})` requires a loaded
+  activation. `request` contains the complete `input` string, optional `model`
+  matching `modelId`, `voice` (default `af_heart`), positive finite `speed`
+  (default `1`) and `responseFormat` (`wav` by default, `opus` or `ogg`).
+  The result is `{audioBase64,contentType,sampleRate,channels,model,voice,speed}`;
+  content type is `audio/wav` or `audio/ogg; codecs=opus`, with mono 24kHz PCM
+  synthesis. The full input is processed in ordered model segments.
+- `unload()` retires the activation and joins owned native work. `close()`
+  permanently closes the engine and releases its state subscriptions.
+
+Queued requests retain order. Cancelling a queued request removes only that
+request. Active cancellation waits for actual helper/session retirement;
+surviving requests resume with the same accepted provider configuration.
+The ONNX owner may need a running native call to return before its worker exits.
+Readiness is lost while that retirement/reload occurs. Errors retain the actual
+engine and cleanup failures; unsupported explicit voices or formats are never
+substituted. No audio is played by this engine.
+
+### Example
+
+```javascript
+import {createNativeKokoroRuntime} from 'arcane-os/local-ai/kokoro';
+
+// The host supplies its existing ONNX owner and already prepared resources.
+async function narrateMoonGoat({onnx, runtime, paths}) {
+    const voice = createNativeKokoroRuntime({
+        onnx, runtime, paths, executionPreference: 'cpu'
+    });
+    try {
+        await voice.load();
+        return await voice.synthesize({
+            input: 'Captain Goat has landed. Guard the moon cheese!',
+            voice: 'af_heart', responseFormat: 'wav'
+        });
+    } finally {
+        await voice.close();
+    }
+}
+```
+
+Changing `voice` to `bf_emma` selects British English. `responseFormat: 'opus'`
+selects Ogg Opus encoding. GPU/physical-device selection uses the existing
+[ONNX execution contract](local-ai.md#physical-execution-targets); an accepted
+provider configuration is separate from observed hardware execution.
+The SDK publishes a Windows x64 helper archive. Other platforms need a matching
+custom helper distribution and supported native ONNX host. Native helper
+production and platform execution evidence remain separate.
+
+## createNativeKokoroRuntime default export
+
+The default export from `arcane-os/local-ai/kokoro` is the same
+`createNativeKokoroRuntime` factory with identical inputs, results and lifetime.
+
+## KOKORO_MODEL
+
+Named string export from `arcane-os/local-ai/kokoro`, with value
+`onnx-community/Kokoro-82M-v1.0-ONNX`. It identifies this frontend's model family
+for matching graph, tokenizer and voice resource selection.
+
+## KOKORO_REVISION
+
+Named string export from `arcane-os/local-ai/kokoro`, with value
+`1939ad2a8e416c0acfeecc08a694d14ef25f2231`. Resource preparation uses this
+upstream revision with `KOKORO_MODEL`.
+
+## KOKORO_SAMPLE_RATE
+
+Named number export from `arcane-os/local-ai/kokoro`, with value `24000`.
+It describes the engine's mono PCM synthesis rate in samples per second.
+
+## KOKORO_VOICES
+
+Named array export from `arcane-os/local-ai/kokoro` containing all 28 supported
+US/GB voice identifiers. The engine uses `af_heart` when the caller omits
+`voice`; an explicit unsupported selection reports an error. Use this complete
+array to populate a native Kokoro voice selector.
+
 ## createWhisperRuntime()
 
 ### Overview
@@ -9018,6 +9137,13 @@ The returned object has `name: 'speech'`, `current`, `subscribe`, `close`,
   Core RPC methods. The context supplies `signal`, `requestId` and `emit`.
   The service publishes synchronous accepted `Thinking` before waiting for
   its role's load, then forwards the engine's complete progress and result.
+- `methods['speech.load'](request,context)` and
+  `methods['speech.unload'](request,context)` route explicit activation to the
+  explicit `role: 'stt' | 'tts'` and forward the remaining activation
+  fields and result through that role's configured engine. A startup load remains owned independently of callers
+  waiting for it. The browser facade exposes `Arcane.speech.load(request,options)`
+  and `unload(request,options)` with `signal`, `onRequest` and no elapsed-time
+  cutoff. See [activation routing](native-speech.md) for selection and errors.
 - `close()` and its `drain()` alias stop acceptance, abort the service lifetime,
   close both engines concurrently and await startup and request work. Repeated
   calls share one promise. `dispose()` also releases event subscriptions.
@@ -9123,7 +9249,8 @@ import createLocalAIService from 'arcane-os/core/local-ai';
 ### Overview
 
 Reuses matching managed runtimes or installs complete selected
-llama.cpp/Ollama/ONNX/image distributions or NeMo libraries in an explicitly supplied directory.
+llama.cpp/Ollama/ONNX/image distributions, NeMo libraries or native Kokoro
+helper/data trees in an explicitly supplied directory.
 
 ### Signature and result
 
@@ -9146,6 +9273,12 @@ trees remain intact while a fresh installation is prepared. See
 Image requirements also accept `backend` and
 `models`; their pinned default runtime, CPU/Metal selection and separate model
 preparation are described in [local image generation](local-image-generation.md).
+`kokoro-native` returns `helperExecutable`, `espeakDataDirectory` and
+`libraryDirectory`. Windows x64 defaults to the helper archive from the
+installed SDK's numeric release; an explicit `url` or `helperRoot` selects a
+complete custom distribution. The data directory is the parent of
+`espeak-ng-data`. Helper preparation loads no Kokoro graph and keeps the
+existing ONNX/model-resource owners separate. See [native speech](native-speech.md).
 Matching concurrent
 installs share their work. Downloads retain runtime libraries and surface
 network/archive failures; cancellation and operation events remain observable.
@@ -9188,6 +9321,10 @@ The corrected Windows x64 ONNX selection retains its
 `nativeDistributionRevision` and complete native libraries. Its `modulePath`
 is relocated with the other runtime paths; bundling introduces no separate
 runtime selection. See [ONNX runtime preparation](local-ai.md#development).
+
+Kokoro bundling retains the complete helper/data tree and relocates
+`helperExecutable`, `espeakDataDirectory` and `libraryDirectory`. Its selected
+ONNX runtime and model resources retain their existing independent ownership.
 
 Image records relocate the complete library, binding and variant paths. Model
 URL descriptors retain their original acquisition metadata for preparation

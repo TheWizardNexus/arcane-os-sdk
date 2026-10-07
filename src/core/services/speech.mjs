@@ -44,8 +44,8 @@ function waitForLoad(task, signal) {
 /** Hosts supply selected engines; this service owns their independent lifetimes. */
 export function createSpeechService({stt, tts, signal} = {}) {
     const roles = {
-        stt: {engine: stt, operation: 'transcribe', state: null, loading: null, unsubscribe: null},
-        tts: {engine: tts, operation: 'synthesize', state: null, loading: null, unsubscribe: null}
+        stt: {engine: stt, operation: 'transcribe', state: null, loading: null, changing: null, unsubscribe: null},
+        tts: {engine: tts, operation: 'synthesize', state: null, loading: null, changing: null, unsubscribe: null}
     };
     for (const [name, role] of Object.entries(roles)) {
         if (role.engine == null) {
@@ -124,6 +124,36 @@ export function createSpeechService({stt, tts, signal} = {}) {
         publish();
     }
 
+    function observeRoleTask(name, task, startup = false) {
+        const role = roles[name];
+        role.changing = task;
+        // Explicit load cancellation belongs to that caller's wait, not another
+        // inference request. Only the service-owned startup is a shared wait.
+        role.loading = startup ? task : null;
+        jobs.add(task);
+        function settled(error, failed) {
+            jobs.delete(task);
+            // An older startup or activation must not replace the selected state.
+            if (role.loading === task) role.loading = null;
+            if (role.changing !== task) return;
+            role.changing = null;
+            if (closed) return;
+            if (failed && startup && !closing) {
+                roleFailed(name, error);
+            } else {
+                role.state = role.engine.current();
+                publish();
+            }
+        }
+        task.then(
+            function speechRoleSettled() { settled(undefined, false); },
+            function speechRoleFailed(error) { settled(error, true); }
+        ).catch(function speechRoleObserverFailed(error) {
+            console.error('Speech role state observer failed.', error);
+        });
+        return task;
+    }
+
     function startRole(name) {
         const role = roles[name];
         if (!role.engine || closing) {
@@ -142,34 +172,60 @@ export function createSpeechService({stt, tts, signal} = {}) {
             roleFailed(name, error);
             return;
         }
+        // Replay can synchronously select an activation or close the service.
+        if (role.changing || closing || closed) return;
         const task = Promise.resolve().then(
             async function loadSpeechEngine() {
                 lifetimeSignal.throwIfAborted();
-                await role.engine.load(
+                if (role.changing !== task) return;
+                return role.engine.load(
                     {signal: lifetimeSignal}
                 );
-                if (!closed) {
-                    role.state = role.engine.current();
-                    publish();
-                }
             }
         );
-        role.loading = task;
-        task.then(
-            function speechEngineLoaded() {
-                role.loading = null;
-            },
-            function speechEngineLoadFailed(error) {
-                role.loading = null;
-                if (!closing) {
-                    roleFailed(name, error);
-                }
-            }
-        ).catch(
-            function speechLoadObserverFailed(error) {
-                console.error('Speech load state observer failed.', error);
-            }
-        );
+        observeRoleTask(name, task, true);
+    }
+
+    function changeRole(operation, parameters, request) {
+        if (closing || closed) {
+            throw failure('CORE_CLOSING', 'The speech service is closing.');
+        }
+        if (!parameters || !is.object(parameters) || is.array(parameters)
+            || !['stt', 'tts'].includes(parameters.role)) {
+            throw failure('SPEECH_ROLE_INVALID', 'Select the stt or tts speech role.');
+        }
+        const {role: name, ...selection} = parameters;
+        const role = roles[name];
+        const operationSignal = request.signal
+            ? AbortSignal.any([lifetimeSignal, request.signal]) : lifetimeSignal;
+        operationSignal.throwIfAborted();
+        if (!role.engine) {
+            throw failure('SPEECH_ENGINE_UNAVAILABLE', `No ${name} speech engine is configured.`);
+        }
+        if (!is.function(role.engine[operation])) {
+            throw failure('SPEECH_OPERATION_UNAVAILABLE', `The ${name} speech engine does not support ${operation}().`);
+        }
+        let acknowledgementFailed = false;
+        let acknowledgementError;
+        const task = Promise.resolve().then(async function changeSpeechRole() {
+            if (acknowledgementFailed) throw acknowledgementError;
+            operationSignal.throwIfAborted();
+            const result = await role.engine[operation]({...selection, signal: operationSignal});
+            operationSignal.throwIfAborted();
+            return result;
+        });
+        // Retain ownership before an acknowledgement observer can close or reenter.
+        observeRoleTask(name, task);
+        try {
+            request.emit?.('speech.progress', {
+                requestId: request.requestId, role: name, operation,
+                status: 'Thinking', progress: {phase: 'accepted'}
+            });
+        } catch (error) {
+            acknowledgementFailed = true;
+            acknowledgementError = error;
+        }
+        return task;
     }
 
     function invoke(name, parameters, request) {
@@ -340,6 +396,12 @@ export function createSpeechService({stt, tts, signal} = {}) {
         },
         methods: {
             'speech.status': current,
+            'speech.load': function load(parameters, request = {}) {
+                return changeRole('load', parameters, request);
+            },
+            'speech.unload': function unload(parameters, request = {}) {
+                return changeRole('unload', parameters, request);
+            },
             'speech.transcribe': function transcribe(parameters, request = {}) {
                 return invoke('stt', parameters, request);
             },

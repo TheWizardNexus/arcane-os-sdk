@@ -8,7 +8,17 @@ import {SDXL_BASE_1_0_MODEL} from './image-models/sdxl.mjs';
 import {normalizeWhisperRuntimeRequirement} from './whisper/config.mjs';
 
 const is = new Is(false);
-export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp', 'whisper.cpp'];
+export const LOCAL_AI_RUNTIME_IDS = ['llama.cpp', 'ollama', 'onnx', 'stable-diffusion.cpp', 'whisper.cpp', 'kokoro-native'];
+
+/** Describe the selected helper without acquiring it or selecting model assets. */
+export function normalizeKokoroRuntimeRequirement(record) {
+    for (const field of ['helperRoot', 'helperExecutable', 'espeakDataDirectory', 'libraryDirectory']) {
+        if (record[field] !== undefined && (!is.string(record[field]) || record[field] === '')) {
+            throw new ArcaneError(ERROR_CODES.usage, `kokoro-native ${field} must be a nonempty path.`);
+        }
+    }
+    return {...record};
+}
 
 /** Select a llama distribution without discovering hardware or acquiring it. */
 export function normalizeLlamaRuntimeRequirement(record) {
@@ -79,6 +89,7 @@ export function normalizeLocalAIConfig(value) {
         if (record.id === 'llama.cpp') return normalizeLlamaRuntimeRequirement(record);
         if (record.id === 'stable-diffusion.cpp') return normalizeImageRuntimeRequirement(record);
         if (record.id === 'whisper.cpp') return normalizeWhisperRuntimeRequirement(record);
+        if (record.id === 'kokoro-native') return normalizeKokoroRuntimeRequirement(record);
         return {...record};
     });
     return {...value, runtimes};

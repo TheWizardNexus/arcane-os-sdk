@@ -429,6 +429,64 @@ test('facade routes native data operations without trimming supplied content',as
     assert.deepEqual(await save,{key,value});
 });
 
+test('speech activation forwards complete selection, results and request correlation',async function speechActivationFrames(t){
+    const {client,frames,receive}=fixture(t);
+    const speech=createCoreFacade(client).speech;
+    const paths={model:'onnx/model.onnx',tokenizer:'tokenizer.json',tokenizerConfig:'tokenizer_config.json',voices:{af_heart:'voices/af_heart.bin'}};
+    const selections=[
+        {role:'tts',assetProjectionId:'prepared-moon',resourcePaths:paths,executionTarget:null,extra:{complete:'  Every line.\r\n月  '}},
+        {role:'tts',assetProjectionId:'prepared-moon',resourcePaths:paths}
+    ];
+    for(const parameters of selections){
+        let observed;
+        const operation=speech.load(parameters,{onRequest({requestId}){observed=requestId;}});
+        const request=frames.at(-1);
+        assert.equal(request.method,'speech.load');
+        assert.equal(request.parameters,parameters);
+        assert.equal(observed,request.id);
+        const result={modelId:'kokoro',state:'ready',loaded:true,execution:{requestedTarget:parameters.executionTarget},detail:{complete:'Full engine result'}};
+        receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result});
+        assert.equal(await operation,result);
+    }
+    assert.equal(Object.hasOwn(frames[1].parameters,'executionTarget'),false);
+    const parameters={role:'tts'};
+    let observed;
+    const unloading=speech.unload(parameters,{onRequest({requestId}){observed=requestId;}});
+    const request=frames.at(-1);
+    assert.equal(request.method,'speech.unload');
+    assert.equal(request.parameters,parameters);
+    assert.equal(observed,request.id);
+    const failure={code:'KOKORO_RELEASE_FAILED',message:'Complete cleanup failure\nsecond line',stack:'Full\nstack',cause:{message:'Native exit failed',detail:{complete:true}},errors:[{message:'Helper failed'},{message:'ONNX release failed'}],execution:{attempts:[{provider:'dml',error:{complete:'Full failure'}}]}};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:false,error:failure});
+    await assert.rejects(unloading,function completeFailure(error){
+        for(const [name,value] of Object.entries(failure))assert.deepEqual(error[name],value);
+        return true;
+    });
+});
+
+test('speech activation cancellation uses its own request and keeps the connection usable',async function speechActivationCancellation(t){
+    const {client,frames,receive}=fixture(t);
+    const speech=createCoreFacade(client).speech;
+    for(const method of ['load','unload']){
+        const controller=new AbortController();
+        const parameters={role:'tts',assetProjectionId:'prepared-moon'};
+        const operation=speech[method](parameters,{signal:controller.signal});
+        const request=frames.at(-1);
+        controller.abort();
+        await assert.rejects(operation,{name:'AbortError',code:'ARCANE_REQUEST_ABORTED',method:`speech.${method}`});
+        assert.deepEqual(frames.at(-1),{protocol:CORE_PROTOCOL,type:'control',control:'request.cancel',requestId:request.id});
+        assert.equal(receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:'late'}),false);
+        const count=frames.length;
+        await assert.rejects(speech[method](parameters,{signal:controller.signal}),{code:'ARCANE_REQUEST_ABORTED'});
+        assert.equal(frames.length,count);
+    }
+    const current=speech.status();
+    const request=frames.at(-1);
+    const result={roles:{stt:{state:'ready',loaded:true},tts:{state:'unloaded',loaded:false}}};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result});
+    assert.equal(await current,result);
+});
+
 test('speech synthesis cancellation preserves its payload and leaves other requests active',async function speechCancellation(t){
     const {client,frames,receive}=fixture(t);
     const facade=createCoreFacade(client);
