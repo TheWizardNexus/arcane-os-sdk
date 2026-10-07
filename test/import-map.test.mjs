@@ -159,6 +159,7 @@ test('complete runtime inventory produces a mutable named import map without rea
             'sdk/ai/browser-wasm.mjs',
             'sdk/ai/browser-speech.mjs',
             'sdk/ai/twin-cloud.mjs',
+            'sdk/ai/model-observation.mjs',
             'sdk/dependencies/event-pubsub/index.js'
         ],
         readFile:async()=>{
@@ -174,6 +175,7 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane-os/ai/browser-speech':'./arcane/sdk/ai/browser-speech.mjs',
         'arcane-os/ai/browser-wasm':'./arcane/sdk/ai/browser-wasm.mjs',
         'arcane-os/ai/twin-cloud':'./arcane/sdk/ai/twin-cloud.mjs',
+        'arcane-os/ai/model-observation':'./arcane/sdk/ai/model-observation.mjs',
         'arcane-os/dom-event-instrumentation':'./arcane/sdk/dom-event-instrumentation.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'arcane-os/entities/Preference.js':'./arcane/entities/Preference.js',
@@ -608,6 +610,11 @@ test(
     async function hostDocumentMaps(context) {
         const documentRoot = await temporaryDirectory(context);
         await writeRuntimeFixture(documentRoot);
+        await writeWorkspaceFile(
+            documentRoot,
+            'arcane/sdk/ai/model-observation.mjs',
+            'export function attachModelObservation() {}\n'
+        );
         const authoredMap = '<script type="importmap" data-product-map>{"imports":{"host":"../shared/host.js"}}</script>';
         const documents = [
             {
@@ -670,6 +677,10 @@ test(
             firstDocuments.set(document.path, html);
             const target = '../arcane/modules/ThemeBootstrap.js';
             assert.equal(imports['arcane/ThemeBootstrap'], target);
+            assert.equal(
+                imports['arcane-os/ai/model-observation'],
+                '../arcane/sdk/ai/model-observation.mjs'
+            );
             assert.equal(imports['../arcane/modules/ThemeBootstrap.js'], target);
             assert.equal(imports['../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9'], undefined);
             assert.equal(

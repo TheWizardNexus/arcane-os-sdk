@@ -538,6 +538,7 @@ test('installed npm sources own maps, development serving and portable output',{
     }),false);
     assert.equal(rootMap.imports[rootTheme],rootTheme);
     assert.equal(rootMap.imports['arcane-os/event-manager'],'./node_modules/arcane-os/browser-runtime/event-manager.mjs');
+    assert.equal(rootMap.imports['arcane-os/ai/model-observation'],'./node_modules/arcane-os/browser-runtime/ai/model-observation.mjs');
     assert.equal(rootMap.imports['strong-type'],'./node_modules/arcane-os/runtime/strong-type/index.js');
     const rootWebManifest=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.webmanifest'),'utf8'));
     assert.equal(rootWebManifest.id,'/apps/'+rootAppId+'/');
