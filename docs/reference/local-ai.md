@@ -267,6 +267,23 @@ owners; they are separate from this runtime service.
 
 ### Selected Ollama model readiness
 
+High-level `AI.setAI()` and `AI.transitionAI()` accept optional
+`{signal,startLanguageModel}` after their six existing preference arguments;
+`configureProviders()` and `transitionProviders()` accept it as their second
+argument. The default remains eager. `startLanguageModel:false` registers the
+built-in adapter and commits the selected provider/model without preloading it,
+including when later Ollama-ready, credential, or residency callbacks arrive.
+Activate that selection explicitly with `ai.providerRuntime.load('llm',{signal})`
+or `ai.startProviders({startLanguageModel:true,signal})`.
+
+Transition cancellation waits for accepted old-provider cleanup and prevents a
+subsequent configuration or preload. Cancellation during the first owned preload
+reaches the native request, retaining the already-committed selection and its real
+runtime state. A newer selection supersedes older pending transition work.
+Cancelled activation stays inactive through readiness callbacks; a caller abort
+after successful settlement does not unload the ready model. These selection
+controls do not change the ownership of separate callers joining an existing load.
+
 The built-in `OLLAMA` LLM provider loads its selected model through Ollama's
 empty `generate` request and separately confirms that selected model in
 `running()` (`/api/ps`). A model catalog entry, a connected bridge, and a

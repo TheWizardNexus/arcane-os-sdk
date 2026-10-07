@@ -759,6 +759,19 @@ function isAbortSignal(value){
         &&is.function(value.removeEventListener);
 }
 
+function normalizeAISelectionOptions({signal=null,startLanguageModel=true}={}){
+    if(signal!==null&&!isAbortSignal(signal)){
+        throw new TypeError('AI selection signal must be an AbortSignal.');
+    }
+    if(!is.boolean(startLanguageModel)){
+        throw new TypeError('AI selection startLanguageModel must be a boolean.');
+    }
+    if(signal?.aborted){
+        throw normalizeAIRequestAbort(signal.reason);
+    }
+    return {signal,startLanguageModel};
+}
+
 function closedRecord(value,keys,required,label){
     if(!value
         ||!is.object(value)
@@ -1173,6 +1186,8 @@ class AI {
     #browserSpeechTransition=Promise.resolve();
     #builtInLLMProviders=new Map();
     #builtInLLMReadiness=Promise.resolve(null);
+    #providerSelectionGeneration=0;
+    #providerSelectionOperation=null;
     #builtInSpeechProviders=new Map();
     #configuredSpeechProviders=new Map();
     #builtInSpeechReadiness=Promise.resolve(null);
@@ -2146,7 +2161,8 @@ class AI {
         });
     }
 
-    #ensureBuiltInLLMProvider(providerId){
+    #ensureBuiltInLLMProvider(providerId,operation=null){
+        if(operation)this.#assertProviderSelection(operation);
         if(providerId!=='TWIN'&&providerId!=='OLLAMA'){
             return false;
         }
@@ -2154,15 +2170,34 @@ class AI {
             return false;
         }
         const provider=this.#createBuiltInLLMProvider(providerId);
-        const unregister=this.#providerRuntime.register(provider);
-        this.#builtInLLMProviders.set(
-            providerId,
-            completeValue({provider,unregister})
-        );
+        const runtime=this;
+        let unregister=null;
+        const record={
+            provider,
+            unregister:function unregisterBuiltInLLMProvider(){
+                if(unregister)return unregister();
+                if(!runtime.#providerRuntime.ownsProvider('llm',provider))return false;
+                return runtime.#providerRuntime.unregister('llm',providerId);
+            }
+        };
+        // Registration can publish a pending route synchronously; its owner must
+        // already be visible to a selection accepted by that callback.
+        this.#builtInLLMProviders.set(providerId,record);
+        try{
+            unregister=this.#providerRuntime.register(provider);
+        }catch(error){
+            if(!this.#providerRuntime.ownsProvider('llm',provider)
+                &&this.#builtInLLMProviders.get(providerId)===record){
+                this.#builtInLLMProviders.delete(providerId);
+            }
+            throw error;
+        }
+        if(operation)this.#assertProviderSelection(operation);
         return true;
     }
 
-    #ensureBuiltInSpeechProvider(role,providerId){
+    #ensureBuiltInSpeechProvider(role,providerId,operation=null){
+        if(operation)this.#assertProviderSelection(operation);
         if(!['stt','tts'].includes(role)||providerId!=='LOCAL_SPEACH'){
             return false;
         }
@@ -2170,33 +2205,54 @@ class AI {
             return false;
         }
         const provider=this.#createBuiltInSpeechProvider(role,providerId);
-        const unregister=this.#providerRuntime.register(provider);
-        this.#builtInSpeechProviders.set(
-            this.#builtInSpeechProviderKey(role,providerId),
-            completeValue({role,providerId,provider,unregister})
-        );
+        const runtime=this;
+        const key=this.#builtInSpeechProviderKey(role,providerId);
+        let unregister=null;
+        const record={
+            role,providerId,provider,
+            unregister:function unregisterBuiltInSpeechProvider(){
+                if(unregister)return unregister();
+                if(!runtime.#providerRuntime.ownsProvider(role,provider))return false;
+                return runtime.#providerRuntime.unregister(role,providerId);
+            }
+        };
+        this.#builtInSpeechProviders.set(key,record);
+        try{
+            unregister=this.#providerRuntime.register(provider);
+        }catch(error){
+            if(!this.#providerRuntime.ownsProvider(role,provider)
+                &&this.#builtInSpeechProviders.get(key)===record){
+                this.#builtInSpeechProviders.delete(key);
+            }
+            throw error;
+        }
+        if(operation)this.#assertProviderSelection(operation);
         return true;
     }
 
-    #releaseInactiveBuiltInLLMProviders(activeProviderId){
+    #releaseInactiveBuiltInLLMProviders(activeProviderId,operation=null){
         for(const [providerId,record] of this.#builtInLLMProviders){
+            if(operation)this.#assertProviderSelection(operation);
             if(providerId===activeProviderId){
                 continue;
             }
-            if(record.unregister()){
+            if(record.unregister()&&this.#builtInLLMProviders.get(providerId)===record){
                 this.#builtInLLMProviders.delete(providerId);
             }
         }
     }
 
-    #releaseInactiveBuiltInSpeechProviders(activeProviders){
+    #releaseInactiveBuiltInSpeechProviders(activeProviders,operation=null){
         for(const [key,record] of this.#builtInSpeechProviders){
+            if(operation)this.#assertProviderSelection(operation);
             if(activeProviders[record.role]===record.providerId){
                 continue;
             }
             if(record.unregister()){
                 record.provider.dispose();
-                this.#builtInSpeechProviders.delete(key);
+                if(this.#builtInSpeechProviders.get(key)===record){
+                    this.#builtInSpeechProviders.delete(key);
+                }
             }
         }
     }
@@ -2246,7 +2302,85 @@ class AI {
         return this.#builtInSpeechReadiness;
     }
 
-    #reconcileBuiltInLLMReadiness(){
+    #beginProviderSelection({signal,startLanguageModel},deferSupersession=false){
+        const previous=this.#providerSelectionOperation;
+        const controller=new AbortController();
+        const operation={
+            generation:++this.#providerSelectionGeneration,
+            controller,
+            startLanguageModel,
+            previous:deferSupersession?previous:null,
+            restorePrevious:deferSupersession,
+            committed:false,
+            settled:false,
+            detachSignal:function detachAISelectionSignal(){
+                signal?.removeEventListener('abort',forwardAbort);
+            }
+        };
+        function forwardAbort(){
+            controller.abort(signal.reason);
+        }
+        this.#providerSelectionOperation=operation;
+        signal?.addEventListener('abort',forwardAbort,{once:true});
+        if(signal?.aborted)forwardAbort();
+        if(!deferSupersession)this.#supersedeProviderSelection(previous);
+        return operation;
+    }
+
+    #supersedeProviderSelection(previous){
+        for(let operation=previous;operation;operation=operation.previous){
+            operation.detachSignal();
+            if(!operation.settled){
+                operation.controller.abort(aiProviderError(
+                    'AI provider selection was superseded.',
+                    'ARCANE_AI_OPERATION_SUPERSEDED'
+                ));
+            }
+        }
+    }
+
+    #assertProviderSelection(operation,allowAborted=false){
+        if(operation.generation!==this.#providerSelectionOperation?.generation){
+            throw aiProviderError(
+                'AI provider selection was superseded.',
+                'ARCANE_AI_OPERATION_SUPERSEDED'
+            );
+        }
+        if(!allowAborted&&operation.controller.signal.aborted){
+            throw normalizeAIRequestAbort(operation.controller.signal.reason);
+        }
+    }
+
+    #commitProviderSelection(operation,tuple){
+        // Configuration already committed its routes before notifying listeners.
+        // Keep its tuple together even when that notification aborts this caller;
+        // a newer owner alone prevents this continuation from applying the tuple.
+        this.#assertProviderSelection(operation,true);
+        this.#applyPreferenceTuple(tuple);
+        operation.committed=true;
+        const previous=operation.previous;
+        operation.previous=null;
+        this.#supersedeProviderSelection(previous);
+        this.#assertProviderSelection(operation);
+    }
+
+    #finishProviderSelection(operation){
+        if(operation.restorePrevious&&!operation.committed
+            &&this.#providerSelectionOperation===operation){
+            this.#providerSelectionOperation=operation.previous;
+        }
+        operation.previous=null;
+        operation.settled=true;
+        operation.detachSignal();
+    }
+
+    #reconcileBuiltInLLMReadiness(operation=this.#providerSelectionOperation){
+        if(operation&&(
+            operation!==this.#providerSelectionOperation
+            ||!operation.committed
+        )){
+            return Promise.resolve(this.#providerRuntime.status('llm'));
+        }
         const selection=this.#builtInLLMSelection(false);
         if(!selection){
             return Promise.resolve(this.#providerRuntime.status('llm'));
@@ -2259,10 +2393,14 @@ class AI {
             return this.#providerRuntime.unload('llm');
         }
         if(this.#builtInLLMCapability(selection.providerId)){
-            if(status.state==='ready'&&status.loaded===true){
+            if(operation?.startLanguageModel===false
+                ||operation?.controller.signal.aborted
+                ||(status.state==='ready'&&status.loaded===true)){
                 return Promise.resolve(status);
             }
-            return this.#providerRuntime.load('llm');
+            return this.#providerRuntime.load('llm',{
+                signal:operation?.controller.signal??null
+            });
         }
         if(status.loaded===true
             ||status.busy===true
@@ -2591,12 +2729,15 @@ class AI {
         }
     }
 
-    async #unloadProviderRolesForTransition(){
-        const settlements=await Promise.allSettled([
-            this.#providerRuntime.unload('llm'),
-            this.#providerRuntime.unload('stt'),
-            this.#providerRuntime.unload('tts')
-        ]);
+    async #unloadProviderRolesForTransition(operation){
+        const runtime=this;
+        const settlements=await Promise.allSettled(
+            ['llm','stt','tts'].map(async function unloadPreviousAIProviderRole(role){
+                runtime.#assertProviderSelection(operation);
+                // Accepted cleanup owns completion independently of page cancellation.
+                return runtime.#providerRuntime.unload(role);
+            })
+        );
         const failure=settlements.find(function findAITransitionCleanupFailure(result){
             return result.status==='rejected';
         });
@@ -2643,7 +2784,8 @@ class AI {
         ttsService,
         model,
         modelTTS,
-        modelSTT
+        modelSTT,
+        options
     ) {
         if (
             !(
@@ -2667,59 +2809,83 @@ class AI {
         ]);
         this.#assertValidProviderTuple(tuple);
         this.#assertSynchronousBrowserSpeechSupersession('AI.setAI');
-        this.#ensureBuiltInLLMProvider(tuple[0]);
-        this.#ensureBuiltInSpeechProvider('stt',tuple[1]);
-        this.#ensureBuiltInSpeechProvider('tts',tuple[2]);
-        this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
-        this.#invalidateSpeechControl();
-        this.#applyPreferenceTuple(tuple);
-        this.#releaseInactiveBuiltInLLMProviders(tuple[0]);
-        this.#releaseInactiveBuiltInSpeechProviders({
-            stt:tuple[1],
-            tts:tuple[2]
-        });
-        this.#retainBuiltInLLMReadiness(
-            this.#reconcileBuiltInLLMReadiness()
-        );
-        this.#retainBuiltInSpeechReadiness(
-            this.#reconcileBuiltInSpeechReadiness()
-        );
-        return true;
+        const normalized=normalizeAISelectionOptions(options);
+        const operation=this.#beginProviderSelection(normalized,true);
+        try{
+            this.#assertProviderSelection(operation);
+            this.#ensureBuiltInLLMProvider(tuple[0],operation);
+            this.#ensureBuiltInSpeechProvider('stt',tuple[1],operation);
+            this.#ensureBuiltInSpeechProvider('tts',tuple[2],operation);
+            this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
+            this.#commitProviderSelection(operation,tuple);
+            this.#invalidateSpeechControl();
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInLLMProviders(tuple[0],operation);
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInSpeechProviders({
+                stt:tuple[1],
+                tts:tuple[2]
+            },operation);
+            this.#assertProviderSelection(operation);
+            const runtime=this;
+            this.#retainBuiltInLLMReadiness(
+                this.#reconcileBuiltInLLMReadiness(operation).finally(
+                    function settleAISelectionReadiness(){
+                        runtime.#finishProviderSelection(operation);
+                    }
+                )
+            );
+            this.#assertProviderSelection(operation);
+            this.#retainBuiltInSpeechReadiness(
+                this.#reconcileBuiltInSpeechReadiness()
+            );
+            return true;
+        }catch(error){
+            this.#finishProviderSelection(operation);
+            throw error;
+        }
     }
 
-    configureProviders(selections){
+    configureProviders(selections,options){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
         this.#assertDeviceSpeechConfiguration(prepared);
         this.#assertSynchronousBrowserSpeechSupersession('AI.configureProviders');
-        this.#ensureBuiltInLLMProvider(
-            prepared.llm.default?.providerId
-        );
-        this.#ensureBuiltInSpeechProvider(
-            'stt',
-            prepared.stt.default?.providerId
-        );
-        this.#ensureBuiltInSpeechProvider(
-            'tts',
-            prepared.tts.default?.providerId
-        );
-        this.#assertRegisteredBuiltInRoutes(prepared);
-        const configured=this.#providerRuntime.configure(prepared);
-        this.#invalidateSpeechControl();
-        this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
-        this.#releaseInactiveBuiltInLLMProviders(
-            configured.llm.default?.providerId
-        );
-        this.#releaseInactiveBuiltInSpeechProviders({
-            stt:configured.stt.default?.providerId,
-            tts:configured.tts.default?.providerId
-        });
-        this.#retainBuiltInLLMReadiness(
-            this.#reconcileBuiltInLLMReadiness()
-        );
-        this.#retainBuiltInSpeechReadiness(
-            this.#reconcileBuiltInSpeechReadiness()
-        );
-        return configured;
+        const normalized=normalizeAISelectionOptions(options);
+        const operation=this.#beginProviderSelection(normalized,true);
+        try{
+            this.#assertProviderSelection(operation);
+            this.#ensureBuiltInLLMProvider(prepared.llm.default?.providerId,operation);
+            this.#ensureBuiltInSpeechProvider('stt',prepared.stt.default?.providerId,operation);
+            this.#ensureBuiltInSpeechProvider('tts',prepared.tts.default?.providerId,operation);
+            this.#assertRegisteredBuiltInRoutes(prepared);
+            const configured=this.#providerRuntime.configure(prepared);
+            this.#commitProviderSelection(operation,this.#tupleFromProviderRoutes(configured));
+            this.#invalidateSpeechControl();
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInLLMProviders(configured.llm.default?.providerId,operation);
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInSpeechProviders({
+                stt:configured.stt.default?.providerId,
+                tts:configured.tts.default?.providerId
+            },operation);
+            this.#assertProviderSelection(operation);
+            const runtime=this;
+            this.#retainBuiltInLLMReadiness(
+                this.#reconcileBuiltInLLMReadiness(operation).finally(
+                    function settleAIProviderConfigurationReadiness(){
+                        runtime.#finishProviderSelection(operation);
+                    }
+                )
+            );
+            this.#assertProviderSelection(operation);
+            this.#retainBuiltInSpeechReadiness(
+                this.#reconcileBuiltInSpeechReadiness()
+            );
+            return configured;
+        }catch(error){
+            this.#finishProviderSelection(operation);
+            throw error;
+        }
     }
 
     configureSpeechProviders(selections){
@@ -2762,7 +2928,8 @@ class AI {
         ttsService,
         model,
         modelTTS,
-        modelSTT
+        modelSTT,
+        options
     ){
         const tuple=this.#nextPreferenceTuple([
             llmService,
@@ -2773,54 +2940,70 @@ class AI {
             modelSTT
         ]);
         this.#assertValidProviderTuple(tuple);
-        await this.#supersedeBrowserSpeechForRouteChange();
-        this.#invalidateSpeechControl();
-        await this.#unloadProviderRolesForTransition();
-        this.#ensureBuiltInLLMProvider(tuple[0]);
-        this.#ensureBuiltInSpeechProvider('stt',tuple[1]);
-        this.#ensureBuiltInSpeechProvider('tts',tuple[2]);
-        this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
-        this.#applyPreferenceTuple(tuple);
-        this.#releaseInactiveBuiltInLLMProviders(tuple[0]);
-        this.#releaseInactiveBuiltInSpeechProviders({
-            stt:tuple[1],
-            tts:tuple[2]
-        });
-        await this.#reconcileBuiltInLLMReadiness();
-        await this.#reconcileBuiltInSpeechReadiness();
-        return this.#providerRuntime.status();
+        const operation=this.#beginProviderSelection(normalizeAISelectionOptions(options));
+        try{
+            this.#assertProviderSelection(operation);
+            await this.#supersedeBrowserSpeechForRouteChange(operation);
+            this.#assertProviderSelection(operation);
+            this.#invalidateSpeechControl();
+            await this.#unloadProviderRolesForTransition(operation);
+            this.#assertProviderSelection(operation);
+            this.#ensureBuiltInLLMProvider(tuple[0],operation);
+            this.#ensureBuiltInSpeechProvider('stt',tuple[1],operation);
+            this.#ensureBuiltInSpeechProvider('tts',tuple[2],operation);
+            this.#assertProviderSelection(operation);
+            this.#providerRuntime.configure(this.#routesFromPreferenceTuple(tuple));
+            this.#commitProviderSelection(operation,tuple);
+            this.#releaseInactiveBuiltInLLMProviders(tuple[0],operation);
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInSpeechProviders({
+                stt:tuple[1],
+                tts:tuple[2]
+            },operation);
+            this.#assertProviderSelection(operation);
+            await this.#reconcileBuiltInLLMReadiness(operation);
+            this.#assertProviderSelection(operation);
+            await this.#reconcileBuiltInSpeechReadiness();
+            this.#assertProviderSelection(operation);
+            return this.#providerRuntime.status();
+        }finally{
+            this.#finishProviderSelection(operation);
+        }
     }
 
-    async transitionProviders(selections){
+    async transitionProviders(selections,options){
         const prepared=this.#providerRuntime.validateConfiguration(selections);
         this.#assertDeviceSpeechConfiguration(prepared);
-        await this.#supersedeBrowserSpeechForRouteChange();
-        this.#ensureBuiltInLLMProvider(
-            prepared.llm.default?.providerId
-        );
-        this.#ensureBuiltInSpeechProvider(
-            'stt',
-            prepared.stt.default?.providerId
-        );
-        this.#ensureBuiltInSpeechProvider(
-            'tts',
-            prepared.tts.default?.providerId
-        );
-        this.#assertRegisteredBuiltInRoutes(prepared);
-        this.#invalidateSpeechControl();
-        await this.#unloadProviderRolesForTransition();
-        const configured=this.#providerRuntime.configure(prepared);
-        this.#applyPreferenceTuple(this.#tupleFromProviderRoutes(configured));
-        this.#releaseInactiveBuiltInLLMProviders(
-            configured.llm.default?.providerId
-        );
-        this.#releaseInactiveBuiltInSpeechProviders({
-            stt:configured.stt.default?.providerId,
-            tts:configured.tts.default?.providerId
-        });
-        await this.#reconcileBuiltInLLMReadiness();
-        await this.#reconcileBuiltInSpeechReadiness();
-        return configured;
+        const operation=this.#beginProviderSelection(normalizeAISelectionOptions(options));
+        try{
+            this.#assertProviderSelection(operation);
+            await this.#supersedeBrowserSpeechForRouteChange(operation);
+            this.#assertProviderSelection(operation);
+            this.#invalidateSpeechControl();
+            await this.#unloadProviderRolesForTransition(operation);
+            this.#assertProviderSelection(operation);
+            this.#ensureBuiltInLLMProvider(prepared.llm.default?.providerId,operation);
+            this.#ensureBuiltInSpeechProvider('stt',prepared.stt.default?.providerId,operation);
+            this.#ensureBuiltInSpeechProvider('tts',prepared.tts.default?.providerId,operation);
+            this.#assertRegisteredBuiltInRoutes(prepared);
+            this.#assertProviderSelection(operation);
+            const configured=this.#providerRuntime.configure(prepared);
+            this.#commitProviderSelection(operation,this.#tupleFromProviderRoutes(configured));
+            this.#releaseInactiveBuiltInLLMProviders(configured.llm.default?.providerId,operation);
+            this.#assertProviderSelection(operation);
+            this.#releaseInactiveBuiltInSpeechProviders({
+                stt:configured.stt.default?.providerId,
+                tts:configured.tts.default?.providerId
+            },operation);
+            this.#assertProviderSelection(operation);
+            await this.#reconcileBuiltInLLMReadiness(operation);
+            this.#assertProviderSelection(operation);
+            await this.#reconcileBuiltInSpeechReadiness();
+            this.#assertProviderSelection(operation);
+            return configured;
+        }finally{
+            this.#finishProviderSelection(operation);
+        }
     }
 
     async transitionSpeechProviders(selections){
@@ -3061,10 +3244,13 @@ class AI {
         );
     }
 
-    async #supersedeBrowserSpeechForRouteChange(){
+    async #supersedeBrowserSpeechForRouteChange(operation=null){
         for(const role of [...this.#configuredSpeechProviders.keys()]){
+            if(operation)this.#assertProviderSelection(operation);
             await this.configureSpeechProvider(role,null);
+            if(operation)this.#assertProviderSelection(operation);
         }
+        if(operation)this.#assertProviderSelection(operation);
         if(!this.#browserSpeechConfigurationRecord
             &&this.#browserSpeechRetiredRecords.size===0){
             return false;

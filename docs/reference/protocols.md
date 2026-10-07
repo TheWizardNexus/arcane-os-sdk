@@ -943,6 +943,21 @@ switches, or falls back implicitly. Generic provider-promise settlement is not
 a claim that underlying work stopped; only a provider's documented positive
 acknowledgement or destructive worker teardown can prove that stronger fact.
 
+High-level built-in selection has its own activation boundary:
+`AI.setAI(...sixPreferences,{signal,startLanguageModel:false})`,
+`AI.transitionAI(...sixPreferences,{signal,startLanguageModel:false})`,
+`AI.configureProviders(selections,{signal,startLanguageModel:false})`, and
+`AI.transitionProviders(selections,{signal,startLanguageModel:false})` register
+the selected adapters and keep the AI tuple and runtime routes together without
+an implicit LLM load. The omitted option remains eager. Deferred or cancelled
+activation remains inactive through later readiness callbacks; explicit runtime
+load or startup can activate that selected route. Accepted transition cleanup
+settles independently, cancellation is checked before configuring/preloading the
+replacement, and the first owned load receives the caller signal. Newer accepted
+selections supersede older pending work without allowing older continuations to
+alter the newer selection. After settlement, later caller abort does not unload
+the completed model. This does not change same-route runtime-load join ownership.
+
 `startAIRuntime({startLanguageModel:false,startTranscription:false})` is the
 explicit startup boundary for browser-WASM LLM and default STT activation. It
 leaves the selected LLM unloaded until the shared chat control publishes an

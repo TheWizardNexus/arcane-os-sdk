@@ -21,8 +21,9 @@ class FixtureIs {
 
 function deferred() {
     let resolve;
-    const promise = new Promise(function captureResolve(done) {resolve = done;});
-    return {promise, resolve};
+    let reject;
+    const promise = new Promise(function captureSettlement(done, fail) {resolve = done; reject = fail;});
+    return {promise, resolve, reject};
 }
 
 function environment(applicationId = 'dragon-observatory', storage = new Map()) {

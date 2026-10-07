@@ -257,10 +257,41 @@ provider. `transitionAI()` and `transitionProviders()` are deliberate
 cross-role transitions: each stops queued audio, unloads the current LLM, STT,
 and TTS roles, then applies the replacement configuration. `transitionAI()`
 returns aggregate runtime status; `transitionProviders()` returns the configured
-three-role route configuration. Selected TWiN Cloud `TWIN` LLM, `OLLAMA` LLM,
-and Core `LOCAL_SPEACH` STT/TTS built-in routes expose truthful capability-only
-readiness through internal provider/2 adapters without probing, downloading, or
-hiding a load. Explicit speech preference slots remain unchanged, including a
+three-role route configuration.
+
+`setAI(llmService,sttService,ttsService,model,modelTTS,modelSTT,options)` and
+`transitionAI(llmService,sttService,ttsService,model,modelTTS,modelSTT,options)`
+preserve their six positional preference arguments. `configureProviders(selections,options)`
+and `transitionProviders(selections,options)` accept the same optional
+`{signal=null,startLanguageModel=true}` controls. Omission preserves eager built-in
+LLM activation. `startLanguageModel:false` still registers built-in adapters and
+updates both the runtime routes and AI preference tuple, while leaving the selected
+LLM unloaded. Readiness events, credential changes, and native residency observations
+retain that deferred intent; an explicit `providerRuntime.load('llm',{signal})` or
+`startProviders({startLanguageModel:true,signal})` can activate it. Deferral never
+changes the selected model or substitutes another provider.
+
+An already-aborted signal rejects before selection changes. During an asynchronous
+transition, accepted old-provider cleanup finishes, then cancellation prevents new
+configuration or preload. A newer accepted selection supersedes pending older
+transition work; older completion cannot configure, load, or clean up the newer
+selection. Once replacement routes are committed, cancellation reaches the first
+owned load and leaves that replacement explicitly selected with its actual runtime
+state. Later readiness callbacks do not restart the cancelled activation. Completed
+selection/load settlement detaches its caller signal, so later abort never unloads
+the ready model. `setAI()` retains its synchronous boolean and `configureProviders()`
+its synchronous route result; their asynchronous readiness remains observable through
+the provider runtime. Rejected synchronous configuration preserves the prior owned
+selection/load. A selection accepted by a synchronous registration or configuration
+listener supersedes the older continuation before it can apply preferences or load.
+These controls do not change cancellation ownership for a
+separate caller joining an already-pending runtime load.
+
+Selected TWiN Cloud `TWIN` LLM, `OLLAMA` LLM,
+and Core `LOCAL_SPEACH` STT/TTS built-in routes use internal provider/2 adapters.
+TWiN Cloud and Core speech expose capability readiness; Ollama explicitly
+preloads its selected model and confirms its residency before reporting ready.
+Explicit speech preference slots remain unchanged, including a
 selected external provider that the application registers after AI startup.
 TWiN Cloud availability
 requires the selected LLM route, its model, a credential, and `fetch`; Core speech

@@ -304,8 +304,11 @@ function copyRoleRecord(role, record) {
     }
     const pendingRecovery = ['recovering', 'error'].includes(record.state)
         && record.operationId !== null;
-    if (record.busy && !pendingRecovery && (record.state !== 'ready' || !record.loaded)) {
-        fail('a busy role must be ready and loaded or retain its recovering/error operation.');
+    const pendingUnload = record.state === 'unloading'
+        && record.loaded && record.operationId !== null;
+    if (record.busy && !pendingRecovery && !pendingUnload
+        && (record.state !== 'ready' || !record.loaded)) {
+        fail('a busy role must be ready and loaded, retain its recovering/error operation, or retain its loaded unloading operation.');
     }
     if (record.state === 'error' && error === null) {
         fail('an error role state must include error details.');
