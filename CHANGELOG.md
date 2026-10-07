@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.86.1
+
+- Include the existing public `arcane-os/ai/model-observation` export in
+  generated browser import maps. Both managed application maps and standalone
+  document maps resolve the same published browser module, including direct
+  installed-package URLs and nested documents.
+- Consumers adopt the published package and run their normal import-map
+  generation before rebuilding or serving their application. No manual map
+  edits, alternate imports or new native host build are required. The matching
+  Windows and Whisper runtime assets are unchanged from 0.86.0.
+
 ## 0.86.0
 
 - Add fixed `Tab`, `Shift+Tab`, `Enter` and `Space` key operations to
