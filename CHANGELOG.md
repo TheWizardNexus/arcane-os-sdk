@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.93.0
+
+- Add native desktop notification status, submission, state and removal through
+  `Arcane.notifications`, with ordered notification state events and an owned
+  Windows adapter. The host reports actual submission and OS errors; submission
+  does not establish that a person saw or activated the notification.
+- Retain complete native document errors in the Windows host session, including
+  `window.error`, `unhandledrejection` and explicit `reportNativeError()` reports.
+  Retrieve non-consuming records through `connectAppControl().diagnostics()`
+  without foregrounding the app or waiting for Core/model readiness. Records
+  survive document navigation within that host session and end with the host.
+- Publish the matching rebuilt Windows host archive with its document-start
+  diagnostic helper. Keep ordinary console output separate from retained error
+  history; console interception and caught console arguments are outside this
+  release. Native notification behavior and application acceptance remain
+  consumer-owned verification, distinct from the selected compile and package.
+
 ## 0.92.0
 
 - Add opt-in `allowUnborn` Git text snapshots and `initialBranch` repository
