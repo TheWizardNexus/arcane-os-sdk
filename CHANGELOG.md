@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.92.0
+
+- Add opt-in `allowUnborn` Git text snapshots and `initialBranch` repository
+  preparation for first publication from a remote with no advertised revision.
+  Repository configuration now reports the actual revision and unborn state.
+  Preserve existing checkouts, advertised refs, complete diagnostics and real
+  Git failures; first publication uses the existing explicit non-force writer.
+- Let the default Windows `git` process runner discover an installed Git for
+  Windows registration and append its command directory only to that child's
+  PATH. Existing lookup priority, other platforms, explicit executable paths
+  and custom adapters retain their behavior; no installation, global setting
+  change or command retry is introduced.
+- Reuse the retained Windows host, Whisper and ONNX runtime archives. This
+  release changes shared JavaScript repository/process behavior, not those
+  native binaries; application adoption remains independently owned.
+
 ## 0.91.0
 
 - Persist complete native `modelAssets.prepare()` acquisitions across release,
