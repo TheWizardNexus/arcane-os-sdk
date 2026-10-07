@@ -1,17 +1,45 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.86.1",
+  "sdkVersion": "0.87.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 306,
+  "memberCount": 308,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "core-document-acquisition:createDocumentAcquisitionService",
+      "name": "createDocumentAcquisitionService",
+      "displayName": "createDocumentAcquisitionService()",
+      "kind": "function",
+      "signature": "createDocumentAcquisitionService({destinationPredicate,signal}={})",
+      "entrypoints": ["arcane-os/core/document-acquisition"],
+      "primaryImport": "arcane-os/core/document-acquisition",
+      "group": "Native document acquisition",
+      "summary": "Acquires complete HTTP(S) documents in the native Core process with application-owned destination selection before every request.",
+      "availability": "Node Core on Windows, Linux and macOS; Android requires the same service through its host adaptation",
+      "protocol": "arcane/1 documents.acquire and request-correlated documents.progress; selected through the existing application-native service factory contract",
+      "normalization": "Returns name:documents, methods, acquire({url,signal,onProgress}) and idempotent asynchronous dispose(). GET follows 301/302/303/307/308 manually, awaiting the optional native destinationPredicate(url,{requestedUrl,previousUrl,signal}) before every request; only true proceeds. Omission leaves ordinary acquisition functional. Results retain requestedUrl, finalUrl/url, actual Fetch status/statusText/ok, all exposed header entries, mediaType, complete Uint8Array body and ordered complete redirect records, including non-2xx bodies. Fetch entity decoding is distinct from compressed wire framing. Errors retain their cause and complete available response evidence, with interrupted bodies marked complete:false. Independent jobs remain concurrent; cancellation stops the selected job and dispose aborts and joins all owned work. Progress is phase/document-count information, never content measurement. Base64 is used only at JSON transport; no parsing, text transformation, storage, automatic retry or application domain policy. See document-acquisition.md for composition, fields and lifecycle."
+    },
+    {
+      "id": "document-acquisition:acquireCoreDocument",
+      "name": "acquireCoreDocument",
+      "displayName": "acquireCoreDocument()",
+      "kind": "function",
+      "signature": "async acquireCoreDocument({url,client=getInstalledCoreClient(),signal,onProgress}={})",
+      "entrypoints": ["arcane-os/document-acquisition"],
+      "primaryImport": "arcane-os/document-acquisition",
+      "group": "Native document acquisition",
+      "summary": "Retrieves a complete selected document as a Blob through the application's existing native Core connection.",
+      "availability": "JavaScript with an existing Core client and explicitly composed documents service; no browser-only Fetch fallback",
+      "protocol": "documents.acquire({url}) with existing cancellation and correlated documents.progress subscriptions",
+      "normalization": "Preserves complete native response metadata and ordered redirect evidence, decoding only transport base64 into Blobs. The installed Core client is the default; unavailable Core reports DOCUMENT_ACQUISITION_CORE_UNAVAILABLE and a missing service uses the existing Core method error. The native application owns the optional destination predicate; no function crosses RPC. onProgress receives complete phase/document-count records plus requestId; accepted synchronous/asynchronous callbacks are observed and joined on settlement, listener cleanup always runs, and simultaneous operation/callback failures remain observable. The caller signal owns cancellation and any deadline; timeoutMs is disabled for the acquisition. Existing Core cancellation rejects locally and sends native cancellation without waiting for a native error evidence response. Complete bodies are buffered for one final RPC response; progress events are not streaming body backpressure. See document-acquisition.md for public usage and errors."
+    },
     {
       "id": "core-model-observation:createModelObservationService",
       "name": "createModelObservationService",

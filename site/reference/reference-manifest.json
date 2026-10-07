@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.86.1",
+    "sdk": "0.87.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 56,
+    "markdownPages": 57,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 153,
+    "htmlPages": 154,
     "inventories": 4
   },
   "pages": [
@@ -218,6 +218,12 @@
       "source": "docs/reference/diarization.md",
       "output": "site/reference/diarization/index.html",
       "route": "reference/diarization/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/document-acquisition.md",
+      "output": "site/reference/document-acquisition/index.html",
+      "route": "reference/document-acquisition/",
       "kind": "markdown"
     },
     {

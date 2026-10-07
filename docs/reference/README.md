@@ -71,6 +71,7 @@ alone does not make bare module names resolve in a browser.
 | Expose application-owned tools and static resources through Node STDIO | [MCP STDIO server](mcp-stdio.md) |
 | Run application-selected llama.cpp, Ollama or ONNX through Core | [Local AI through Core](local-ai.md) |
 | Observe existing renderer and Core model state, progress and failures | [Existing model observation](model-observation.md) |
+| Acquire complete HTTP(S) documents and redirect responses through an application-selected native Core service | [Native document acquisition](document-acquisition.md) |
 | Generate complete local PNG images with a retained native model | [Local image generation](local-image-generation.md) |
 | Select FLUX.2 Klein 4B and its three complementary model resources | [FLUX.2 Klein 4B through Core](local-image-flux.md) |
 | Select the complete SDXL Base 1.0 checkpoint for generation and whole-image editing | [SDXL Base 1.0 through Core](local-image-sdxl.md) |

@@ -57,6 +57,8 @@ runtime layouts.
 | `arcane-os/core/runtime` | App-neutral native Core dispatcher and service lifecycle. |
 | `arcane-os/core/model-observation` | Passive observation of an existing Core and its actual native model service owners. |
 | `arcane-os/ai/model-observation` | Attach existing renderer model owners and subscribe through an existing Core client. |
+| `arcane-os/document-acquisition` | Acquire complete document and redirect bodies through the selected native Core service. |
+| `arcane-os/core/document-acquisition` | Native HTTP(S) GET service, application-owned destination predicate and acquisition lifecycle. |
 | `arcane-os/core/development` | App-service composition and document-owned Core transport during source development, independently of local AI. |
 | `arcane-os/core/stdio` | Framed Node stdio transport with graceful runtime drain. |
 | `arcane-os/core/host` | Node-only reusable Core host lifecycle, app-selected native launch defaults and shared native location resolution. |
@@ -425,6 +427,8 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `createModelObservationService()` | function | `arcane-os/core/model-observation` | Existing model observation | Node with an existing Core runtime and optional existing native model services |
 | `attachModelObservation()` | function | `arcane-os/ai/model-observation` | Existing model observation | JavaScript with an existing Core client and optional existing renderer owners |
 | `subscribeModelObservation()` | function | `arcane-os/ai/model-observation` | Existing model observation | JavaScript with an existing Core client and composed observation service |
+| `acquireCoreDocument()` | function | `arcane-os/document-acquisition` | Native document acquisition | Browser or native WebView with an existing Core client and selected document service |
+| `createDocumentAcquisitionService()` | function | `arcane-os/core/document-acquisition` | Native document acquisition | Node Core on Windows, Linux and macOS; Android requires host adaptation |
 | `encodeCoreFrame()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
 | `createCoreFrameDecoder()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
 | `startCoreStdio()` | function | `arcane-os/core/stdio` | Native Core stdio transport | Node |
@@ -7670,6 +7674,64 @@ the attachment. Callback failures retire it and reach `onError`; callback
 promises may await `close()` without becoming its completion barrier. It starts
 no model, refresh, polling, endpoint discovery, host or reconnect. See
 [observation records and limits](model-observation.md#read-or-subscribe-from-an-existing-client).
+
+## acquireCoreDocument()
+
+```text
+acquireCoreDocument({url,client,signal,onProgress}={})
+```
+
+Import from `arcane-os/document-acquisition`. The asynchronous helper uses the
+supplied or installed Core client to invoke `documents.acquire` with `{url}`.
+The application must compose the native document service. Missing Core reports
+`DOCUMENT_ACQUISITION_CORE_UNAVAILABLE`; a missing service retains the existing
+unavailable-method error. Browser-only previews have no browser Fetch fallback.
+
+Resolves with `{requestedUrl,finalUrl,url,status,statusText,ok,headers,mediaType,
+body,complete,redirects}`. The final body and every ordered redirect body are
+complete `Blob` values. An HTTP error response retains its status and content;
+`ok:false` is a result, not a generic acquisition error. Headers and entity
+content reflect Fetch's public response, including ordinary content decoding.
+
+`signal` cancels this request; there is no implicit timeout. `onProgress` receives
+request-correlated `documents.progress` records with phases, document counts
+and status fields, never body content. All accepted callback promises settle
+before the helper settles. Callback failures cancel acquisition and remain
+observable; concurrent operation and callback failures retain an `AggregateError`.
+A late callback or subscription cleanup failure retains the completed response
+in `error.documentAcquisition` with the original cause or aggregated failures.
+Every settlement removes the subscription. Local abort rejects immediately and
+does not wait for native error evidence. See
+[complete result, progress and error records](document-acquisition.md).
+
+## createDocumentAcquisitionService()
+
+```text
+createDocumentAcquisitionService({destinationPredicate,signal}={})
+```
+
+Import from `arcane-os/core/document-acquisition`. This synchronous factory
+returns the Core service definition with `documents.acquire`, direct
+`acquire({url,signal,onProgress})` and idempotent asynchronous `dispose()`.
+Select it through the application's existing native service composition. The
+ordinary service performs HTTP(S) GET acquisition without a predicate.
+
+An application-selected `destinationPredicate(destinationUrl,
+{requestedUrl,previousUrl,signal})` runs locally before every actual GET,
+including the first destination and each redirect. Only `true` permits the
+request; other returns produce `DOCUMENT_DESTINATION_DECLINED`, and a thrown
+or rejected value remains the original cause. The predicate is never serialized.
+Redirects retain every response body; no automatic retry or redirect-count cap
+is imposed. The caller can cancel a repeating redirect chain.
+
+Direct results and error evidence retain `Uint8Array` bodies. Acquisition errors
+keep the original cause and `documentAcquisition` response/redirect records;
+an interrupted body read retains available content marked `complete:false`.
+Only Core JSON transport encodes bodies as base64; the browser restores Blobs.
+The factory signal owns the service lifetime; each call signal owns only its
+request and leaves sibling acquisitions active. `dispose()` aborts and joins all
+active operations. Bodies are buffered completely; progress is not a body stream.
+See [native composition and lifecycle](document-acquisition.md).
 
 ## createPortableNativeProvider()
 

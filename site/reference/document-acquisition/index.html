@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="acquireCoreDocument from arcane-os/document-acquisition retrieves one HTTP(S) document through the application&#39;s selected native Core service. createDocumentAcquisitionService from arcane-os/core/document-acquisition owns the reusable native acquisition. It performs a GET, follows redirects manually, and retains the complete response bodies without parsing or rewriting the document. Applications own source selection, document interpretation, enumeration, storage, and any destination predicate.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/document-acquisition/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native document acquisition · Arcane OS SDK"><meta property="og:description" content="acquireCoreDocument from arcane-os/document-acquisition retrieves one HTTP(S) document through the application&#39;s selected native Core service. createDocumentAcquisitionService from arcane-os/core/document-acquisition owns the reusable native acquisition. It performs a GET, follows redirects manually, and retains the complete response bodies without parsing or rewriting the document. Applications own source selection, document interpretation, enumeration, storage, and any destination predicate."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/document-acquisition/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native document acquisition · Arcane OS SDK"><meta name="twitter:description" content="acquireCoreDocument from arcane-os/document-acquisition retrieves one HTTP(S) document through the application&#39;s selected native Core service. createDocumentAcquisitionService from arcane-os/core/document-acquisition owns the reusable native acquisition. It performs a GET, follows redirects manually, and retains the complete response bodies without parsing or rewriting the document. Applications own source selection, document interpretation, enumeration, storage, and any destination predicate."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native document acquisition | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native document acquisition</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-document-acquisition">Native document acquisition</h1><p class="doc-lead">acquireCoreDocument from arcane-os/document-acquisition retrieves one HTTP(S) document through the application&#39;s selected native Core service. createDocumentAcquisitionService from arcane-os/core/document-acquisition owns the reusable native acquisition. It performs a GET, follows redirects manually, and retains the complete response bodies without parsing or rewriting the document. Applications own source selection, document interpretation, enumeration, storage, and any destination predicate.</p><div class="doc-meta"><span>SDK 0.87.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="./" aria-current="page">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/document-acquisition.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#application-composition">Application composition</a><a href="#browser-api">Browser API</a><a href="#progress-cancellation-and-errors">Progress, cancellation, and errors</a><a href="#native-calls-and-transport">Native calls and transport</a></nav></details><p><code>acquireCoreDocument</code> from <code>arcane-os/document-acquisition</code> retrieves one
+HTTP(S) document through the application&#39;s selected native Core service.
+<code>createDocumentAcquisitionService</code> from <code>arcane-os/core/document-acquisition</code>
+owns the reusable native acquisition. It performs a GET, follows redirects
+manually, and retains the complete response bodies without parsing or rewriting
+the document. Applications own source selection, document interpretation,
+enumeration, storage, and any destination predicate.</p>
+<h2 id="application-composition">Application composition</h2>
+<p>Select an application-owned native factory through the existing
+<a href="../core-native-packaging/#explicit-application-services"><code>native.services</code> composition</a>.
+Include its source through the application&#39;s <code>package.nativeResources</code> as
+described there. The factory runs in the native Core process; its options are
+JSON data, while its predicate is an ordinary locally imported function.
+Functions are never serialized through Core RPC.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">// native/documents.mjs, owned by the application
+import {createDocumentAcquisitionService} from &#39;arcane-os/core/document-acquisition&#39;;
+
+export default function createDocuments() {
+    return createDocumentAcquisitionService();
+}
+</code></pre></div>
+<div class="code-block reference-code"><div class="code-bar"><span>json</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-json">{
+    &quot;native&quot;: {
+        &quot;services&quot;: [{&quot;module&quot;: &quot;native/documents.mjs&quot;}]
+    }
+}
+</code></pre></div>
+<p>The ordinary service works without a predicate. When an application selects a
+destination restriction, its native factory supplies
+<code>createDocumentAcquisitionService({destinationPredicate})</code>. The SDK awaits
+<code>destinationPredicate(destinationUrl, {requestedUrl, previousUrl, signal})</code>
+before <strong>every</strong> HTTP(S) request, including the first URL and each redirect.
+Return <code>true</code> to request that destination. Any other return value declines it
+with <code>DOCUMENT_DESTINATION_DECLINED</code>. A thrown or rejected error remains the
+acquisition error&#39;s original <code>cause</code>. The predicate receives the resolved URL
+string, the caller&#39;s original URL string, the prior response URL or <code>null</code>, and
+the operation&#39;s signal. It stays local to the application&#39;s native process.</p>
+<p>An asynchronous predicate must finish or honor its signal so native shutdown
+can join it. There is no automatic retry or redirect-count limit. The caller
+can cancel its operation, including a repeating redirect chain. Redirects
+with statuses 301, 302, 303, 307, and 308 follow their <code>Location</code>, resolved
+against the response URL. A response without a redirect destination is returned
+as received. The service performs GET on each destination; it does not submit
+forms or add application credentials.</p>
+<h2 id="browser-api">Browser API</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {acquireCoreDocument} from &#39;arcane-os/document-acquisition&#39;;
+
+const cancellation = new AbortController();
+const document = await acquireCoreDocument({
+    url: selectedDocumentUrl,
+    signal: cancellation.signal,
+    onProgress(progress) {
+        status.textContent = progress.phase;
+    }
+});
+
+// The original entity content is available even for an HTTP error response.
+const completeContent = document.body; // Blob
+const receivedSuccessfully = document.ok;
+</code></pre></div>
+<p>The options are <code>{url, client?, signal?, onProgress?}</code>. <code>client</code> defaults to the
+installed Core client. The helper invokes <code>documents.acquire</code> with <code>{url}</code>;
+callbacks and the signal stay local. It uses existing request cancellation and
+<code>documents.progress</code> subscriptions, with no extra event bus or transport.
+There is no implicit request timeout. The caller owns any selected deadline
+through its signal.</p>
+<p>The native service must be selected by the application. An absent Core client
+reports <code>DOCUMENT_ACQUISITION_CORE_UNAVAILABLE</code>; an installed Core without the
+service returns its existing unavailable-method error. Browser-only preview
+does not acquire native capability and does not silently switch to browser
+Fetch. Portable Windows, Linux, and macOS applications use their existing Core
+transport; Android requires its host to provide this same native service.</p>
+<p>The result contains:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>requestedUrl</code></td>
+<td>Caller-supplied URL string, retained unchanged.</td>
+</tr>
+<tr>
+<td><code>finalUrl</code> / <code>url</code></td>
+<td>Final response URL reported by Fetch.</td>
+</tr>
+<tr>
+<td><code>status</code>, <code>statusText</code>, <code>ok</code></td>
+<td>Actual Fetch response status fields. <code>ok:false</code> is returned with its body, not replaced by a generic error.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>All entries exposed by the Fetch <code>Headers</code> object, represented as <code>[name, value]</code> pairs.</td>
+</tr>
+<tr>
+<td><code>mediaType</code></td>
+<td>Complete <code>Content-Type</code> field value exposed by Fetch, or <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td>Complete entity content as a <code>Blob</code> in the browser and a <code>Uint8Array</code> in native calls.</td>
+</tr>
+<tr>
+<td><code>complete</code></td>
+<td><code>true</code> after the response body reaches its end.</td>
+</tr>
+<tr>
+<td><code>redirects</code></td>
+<td>Ordered preceding response records, each with <code>url</code>, status fields, headers, media type, body, and completion state.</td>
+</tr></tbody>
+</table>
+</div>
+<p>The content is the response entity supplied by Fetch, including Fetch&#39;s normal
+content-decoding behavior. It is not a capture of compressed network framing.
+Likewise, headers reflect Fetch&#39;s casing and combination behavior; the SDK does
+not invent original wire casing or unavailable header distinctions. Document
+content is never converted to text, normalized, summarized, or wrapped in
+instructions. Query and progress metadata remain outside the content.</p>
+<h2 id="progress-cancellation-and-errors">Progress, cancellation, and errors</h2>
+<p>Progress records contain <code>phase</code>, <code>completed</code>, <code>total:1</code>, <code>unit:&#39;documents&#39;</code>,
+<code>requestedUrl</code>, and the current <code>url</code>. Browser records additionally contain
+the originating <code>requestId</code>. Phases are <code>accepted</code>, <code>destination</code>, <code>request</code>,
+<code>response</code>, <code>redirect</code>, and <code>complete</code>. The completed count becomes one only
+after the final response has been fully acquired, including an HTTP error
+response. Status fields, not acquisition progress, establish HTTP success.
+Progress does not measure content and carries no document body.</p>
+<p>The browser helper filters request-correlated events and removes its listener
+on every settlement. Synchronous or asynchronous progress callbacks are
+observed; all accepted callback promises settle before the helper settles.
+A callback failure cancels the request and remains observable. Simultaneous
+operation and callback failures are retained in an <code>AggregateError</code>.
+If a callback or subscription cleanup fails after the complete response has
+arrived, that response remains in the error&#39;s <code>documentAcquisition</code> evidence;
+the original callback failure remains its <code>cause</code> or an aggregated error.
+Callbacks must finish or honor the application&#39;s cancellation signal.</p>
+<p>Native acquisition errors retain the original thrown value as <code>cause</code> and
+include <code>documentAcquisition: {requestedUrl, requestUrl, redirects, response?}</code>.
+Every acquired redirect body is retained. If reading a response fails, its
+available original content is retained with <code>complete:false</code>; that record is
+explicitly incomplete. Cleanup failures remain observable alongside the
+original error. On errors delivered through Core, the browser helper restores
+the response and redirect bodies as Blobs and retains the native error record.</p>
+<p>An abort uses the existing Core client&#39;s immediate local rejection and sends
+request cancellation to the native owner. That local cancellation does not
+wait for a native error record or return its response evidence. The native
+owner cancels and joins its active response reader. Independent acquisitions
+remain concurrent, and cancelling one request leaves sibling requests active.
+Service <code>dispose()</code> aborts and joins all of that service&#39;s active operations.</p>
+<h2 id="native-calls-and-transport">Native calls and transport</h2>
+<p>The synchronous factory accepts <code>{destinationPredicate?, signal?}</code> and returns
+the existing Core service definition plus
+<code>acquire({url, signal?, onProgress?})</code> and idempotent asynchronous <code>dispose()</code>.
+Direct native results and error evidence contain <code>Uint8Array</code> bodies (Node
+Buffers implement that interface). The optional factory signal controls the
+service lifetime; a per-call signal controls only that acquisition.</p>
+<p>At the JSON RPC boundary only, each body becomes
+<code>{encoding:&#39;base64&#39;, data:&#39;...&#39;}</code>. One final response carries the complete result
+and ordered redirect records. The browser decodes those transport fields into
+Blobs. This path buffers complete response bodies; phase events are not a
+body stream and do not supply streaming backpressure. Existing Core lifecycle,
+request routing, and connection-close cancellation retain ownership of the
+operation through native settlement.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#application-composition">Application composition</a><a href="#browser-api">Browser API</a><a href="#progress-cancellation-and-errors">Progress, cancellation, and errors</a><a href="#native-calls-and-transport">Native calls and transport</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.87.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>
