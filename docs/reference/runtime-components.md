@@ -2084,8 +2084,12 @@ changing these attributes later does not reconfigure an existing instance.
 `setMode()` updates pressed state and the host's `data-mode` only. `refresh()`
 loads the existing ThemeManager state, updates selection and Skin availability,
 and resolves with the complete manager state. Clicking a choice uses the same
-manager persistence/activation operation; buttons remain disabled while that
-operation is pending. Presentation configuration preserves that pending state.
+manager persistence/activation operation. While it is pending, choices expose
+`aria-disabled="true"` and ignore repeated activation while remaining in the
+keyboard focus flow. Native disabling remains for an unavailable Skin choice.
+Selection does not move focus when it completes or fails, so the initiating
+button retains focus unless the user moves elsewhere. Presentation configuration
+preserves that pending state; an actual reorder retains its focus behavior above.
 
 The host inherits text color. Existing `--app-bar-border` (falling back to
 `--border-color`), `--app-bar-accent` (then `--secondary-color`),

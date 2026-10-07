@@ -38,7 +38,7 @@
         overflow-wrap:anywhere;
     }
 
-    button:hover:not(:disabled):not([aria-pressed="true"]) {
+    button:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]) {
         background:color-mix(in srgb,currentColor 14%,transparent);
     }
 
@@ -48,7 +48,8 @@
         box-shadow:inset 0 0 0 .1rem currentColor;
     }
 
-    button:disabled {
+    button:disabled,
+    button[aria-disabled="true"] {
         cursor:not-allowed;
         opacity:.55;
     }
@@ -88,7 +89,7 @@
     host.refresh=refresh;
     group.addEventListener('click',async function selectScheme(event){
         const button=event.target.closest('[data-scheme]');
-        if(!button||button.disabled) return;
+        if(!button||button.disabled||busy) return;
         setBusy(true);
         try{
             const state=button.dataset.scheme==='custom'?await manager.activateCustom():await manager.setScheme(button.dataset.scheme);
@@ -134,10 +135,14 @@
     }
     function setBusy(value){
         busy=Boolean(value);
-        for(const button of buttons) button.disabled=busy;
+        // Keep the focused choice in the keyboard flow while its operation
+        // settles. The click owner rejects repeat activation without moving focus.
+        for(const button of buttons) button.setAttribute('aria-disabled',String(busy||button.disabled));
     }
     function setCustomAvailable(value){
-        buttons.find(function customScheme(button){return button.dataset.scheme==='custom';}).disabled=busy||!value;
+        const button=buttons.find(function customScheme(button){return button.dataset.scheme==='custom';});
+        button.disabled=!value;
+        button.setAttribute('aria-disabled',String(busy||button.disabled));
     }
     async function refresh(){const state=await manager.load();setMode(state.mode);setCustomAvailable(Boolean(state.theme));return state;}
 

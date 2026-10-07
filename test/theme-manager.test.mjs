@@ -730,7 +730,12 @@ async function themeSwitcherFixture(dataset={}) {
         const button={
             dataset:{scheme:attributes.get('data-scheme')},
             textContent:match[2],
-            disabled:/\sdisabled(?:\s|$)/u.test(match[1]),
+            unavailable:/\sdisabled(?:\s|$)/u.test(match[1]),
+            get disabled(){return this.unavailable;},
+            set disabled(value){
+                this.unavailable=value;
+                if(value&&host.shadowRoot.activeElement===this) host.shadowRoot.activeElement=null;
+            },
             setAttribute(name,value){attributes.set(name,value);},
             getAttribute(name){return attributes.get(name)??null;},
             closest(selector){assert.equal(selector,'[data-scheme]');return this;},
@@ -833,7 +838,7 @@ test('theme switcher configures full labels and visible DOM order without changi
     assert.match(current.source,/background:var\(--theme-switcher-background,color-mix\(in srgb,currentColor 8%,transparent\)\)/u);
     assert.match(current.source,/min-inline-size:2\.75rem/u);
     assert.match(current.source,/min-block-size:2\.75rem/u);
-    assert.match(current.source,/button:hover:not\(:disabled\):not\(\[aria-pressed="true"\]\)/u);
+    assert.match(current.source,/button:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\):not\(\[aria-pressed="true"\]\)/u);
     assert.doesNotMatch(current.source,/button:hover:not\(:disabled\)\s*\{/u);
     assert.match(current.source,/button:focus-visible/u);
     assert.match(current.source,/button:disabled/u);
@@ -850,17 +855,22 @@ test('theme switcher initial options and later configuration preserve pending se
     assert.equal(current.button('light').getAttribute('aria-pressed'),'true');
     const selected=deferred();
     current.selectWith(selected.promise);
+    current.button('dark').focus();
     const selecting=current.click('dark');
-    assert.equal(current.buttons.every(function disabled(button){return button.disabled;}),true);
+    assert.equal(current.buttons.every(function disabled(button){return button.getAttribute('aria-disabled')==='true';}),true);
+    assert.equal(current.host.shadowRoot.activeElement,current.button('dark'));
+    assert.equal(current.button('dark').disabled,false,'Pending activation preserves the native focusable button.');
     assert.deepEqual(current.calls.at(-1),{method:'setScheme',mode:'dark'});
     current.host.configure({modes:['dark','system','light','custom']});
-    assert.equal(current.buttons.every(function disabled(button){return button.disabled;}),true);
+    assert.equal(current.buttons.every(function disabled(button){return button.getAttribute('aria-disabled')==='true';}),true);
+    assert.equal(current.host.shadowRoot.activeElement,current.button('dark'));
     await current.host.refresh();
-    assert.equal(current.button('custom').disabled,true,'A refresh cannot enable Skin during a pending selection.');
+    assert.equal(current.button('custom').getAttribute('aria-disabled'),'true','A refresh cannot make Skin actionable during a pending selection.');
     await current.click('light');
     assert.equal(current.calls.filter(function selection(call){return call.method==='setScheme';}).length,1);
     selected.resolve({mode:'dark',theme:{name:'Moon garden'}});
     await selecting;
+    assert.equal(current.host.shadowRoot.activeElement,current.button('dark'));
     assert.equal(current.host.dataset.mode,'dark');
     assert.equal(current.button('dark').getAttribute('aria-pressed'),'true');
     assert.equal(current.button('light').getAttribute('aria-pressed'),'false');
@@ -870,8 +880,16 @@ test('theme switcher initial options and later configuration preserve pending se
     assert.deepEqual(current.calls.at(-1),{method:'activateCustom'});
     assert.equal(current.host.dataset.mode,'custom');
     const failure=new Error('Original preference failure');
-    current.selectWith(Promise.reject(failure));
-    await assert.rejects(current.click('light'),function original(error){return error===failure;});
+    const rejected=deferred();
+    current.selectWith(rejected.promise);
+    current.button('light').focus();
+    const failing=current.click('light');
+    const failureObserved=assert.rejects(failing,function original(error){return error===failure;});
+    assert.equal(current.host.shadowRoot.activeElement,current.button('light'));
+    current.button('system').focus();
+    rejected.reject(failure);
+    await failureObserved;
+    assert.equal(current.host.shadowRoot.activeElement,current.button('system'),'Settlement must preserve an intentional focus move.');
     assert.equal(current.host.dataset.mode,'custom');
     assert.equal(current.buttons.every(function enabled(button){return !button.disabled;}),true);
 });
