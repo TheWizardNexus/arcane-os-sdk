@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import {packageApp,verifyApp} from '../src/packager/core.mjs';
+import {installedSdkRoutes} from '../src/sdk-runtime-layout.mjs';
 
 async function fixture(t,{secondDocument=false}={}){
     const parent=fileURLToPath(new URL('../.arcane/',import.meta.url));
@@ -289,4 +290,260 @@ test('literal runtime URLs reach selected shared components without rewriting su
     const component=await readFile(path.join(release.outputRoot,'arcane/components/extra.html'),'utf8');
     assert.ok(component.includes('data-arcane-packaged-script'));
     assert.equal(await readFile(path.join(release.outputRoot,'content/original.html'),'utf8'),selected.content);
+});
+
+async function installedDecisionFixture(context, {packageSource = 'node_modules/arcane-os', direct = true, pwa = false} = {}) {
+    const selected = await fixture(context);
+    const browserPath = direct ? `${packageSource}/browser-runtime` : 'arcane/sdk';
+    await selected.json(
+        'arcane-packager.json',
+        {
+            schemaVersion: 1, appsRoot: '.', distRoot: 'dist',
+            sharedPayloads: {'browser-runtime': installedSdkRoutes(packageSource, {direct})}
+        }
+    );
+    await selected.json(
+        'arcane-package.json',
+        {
+            schemaVersion: 1, id: 'native-example', displayName: 'Moon burglar decisions', version: '1.0.0',
+            entry: 'index.html', strategy: 'static', include: ['index.html'], exclude: [],
+            shared: ['browser-runtime'], pwa: {enabled: pwa}
+        }
+    );
+    await selected.json(`${packageSource}/package.json`, {name: 'arcane-os', version: '9.8.7', type: 'module'});
+    const imports = {'arcane-os/ai/browser-decisions': `./${browserPath}/ai/browser-decisions.mjs`};
+    const html = '<!doctype html><script type="importmap">'
+        + JSON.stringify({imports}) + '</script>\n'
+        + '<script type="module">import * as decisions from "arcane-os/ai/browser-decisions"; globalThis.decisions=decisions;</script>\n';
+    await selected.write('index.html', html);
+    for (const directory of ['components', 'css', 'entities', 'img', 'modules']) {
+        await mkdir(path.join(selected.workspaceRoot, packageSource, 'runtime', 'arcane', directory), {recursive: true});
+    }
+    const module = 'import "./decision-worker.mjs";\n'
+        + 'export const entry=new URL("./decisions-runtime/transformers.min.js",import.meta.url);\n';
+    const resources = new Map([
+        ['browser-runtime/ai/browser-decisions.mjs', module],
+        ['browser-runtime/ai/decision-worker.mjs', 'export const localWorker="complete";\n'],
+        ['browser-runtime/pwa.mjs', 'export function registerPwa() {}\nexport function mountPwaInstallPrompt() {}\n'],
+        ['runtime/strong-type/index.js', 'export default function Is() {}\n'],
+        ['LICENSE', 'Complete synthetic SDK license\n'],
+        ['COMMERCIAL-LICENSE.md', 'Complete synthetic commercial license\n'],
+        ['NOTICE', 'Complete synthetic SDK notice\n']
+    ]);
+    for (const [relative, content] of resources) {
+        await selected.write(`${packageSource}/${relative}`, content);
+    }
+    return {...selected, packageSource, browserPath, html, module};
+}
+
+for (const moduleFormat of ['import-map', 'native']) {
+    for (const route of [
+        {packageSource: 'node_modules/arcane-os', direct: true},
+        {packageSource: 'node_modules/@moon/arcane-sdk', direct: true},
+        {packageSource: 'node_modules/arcane-sdk', direct: false}
+    ]) {
+        test(
+            `${moduleFormat} decision packaging acquires opaque distribution beside ${route.packageSource} direct=${route.direct}`,
+            async function installedDecisionDistribution(context) {
+                const pwa = moduleFormat === 'import-map';
+                const selected = await installedDecisionFixture(context, {...route, pwa});
+                const originalFetch = globalThis.fetch;
+                context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+                const calls = [];
+                const events = [];
+                const moduleContent = 'import exact from "upstream-only";\n'
+                    + 'export const url=new URL("./model.onnx?v=retain",import.meta.url); // 雪 complete trailing space \n';
+                const wasmContent = new Uint8Array([0, 97, 115, 109, 0, 255, 0]);
+                const licenseContent = 'Complete upstream license\nSecond line with trailing space \n';
+                globalThis.fetch = async function selectedDistribution(url, {signal}) {
+                    calls.push(url);
+                    assert.equal(signal.aborted, false);
+                    return new Response(url.endsWith('.wasm') ? wasmContent : url.endsWith('LICENSE') ? licenseContent : moduleContent);
+                };
+                const release = await packageApp(
+                    {
+                        workspaceRoot: selected.workspaceRoot, appId: 'native-example',
+                        outputDirectory: 'dist/extension/app', moduleFormat, browserPwa: pwa, browserDecisions: true,
+                        onEvent: function observeDistribution(event) {
+                            if (event.type.startsWith('workspace.decisions.')) events.push(event);
+                        }
+                    }
+                );
+                const transformers = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/';
+                const onnx = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/';
+                assert.deepEqual(calls, [
+                    `${transformers}dist/transformers.min.js`,
+                    `${onnx}dist/ort-wasm-simd-threaded.asyncify.mjs`,
+                    `${onnx}dist/ort-wasm-simd-threaded.asyncify.wasm`,
+                    `${transformers}LICENSE`, `${onnx}LICENSE`
+                ]);
+                const distribution = `${selected.browserPath}/ai/decisions-runtime`;
+                const offline = pwa
+                    ? JSON.parse(await readFile(path.join(release.outputRoot, 'arcane-offline.json'), 'utf8'))
+                    : null;
+                if (!pwa) assert.equal(release.files.includes('arcane-offline.json'), false);
+                for (const file of [
+                    'transformers.min.js', 'ort-wasm-simd-threaded.asyncify.mjs',
+                    'ort-wasm-simd-threaded.asyncify.wasm', 'TRANSFORMERS-LICENSE', 'ONNX-RUNTIME-LICENSE'
+                ]) {
+                    const relative = `${distribution}/${file}`;
+                    const content = await readFile(path.join(release.outputRoot, relative));
+                    if (file.endsWith('.wasm')) assert.deepEqual(new Uint8Array(content), wasmContent);
+                    else assert.equal(content.toString('utf8'), file.endsWith('LICENSE') ? licenseContent : moduleContent);
+                    assert.ok(release.files.includes(relative), relative);
+                    assert.ok(release.manifest.files.includes(relative), relative);
+                    if (offline) assert.ok(offline.assets.includes(`./${relative}`), relative);
+                }
+                assert.equal(events[0].type, 'workspace.decisions.started');
+                assert.deepEqual(events.map(function completedFiles(event) { return event.completed; }), [0, 1, 2, 3, 4, 5]);
+                const html = await readFile(path.join(release.outputRoot, 'index.html'), 'utf8');
+                assert.equal(html.includes('type="importmap"'), moduleFormat === 'import-map');
+                assert.equal(await readFile(path.join(selected.workspaceRoot, 'index.html'), 'utf8'), selected.html);
+                assert.equal(
+                    await readFile(path.join(selected.workspaceRoot, selected.packageSource, 'browser-runtime/ai/browser-decisions.mjs'), 'utf8'),
+                    selected.module
+                );
+                await assert.rejects(readdir(path.join(selected.workspaceRoot, 'arcane')), {code: 'ENOENT'});
+                await assert.rejects(
+                    readdir(path.join(selected.workspaceRoot, selected.packageSource, 'browser-runtime/ai/decisions-runtime')),
+                    {code: 'ENOENT'}
+                );
+            }
+        );
+    }
+}
+
+test('decision package acquisition is opt-in and dry runs leave the distribution unacquired', async function decisionDryRun(context) {
+    const selected = await installedDecisionFixture(context);
+    const originalFetch = globalThis.fetch;
+    context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+    globalThis.fetch = async function unexpectedAcquisition() {
+        assert.fail('Default packaging and dry runs must not acquire optional browser executables.');
+    };
+    const ordinary = await packageApp({workspaceRoot: selected.workspaceRoot, appId: 'native-example'});
+    assert.equal(ordinary.files.some(function distributionFile(file) { return file.includes('/decisions-runtime/'); }), false);
+    const planned = await packageApp(
+        {
+            workspaceRoot: selected.workspaceRoot, appId: 'native-example',
+            outputDirectory: 'dist/extension/app', moduleFormat: 'native', browserDecisions: true, dryRun: true
+        }
+    );
+    assert.equal(planned.dryRun, true);
+    await assert.rejects(readdir(path.join(selected.workspaceRoot, 'dist/extension/app')), {code: 'ENOENT'});
+    await assert.rejects(
+        readdir(path.join(selected.workspaceRoot, selected.packageSource, 'browser-runtime/ai/decisions-runtime')),
+        {code: 'ENOENT'}
+    );
+});
+
+test('decision distribution uses the existing offline selection without removing release files', async function decisionOfflineSelection(context) {
+    const selected = await installedDecisionFixture(context, {pwa: true});
+    const distribution = `${selected.browserPath}/ai/decisions-runtime`;
+    const config = JSON.parse(await readFile(path.join(selected.workspaceRoot, 'arcane-package.json'), 'utf8'));
+    config.pwa.offline = {exclude: [distribution]};
+    await selected.json('arcane-package.json', config);
+    const originalFetch = globalThis.fetch;
+    context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+    globalThis.fetch = async function distributionResponse() { return new Response('Complete selected distribution\n'); };
+    const release = await packageApp(
+        {workspaceRoot: selected.workspaceRoot, appId: 'native-example', browserDecisions: true}
+    );
+    const offline = JSON.parse(await readFile(path.join(release.outputRoot, 'arcane-offline.json'), 'utf8'));
+    assert.ok(release.files.includes(`${distribution}/transformers.min.js`));
+    assert.equal(offline.assets.some(function excludedDistribution(asset) { return asset.startsWith(`./${distribution}/`); }), false);
+});
+
+test('decision package option reports an unselected SDK module without acquiring files', async function missingDecisionModule(context) {
+    const selected = await fixture(context);
+    const originalFetch = globalThis.fetch;
+    context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+    globalThis.fetch = async function unexpectedAcquisition() { assert.fail('No selected SDK decision module to receive distribution.'); };
+    await assert.rejects(
+        packageApp({workspaceRoot: selected.workspaceRoot, appId: 'native-example', browserDecisions: true}),
+        /requires the selected SDK browser-decisions module/u
+    );
+    assert.deepEqual(await readdir(path.join(selected.workspaceRoot, 'dist')), []);
+});
+
+for (const failureKind of ['http', 'observer']) {
+    test(`decision package ${failureKind} failure preserves the previous release`, async function decisionFailure(context) {
+        const selected = await installedDecisionFixture(context);
+        const options = {
+            workspaceRoot: selected.workspaceRoot, appId: 'native-example',
+            outputDirectory: 'dist/extension/app', moduleFormat: 'native', browserPwa: false
+        };
+        const previous = await packageApp(options);
+        const original = await readFile(path.join(previous.outputRoot, 'ARCANE_APP_RELEASE.json'), 'utf8');
+        const originalFetch = globalThis.fetch;
+        context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+        const observerFailure = new Error('Complete selected-package observer failure.');
+        const responseContent = 'Complete upstream HTTP explanation: 雪\nSecond line\n';
+        globalThis.fetch = async function distributionResponse(url) {
+            return failureKind === 'http' && url.endsWith('transformers.min.js')
+                ? new Response(responseContent, {status: 503, statusText: 'Unavailable'})
+                : new Response('Complete distribution fixture\n');
+        };
+        await assert.rejects(
+            packageApp(
+                {
+                    ...options, browserDecisions: true,
+                    onEvent: function observeDistribution(event) {
+                        if (failureKind === 'observer' && event.type === 'workspace.decisions.progress') throw observerFailure;
+                    }
+                }
+            ),
+            function retainedFailure(error) {
+                if (failureKind === 'observer') assert.equal(error, observerFailure);
+                else {
+                    assert.equal(error.code, 'ARCANE_DECISION_DISTRIBUTION_DOWNLOAD_FAILED');
+                    assert.equal(error.response.status, 503);
+                    assert.equal(new TextDecoder().decode(error.response.content), responseContent);
+                }
+                return true;
+            }
+        );
+        assert.equal(await readFile(path.join(previous.outputRoot, 'ARCANE_APP_RELEASE.json'), 'utf8'), original);
+        assert.deepEqual(await readdir(path.dirname(previous.outputRoot)), ['app']);
+    });
+}
+
+test('decision package cancellation joins distribution work before removing its stage', async function decisionCancellation(context) {
+    const selected = await installedDecisionFixture(context);
+    const options = {
+        workspaceRoot: selected.workspaceRoot, appId: 'native-example', outputDirectory: 'dist/extension/app'
+    };
+    const previous = await packageApp(options);
+    const original = await readFile(path.join(previous.outputRoot, 'ARCANE_APP_RELEASE.json'), 'utf8');
+    const originalFetch = globalThis.fetch;
+    context.after(function restoreFetch() { globalThis.fetch = originalFetch; });
+    const controller = new AbortController();
+    const reason = new Error('Cancel selected package distribution.');
+    let started;
+    let finish;
+    const allStarted = new Promise(function captureStarted(resolve) { started = resolve; });
+    const cleanup = new Promise(function captureCleanup(resolve) { finish = resolve; });
+    let calls = 0;
+    let settled = 0;
+    globalThis.fetch = async function pendingDistribution(url, {signal}) {
+        const aborted = new Promise(function observeAbort(resolve) { signal.addEventListener('abort', resolve, {once: true}); });
+        calls += 1;
+        if (calls === 5) started();
+        await aborted;
+        await cleanup;
+        settled += 1;
+        throw signal.reason;
+    };
+    let returned = false;
+    const operation = packageApp({...options, browserDecisions: true, signal: controller.signal});
+    const rejected = assert.rejects(operation, function selectedReason(error) { return error === reason; })
+        .then(function markReturned() { returned = true; });
+    await allStarted;
+    controller.abort(reason);
+    await Promise.resolve();
+    assert.equal(returned, false);
+    finish();
+    await rejected;
+    assert.equal(settled, 5);
+    assert.equal(await readFile(path.join(previous.outputRoot, 'ARCANE_APP_RELEASE.json'), 'utf8'), original);
+    assert.deepEqual(await readdir(path.dirname(previous.outputRoot)), ['app']);
 });

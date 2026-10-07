@@ -13,6 +13,7 @@ import {
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {appRelativeRoot,resolveAppRoot,resolvePackageOutputRoot} from '../app-layout.mjs';
+import {materializeBrowserDecisions} from '../browser-decisions-distribution.mjs';
 import {TARGET_IDS} from '../constants.mjs';
 import {normalizeLocalAIConfig} from '../local-ai/config.mjs';
 import {readInstalledSdkLayout} from '../sdk-runtime-layout.mjs';
@@ -904,7 +905,8 @@ async function replaceDirectory(stagingRoot,outputRoot){
 }
 
 async function packageWithContext(context,options={}){
-    const {signal,onEvent,moduleFormat='import-map',browserPwa:requestedBrowserPwa=true}=options;
+    const {signal,onEvent,moduleFormat='import-map',browserPwa:requestedBrowserPwa=true,browserDecisions=false}=options;
+    if (!is.boolean(browserDecisions)) throw new TypeError('packageApp browserDecisions must be a boolean.');
     const browserPwa=context.target==='browser'&&requestedBrowserPwa;
     if(!['import-map','native'].includes(moduleFormat)){
         throw new TypeError('packageApp moduleFormat must be "import-map" or "native".');
@@ -1151,7 +1153,32 @@ async function packageWithContext(context,options={}){
         if(!files.some(file=>pathKey(file)===pathKey(entryPath))){
             fail(`Package output is missing its entry file: ${context.config.entry}.`);
         }
-        const installed=pwaEnabled?await readInstalledSdkLayout(context.workspaceRoot,context.rootConfig):null;
+        const installed=pwaEnabled||browserDecisions
+            ?await readInstalledSdkLayout(context.workspaceRoot,context.rootConfig):null;
+        if (browserDecisions) {
+            const moduleSource = installed
+                ? path.join(installed.packageRoot, 'browser-runtime', 'ai', 'browser-decisions.mjs')
+                : path.join(context.workspaceRoot, 'arcane', 'sdk', 'ai', 'browser-decisions.mjs');
+            const moduleRecord = browserRecords.find(
+                function selectedDecisionModule(record) { return record.source === moduleSource; }
+            );
+            if (!moduleRecord || !inventory.has(moduleRecord.destination)) {
+                fail('packageApp browserDecisions requires the selected SDK browser-decisions module in the package.');
+            }
+            const distributionPath = path.posix.join(path.posix.dirname(moduleRecord.destination), 'decisions-runtime');
+            // Acquire after native module and asset rewriting. The upstream
+            // distribution stays opaque and joins the final PWA/release inventory.
+            const distribution = await materializeBrowserDecisions(
+                path.join(stagingRoot, ...distributionPath.split('/')),
+                signal,
+                onEvent
+            );
+            for (const file of distribution.files) {
+                const relative = `${distributionPath}/${file}`;
+                if (!inventory.has(relative)) files.push(relative);
+                inventory.add(relative);
+            }
+        }
         const pwaArtifacts=pwaEnabled?createPwaArtifacts({
             app:{
                 id:context.appId,

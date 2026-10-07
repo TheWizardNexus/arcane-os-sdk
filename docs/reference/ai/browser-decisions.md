@@ -95,14 +95,18 @@ pipeline. Existing Wllama, cloud, speech and chat APIs are unchanged.
 
 ## Extension-local executables (Manifest V3)
 
-During the application's ordinary SDK materialization, opt into the upstream
-browser distribution through the public Node API:
+When packaging the application, opt into the upstream browser distribution
+through the public Node API:
 
 ```js
-import {materializeInstalledSdkRuntime} from 'arcane-os';
+import {packageApp} from 'arcane-os';
 
-await materializeInstalledSdkRuntime({
+const release = await packageApp({
     workspaceRoot: process.cwd(),
+    appId: 'moon-dashboard',
+    outputDirectory: 'dist/extension/app',
+    moduleFormat: 'native',
+    browserPwa: false,
     browserDecisions: true
 });
 ```
@@ -111,30 +115,50 @@ This acquires the official bundled Transformers.js `4.3.0`
 `transformers.min.js`, matching ONNX Runtime
 `1.31.0-dev.20260914-8d85527a0` `ort-wasm-simd-threaded.asyncify.mjs` and
 `ort-wasm-simd-threaded.asyncify.wasm`, plus `TRANSFORMERS-LICENSE` and
-`ONNX-RUNTIME-LICENSE`. The five complete files are staged under
-`arcane/sdk/ai/decisions-runtime/` before replacing the projected runtime.
-Retain the supplied licenses with the distribution. No bundler, Node engine
-dependency tree, model graph or tokenizer is installed by this option.
-Repeat `browserDecisions: true` on each materialization that should retain
-this closure; whole-tree replacement removes files absent from a later selection.
+`ONNX-RUNTIME-LICENSE`. The five complete files are acquired only into the
+package stage, under `decisions-runtime/` beside the selected SDK
+`ai/browser-decisions.mjs`. Installed-package routes retain their actual
+dependency path, including npm aliases: for example,
+`node_modules/arcane-os/browser-runtime/ai/decisions-runtime/` inside
+`release.outputRoot`. The installed dependency and application source remain
+unchanged; this route creates no workspace-root `arcane/` projection.
 
-The result's `workspaceRuntime.browserDecisions` contains `directory`,
-`transformersVersion`, `onnxRuntimeVersion` and `files`. The lower-level
+Acquisition follows SDK module/asset rewriting, preserving complete upstream
+executable content and licenses unchanged. It works with both
+`moduleFormat: 'native'` and the default `'import-map'`. The returned `files`
+and release manifest include the distribution; when browser PWA generation
+is enabled, its ordinary offline include/exclude selection applies too.
+Retain the supplied licenses with the deployment. No bundler, Node engine
+dependency tree, model graph or tokenizer is installed by this option. Select
+`browserDecisions: true` on each package build that should acquire the closure.
+The default `false` and `dryRun: true` perform no optional acquisition; dry runs
+report selected input files rather than downloaded distribution files.
+
+Existing physical workspace projections retain
+`materializeInstalledSdkRuntime({workspaceRoot, browserDecisions: true})`.
+That operation stages these files under `arcane/sdk/ai/decisions-runtime/`
+before replacing the projection, returning `directory`, `transformersVersion`,
+`onnxRuntimeVersion` and `files` under `workspaceRuntime.browserDecisions`.
 `materializeWorkspaceRuntimeContent()` accepts the same option and returns
-that record directly as `result.browserDecisions`. Omission performs no
-optional network acquisition. The fixed distribution files are acquired
-concurrently, once each per selected materialization. Events
+that record as `result.browserDecisions`. Repeat the option on each projection
+refresh that should retain the closure. Installed-package applications use
+`packageApp()` above, because their routes read from the installed dependency
+rather than this separate projection.
+
+Both operations share one distribution owner. Its fixed files are acquired
+concurrently, once each per operation. Events
 `workspace.decisions.started` and `workspace.decisions.progress` expose
 `completed`/`total` file counts; each progress event also has `file` and `url`.
 Cancellation and HTTP or observer failure abort/join pending acquisition and
-preserve the prior runtime. An HTTP failure retains the complete response as
+preserve the prior package output or physical runtime. An HTTP failure retains
+the complete response as
 `error.response` (`url`, `status`, `statusText`, `headers`, `content`), including
 inside `AggregateError.errors` when several operations fail.
 
 Load from an extension-owned module script, using the deployed SDK path:
 
 ```js
-import {createBrowserDecisionModel} from './arcane/sdk/ai/browser-decisions.mjs';
+import {createBrowserDecisionModel} from './node_modules/arcane-os/browser-runtime/ai/browser-decisions.mjs';
 
 const decisions = createBrowserDecisionModel({
     family: 'laya',
@@ -146,6 +170,9 @@ const decisions = createBrowserDecisionModel({
 });
 await decisions.load();
 ```
+
+Use the actual deployed alias path when the dependency has another name;
+physical projections instead use `./arcane/sdk/ai/browser-decisions.mjs`.
 
 For Julia-1, change the family/model to `julia` /
 `SupersonicLabs/Julia-1-ONNX` and select `dtype: 'fp32'`. Model and tokenizer

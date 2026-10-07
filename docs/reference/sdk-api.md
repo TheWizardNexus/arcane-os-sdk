@@ -1044,6 +1044,25 @@ ordinary browser output remain unchanged. See
 [native-module package output](protocols.md#native-module-package-output)
 for resource handling and the static transformation boundary.
 
+`browserDecisions` defaults to `false`. Explicit `browserDecisions: true`
+acquires the bundled Transformers.js 4.3.0 entry, matching ONNX Runtime
+1.31.0-dev.20260914-8d85527a0 asyncify module/WASM and both licenses into
+the package stage beside the selected SDK `ai/browser-decisions.mjs`, under
+`decisions-runtime/`. Installed-package routes retain their configured
+dependency path, including aliases; source and installed dependencies remain
+unchanged, with no workspace-root `arcane/` projection. The selected SDK decision
+module must be included in the package. Acquisition happens after native-module
+and asset rewriting, preserving upstream content unchanged in both module
+formats. The distribution joins the returned and release-manifest inventories
+and any enabled PWA's ordinary offline selection. The default and dry runs
+perform no optional acquisition; dry runs report selected inputs. Repeat this
+option on each package build that should acquire the closure. Cancellation and
+HTTP or observer failures abort/join acquisition before stage cleanup and
+preserve previous output. The existing `workspace.decisions.started` and
+`workspace.decisions.progress` events report file progress. See the
+[extension-local decision guide](ai/browser-decisions.md#extension-local-executables-manifest-v3)
+for `runtime.local: true`, upstream versions and complete error details.
+
 An operation may override `outputDirectory` without changing the saved app
 configuration. For example, package a complete application beneath an
 application-owned extension manifest and launcher:
@@ -1875,6 +1894,11 @@ module/WASM and license files from their upstream distributions into
 `transformersVersion`, `onnxRuntimeVersion` and `files` under
 `workspaceRuntime.browserDecisions`. The default `false` performs no optional
 acquisition. Select this option on each refresh that should retain those files.
+For applications with installed-package routes, use
+`packageApp({workspaceRoot, appId, browserDecisions: true})` to place the
+distribution beside the actual deployed SDK module. This physical materializer
+continues to own only the separate `arcane/` projection; it does not populate or
+modify `node_modules`.
 The [extension-local decision guide](ai/browser-decisions.md#extension-local-executables-manifest-v3)
 describes `runtime.local: true`, complete resource ownership and MV3 usage.
 
@@ -10154,7 +10178,9 @@ Cancellation terminates that client's Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.
 
 For explicitly selected extension-local execution, supply `runtime: {local:
-true}` after materializing with `browserDecisions: true`. The SDK directly
+true}` after `packageApp({workspaceRoot, appId, browserDecisions: true})` for
+installed-package routes, or after opting into the existing physical runtime
+materializer. The SDK directly
 imports its deployment-local `decisions-runtime/transformers.min.js` and
 matched asyncify module/WASM. Explicit `runtime.moduleUrl` and
 `runtime.wasmPaths: {mjs, wasm}` may select other compatible files in that same
