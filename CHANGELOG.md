@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.91.0
+
+- Persist complete native `modelAssets.prepare()` acquisitions across release,
+  unload, service disposal and process restart. Reuse the complete ordered
+  source selection from its selected store, with independent caller lifetimes,
+  cancellation and progress. Explicit `refresh: true` acquires a new complete
+  set while preserving earlier completed acquisitions and retained uses.
+- Add `packageApp({browserDecisions: true})` to acquire the upstream browser
+  decision distribution inside the package stage beside the actual selected
+  SDK module, including installed aliases and relocated routes. Both module
+  formats retain complete executables and licenses; default and dry-run
+  behavior stay unchanged. Existing workspace materialization remains supported.
+- Reuse the retained Windows host, Whisper and ONNX runtime archives; this
+  release changes shared JavaScript acquisition and packaging, not those native
+  binaries. Application adoption and native model acceptance remain separately
+  owned.
+
 ## 0.90.0
 
 - Add optional `remoteBase` to repository workspaces, Git text snapshots and
