@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.90.0
+
+- Add optional `remoteBase` to repository workspaces, Git text snapshots and
+  explicit pull/push targets. Applications can declare a remote as a local
+  filesystem locator and capture its native absolute Git argument before
+  asynchronous work or queueing, independently of later directory changes.
+- Preserve original remote, ref and base text in public outcomes. Omission
+  retains ordinary Git remote names, URLs, SCP-like addresses and remote-helper
+  strings without guessed parsing; existing identity, cancellation, complete
+  diagnostics and configured-operation behavior remain unchanged.
+- Reuse the retained compatible Windows host, Whisper and ONNX runtime assets
+  on this numeric release. No native implementation change is included.
+
 ## 0.89.0
 
 - Add explicitly selected clone-local author name/email before the first
