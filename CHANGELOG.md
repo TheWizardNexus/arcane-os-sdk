@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.88.1
+
+- Recover an ordinary workspace-operation lock when its recorded runner is
+  confirmed absent, including before the six-hour expiry. Retrying the public
+  operation uses the shared lock owner; existing published records stay readable.
+- Preserve live or indeterminate owners and complete process-probe errors.
+  Recheck cancellation, nonce, PID and owner presence after asynchronous recovery
+  observation so an observed replacement remains owned by its actual writer.
+  The existing cooperative read/remove protocol is not an atomic cross-process
+  compare-and-delete.
+
 ## 0.88.0
 
 - Add optional `signal` and `startLanguageModel` controls to `AI.setAI`,
