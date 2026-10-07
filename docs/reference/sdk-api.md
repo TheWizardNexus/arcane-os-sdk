@@ -8285,7 +8285,7 @@ explicit existing path. The application owns the remote, branch and Core API.
 ### Signature and result
 
 ```text
-createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,gitIdentity,onEvent,run=runProcess}={})
+createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
 ```
 
 Returns `{directory,open,status,configuration,pull,push,write,close,drain,dispose}`. Construction does
@@ -8303,6 +8303,16 @@ configuration. Existing repositories and non-Windows clone commands remain
 unchanged; no global setting or data migration is performed. Git's ordinary
 configuration precedence, hooks and single-clone lifecycle remain in effect.
 See [Windows long paths](core-repositories.md#windows-long-paths-for-a-new-checkout).
+
+Optional `cloneIdentity:{name?,email?}` captures exact author strings and saves
+only supplied fields in a newly created checkout through Git's `clone --config`
+before its first checkout, on every supported platform. Empty strings are
+explicit values; omitted or `undefined` fields preserve inherited and template
+configuration. Existing repositories are never reconfigured. Unrepresentable
+process arguments fail without changing the supplied text. This option changes
+no global configuration, credentials, remote or branch, and does not identify
+the authenticated account. Command-local `gitIdentity` remains independent.
+See [clone-local author selection](core-repositories.md#clone-local-author-selection).
 
 Optional `gitIdentity:{name?,email?,username?}` captures explicit non-secret
 settings for child Git operations without writing global/local configuration.
