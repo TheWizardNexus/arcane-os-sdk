@@ -125,14 +125,14 @@ test('portable assembly carries complete optional native launch defaults', async
 
 test('portable assembly carries the optional native window configuration unchanged', async function nativeWindowManifest(t) {
     const fixture = await createFixture(t);
-    const window = {width: 1280, height: 800, resizable: true};
+    const window = {width: 1280, height: 800, resizable: true, state: 'maximized'};
     const appDescriptor = {...application, native: {window}};
     const artifact = await createPortableNativeProvider().build({...fixture.request, appDescriptor});
     assert.deepEqual(artifact.manifest.window, window);
     assert.deepEqual(artifact.manifest.app.native.window, window);
     const saved = JSON.parse(await readFile(path.join(artifact.target.rootDir, 'arcane-native.json'), 'utf8'));
     assert.deepEqual(saved.window, window);
-    assert.deepEqual(appDescriptor.native.window, {width: 1280, height: 800, resizable: true});
+    assert.deepEqual(appDescriptor.native.window, {width: 1280, height: 800, resizable: true, state: 'maximized'});
 });
 
 test('native Core listener opt-in attaches to the existing stdio runtime and joins closure', function nativeCoreListenerEntry() {

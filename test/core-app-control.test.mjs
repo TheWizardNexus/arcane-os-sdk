@@ -159,6 +159,40 @@ test('app-control sockets correlate concurrent responses and preserve complete n
     assert.deepEqual(observedErrors, []);
 });
 
+test('app-control preserves complete Escape requests and results through its public client and CLI', async function escapeKey(t) {
+    const peer = await fixture(t);
+    const app = await connectAppControl({endpoint: peer.endpoint});
+    peer.own(function closeClient() { return app.close(); });
+    const parameters = {documentGeneration: 12, key: 'Escape', shiftKey: false,
+        authored: {content: '  The moon elevator dismissed nothing yet.\r\n🦑\t  '}};
+    const pending = app.key(parameters);
+    const request = await peer.next(function escapeFrame(frame) { return frame.method === 'app.control.key'; });
+    assert.deepEqual(request.frame.parameters, parameters);
+    const result = {documentGeneration: 12, key: 'Escape', shiftKey: false,
+        press: {parameters: {type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, modifiers: 0},
+            attempted: true, completed: true, response: '  Complete press result\r\n🦑  '},
+        release: {parameters: {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, modifiers: 0},
+            attempted: true, completed: true, response: '  Complete release result\r\n🦑  '},
+        actual: {focusPath: [], documentHasFocus: false}};
+    await peer.reply(request, {ok: true, result});
+    assert.deepEqual(await pending, result);
+
+    await writeFile(path.join(peer.root, 'escape.json'), JSON.stringify(parameters));
+    const stdout = output();
+    const stderr = output();
+    const controller = new AbortController();
+    const operation = runAppControlCli(['key', '--endpoint', peer.endpoint, '--request', 'escape.json'],
+        {cwd: peer.root, stdout, stderr, controller});
+    peer.own(async function closeCli() { controller.abort(); await operation; });
+    const cliRequest = await peer.next(function cliEscape(frame) {
+        return frame.method === 'app.control.key' && frame !== request.frame;
+    });
+    assert.deepEqual(cliRequest.frame.parameters, parameters);
+    await peer.reply(cliRequest, {ok: true, result});
+    assert.equal(await operation, 0);
+    assert.deepEqual(JSON.parse(stdout.read()), result);
+});
+
 test('app-control cancels one request without replay or losing the live connection', async function requestCancellation(t) {
     const peer = await fixture(t);
     const observedErrors = [];

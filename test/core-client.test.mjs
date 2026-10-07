@@ -200,6 +200,51 @@ test(
     }
 );
 
+test('window state facade preserves actual results, complete errors and cancellation',async function windowState(t){
+    const {client,frames,receive}=fixture(t);
+    const window=createCoreFacade(client).window;
+    const reading=window.state();
+    assert.equal(frames[0].method,'window.state');
+    assert.deepEqual(frames[0].parameters,{});
+    const minimized={platform:'windows',supported:true,state:'minimized'};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames[0].id,ok:true,result:minimized});
+    assert.equal(await reading,minimized);
+    for(const state of ['normal','maximized','fullscreen']){
+        const selection={state,complete:'  Moon observatory\r\n🧀  '};
+        const pending=window.setState(selection);
+        const request=frames.at(-1);
+        assert.equal(request.method,'window.setState');
+        assert.equal(request.parameters,selection);
+        const actual={platform:'windows',supported:true,state};
+        receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:actual});
+        assert.equal(await pending,actual);
+    }
+    const controller=new AbortController();
+    const cancelled=window.setState({state:'normal'},{signal:controller.signal});
+    const request=frames.at(-1);
+    controller.abort();
+    await assert.rejects(cancelled,{code:'ARCANE_REQUEST_ABORTED'});
+    assert.deepEqual(frames.at(-1),{protocol:CORE_PROTOCOL,type:'control',control:'request.cancel',requestId:request.id});
+    assert.equal(receive({protocol:CORE_PROTOCOL,type:'response',id:request.id,ok:true,result:minimized}),false);
+    const before=frames.length;
+    await assert.rejects(window.state({signal:controller.signal}),{code:'ARCANE_REQUEST_ABORTED'});
+    await assert.rejects(window.setState({state:'fullscreen'},{signal:controller.signal}),{code:'ARCANE_REQUEST_ABORTED'});
+    assert.equal(frames.length,before);
+    const failed=window.setState({state:'fullscreen'});
+    const error={code:'ARCANE_WINDOW_STATE_FAILED',message:'Complete native failure\n🧀',
+        details:{requested:{state:'fullscreen'},previous:minimized,actual:{platform:'windows',supported:true,state:'normal'}},
+        cause:{name:'NativeError',message:'Complete original cause',stack:'entire\nstack'}};
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames.at(-1).id,ok:false,error});
+    await assert.rejects(failed,function completeStateError(value){
+        for(const [key,item] of Object.entries(error))assert.deepEqual(value[key],item);
+        return true;
+    });
+    const unsupported=window.state();
+    receive({protocol:CORE_PROTOCOL,type:'response',id:frames.at(-1).id,ok:false,
+        error:{code:'METHOD_NOT_ALLOWED',message:'This host has no window.state method.'}});
+    await assert.rejects(unsupported,{code:'METHOD_NOT_ALLOWED'});
+});
+
 test('cancellation owns completion before a transport can reply to its control',async t=>{
     let receive;
     let requestId;

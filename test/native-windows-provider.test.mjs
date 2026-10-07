@@ -180,9 +180,9 @@ test('Windows assembly preserves complete selected payloads, app services and th
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
 
-test('Windows assembly forwards optional window sizing without replacing services', async function nativeWindowManifest(t) {
+test('Windows assembly forwards optional window sizing and state without replacing services', async function nativeWindowManifest(t) {
     const fixture = await createFixture(t);
-    const window = {width: 1280, height: 800, resizable: false};
+    const window = {width: 1280, height: 800, resizable: false, state: 'fullscreen'};
     fixture.request.appDescriptor.native.window = window;
     const launchContext = {sharedHost: {}, stateRoot: '../app-selected state', payload: '  Complete 🧀\r\n  '};
     fixture.request.appDescriptor.native.launchContext = launchContext;
@@ -195,6 +195,50 @@ test('Windows assembly forwards optional window sizing without replacing service
     assert.deepEqual(saved.app.native.window, window);
     assert.deepEqual(saved.launchContext, launchContext);
     assert.deepEqual(saved.app.native.launchContext, launchContext);
+});
+
+test('Windows source keeps window transitions and fullscreen restore at one owner', async function nativeWindowStateSource() {
+    const [host, launcher, control] = await Promise.all([
+        readFile(path.join(sdkRoot, 'src/core/hosts/windows/ArcaneHost.cs'), 'utf8'),
+        readFile(path.join(sdkRoot, 'src/core/hosts/windows/ArcaneLauncher.cs'), 'utf8'),
+        readFile(path.join(sdkRoot, 'src/core/hosts/windows/ArcaneWindowControl.cs'), 'utf8')
+    ]);
+    assert.match(launcher, /InitialWindowState = OptionalWindowState\(windowOptions\)/u);
+    assert.match(launcher, /window == null \|\| !window.TryGetValue\("state", out value\)\) return null/u);
+    assert.match(host, /ApplyInitialWindowSize\(\);\s+if \(options.InitialWindowState != null\) ApplyWindowState\(options.InitialWindowState\)/u);
+    assert.match(host, /CurrentWindowState\(\) == FormWindowState.Normal \? Bounds : RestoreBounds/u);
+    assert.match(host, /FormBorderStyle = FormBorderStyle.None;\s+Bounds = screen/u);
+    assert.match(host, /FormBorderStyle = fullscreenRestore.BorderStyle;\s+MinimizeBox = fullscreenRestore.MinimizeBox;\s+MaximizeBox = fullscreenRestore.MaximizeBox;\s+ControlBox = fullscreenRestore.ControlBox;\s+Bounds = fullscreenRestore.Bounds;\s+fullscreenRestore = null/u);
+    assert.match(host, /if \(IsIconic\(Handle\)\) return FormWindowState.Minimized/u);
+    assert.match(host, /IsZoomed\(Handle\) \? FormWindowState.Maximized : FormWindowState.Normal/u);
+    assert.match(host, /if \(state != FormWindowState.Normal\) return state.ToString\(\)/u);
+    assert.match(host, /bool visible = IsHandleCreated && IsWindowVisible\(Handle\)/u);
+    assert.match(host, /if \(visible && state == WindowStateName\(\).ToLowerInvariant\(\)/u);
+    assert.match(host, /WindowStateTransition transition = visible \? new WindowStateTransition\(this\) : null/u);
+    assert.match(host, /private static readonly HookProcedure callback = BeforeWindowChange/u);
+    assert.match(host, /SetWindowsHookEx\(WhCbt, callback, IntPtr.Zero, GetCurrentThreadId\(\)\)/u);
+    assert.match(host, /target == window \|\| \(code == HcbtSetFocus && IsChild\(window, target\)\)/u);
+    assert.match(host, /return CallNextHookEx\(IntPtr.Zero, code, target, details\)/u);
+    assert.match(host, /active = false;\s+if \(current == this\) current = previous;\s+if \(hook == IntPtr.Zero\) return null;\s+if \(UnhookWindowsHookEx\(hook\)\)/u);
+    assert.match(host, /pendingCleanup.Contains\(this\)\) pendingCleanup.Add\(this\)/u);
+    assert.match(host, /new AggregateException\("Window state change and activation-hook cleanup failed.",\s+mutationError, cleanupError\)/u);
+    assert.match(host, /error.Data\["nativeErrorCode"\] = code/u);
+    assert.match(host, /WindowStateTransition.ReleasePending\(this\)/u);
+    assert.match(host, /WindowStateResponse\(envelope, requestId, method == "window.setState"\)/u);
+    assert.match(control, /\{ "state", WindowStateName\(\) \}/u);
+    assert.match(control, /if \(WindowStateName\(\) == "Normal"\) return/u);
+});
+
+test('Windows source adds Escape to the existing ordered key pair without text input', async function nativeEscapeSource() {
+    const control = await readFile(path.join(sdkRoot, 'src/core/hosts/windows/ArcaneWindowControl.cs'), 'utf8');
+    assert.match(control, /key != "Tab" && key != "Enter" && key != "Space" && key != "Escape"/u);
+    assert.match(control, /key == "Tab" \|\| key == "Escape" \? "rawKeyDown" : "keyDown"/u);
+    assert.match(control, /key == "Tab" \? 9 : key == "Enter" \? 13 : key == "Escape" \? 27 : 32/u);
+    assert.match(control, /up\["type"\] = "keyUp";\s+if \(key == "Enter" \|\| key == "Space"\)/u);
+    assert.match(control, /if \(shiftKey && key != "Tab"\) throw new ArgumentException/u);
+    assert.match(control, /await appControlKeyOwner.WaitAsync\(cancellation\)/u);
+    assert.match(control, /CallDevToolsProtocolMethodAsync\("Input.dispatchKeyEvent", downJson\)/u);
+    assert.match(control, /CallDevToolsProtocolMethodAsync\("Input.dispatchKeyEvent", upJson\)/u);
 });
 
 test('Windows assembly reuses the exact SDK-version output cache and explicit empty services override app services', async function cachedHost(t) {

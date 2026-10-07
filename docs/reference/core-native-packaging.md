@@ -489,7 +489,7 @@ forced process termination.
 
 ### Initial native window size
 
-An application can select its initial client area and resizing behavior in
+An application can select its initial client area, resizing behavior and state in
 `arcane-app.json`, independently of its page layout:
 
 ```json
@@ -499,15 +499,17 @@ An application can select its initial client area and resizing behavior in
     "icon": "img/icon.png",
     "order": 100,
     "bundledApps": [],
-    "window": {"width": 1280, "height": 800, "resizable": true}
+    "window": {"width": 1280, "height": 800, "resizable": true, "state": "normal"}
   }
 }
 ```
 
 This is the `native` portion of the existing app descriptor. Each `window`
 member is optional. `width` and `height` are positive integral client dimensions
-in logical pixels at 96 DPI; `resizable` is a boolean. Omitting a member retains
-the host's existing choice, and omitting `window` preserves existing startup.
+in logical pixels at 96 DPI; `resizable` is a boolean. Optional `state` is
+`normal`, `maximized`, or `fullscreen`. These example dimensions are an explicit
+application choice, not SDK-wide defaults. Omitting a member retains the host's
+existing choice, and omitting `window` preserves existing startup.
 The native registry projection preserves the record; the browser package
 projection gains no window controls. Portable and Windows assembly copy the
 record to `arcane-native.json` as `window`, without changing page or service
@@ -517,16 +519,30 @@ The matching Windows host applies the dimensions once on initial load, using
 the display DPI and fitting the outer window within the selected monitor's
 usable work area. This fit does not impose a persistent maximum size. Explicit
 `resizable:false` uses a fixed frame and disables the maximize control; `true`
-permits ordinary resizing and maximizing. Later app/user resizing remains
-untouched. A composing launcher's `Load` handler runs after this initial sizing
-and can restore its own saved window state. The SDK adds no saved-bounds store.
+permits ordinary resizing and maximizing. The selected initial state is applied
+after this normal-window sizing, so those normal bounds remain available when
+returning from maximized or fullscreen. Fullscreen uses a borderless window at
+the selected monitor's full bounds, including the taskbar area, without setting
+TopMost or requesting activation. Returning to normal restores the retained
+normal bounds and original frame, minimize/maximize and control-box settings.
+Selecting maximized from fullscreen restores them before maximizing.
+
+Later app/user resizing remains untouched. A composing launcher's `Load` handler
+runs after the initial sizing and optional state selection. Applications can
+read or change their own window through
+[`Arcane.window.state()` and `setState({state})`](core-client.md#current-window-state).
+The application's saved Settings and their application remain application-owned;
+the SDK adds no saved-state or saved-bounds store and does not delay rendering
+for those settings. The window's profile, origin and Core lifetime are unchanged.
 
 Direct Windows host composition uses nullable `ArcaneHostOptions` members
-`InitialClientWidth`, `InitialClientHeight`, and `Resizable` with the same
-semantics. Older precompiled Windows hosts do not read these options; use the
+`InitialClientWidth`, `InitialClientHeight`, `Resizable`, and optional string
+`InitialWindowState` with the same semantics. Older precompiled Windows hosts
+do not read these options; use the
 matching SDK host archive when rebuilding an application. The portable record
 is available to platform adapters; this addition implements its Windows host
-behavior and leaves window sizing on other platforms unchanged.
+behavior and leaves window sizing/state on other platforms unchanged. The current
+other-platform hosts do not implement this state selection.
 
 ### Application icon and window colors
 

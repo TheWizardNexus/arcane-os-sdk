@@ -7143,6 +7143,21 @@ no engine. The native routes of `AI.fetchTTS(payload, signal)` and
 `AI.fetchSTT(audio, signal)` forward their signals through these calls and
 normalize cancellation to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
 
+`facade.window.state({signal}?)` reads the calling document's native window;
+`facade.window.setState({state}, {signal}?)` selects `normal`, `maximized` or
+`fullscreen` for that same window. The matching Windows host returns
+`{platform:'windows', supported:true, state}`, with observed `state` also able
+to be `minimized`. Fullscreen removes the frame and fills the selected monitor;
+leaving it restores the preceding normal bounds and frame controls before any
+requested maximization. Visible state transitions prevent activation/focus
+assignment to the requesting window without changing TopMost, Core, origin or
+profile. Optional `native.window.state` selects startup state after initial
+sizing; omission preserves host behavior. Saved Settings remain application-owned.
+Cancellation does not undo an already-applied change. Other hosts retain their
+actual unavailable-method/transport errors; the facade provides no fallback.
+See [current-window state](core-client.md#current-window-state) for complete
+native errors, partial-state evidence, navigation and cleanup ownership.
+
 `facade.window.setTheme(presentation, {signal}?)` forwards the complete
 presentation to the current native window, independently of OS-user appearance.
 Optional `backgroundColor` and `textColor` accept `{red,green,blue,alpha}` or
@@ -9187,7 +9202,8 @@ portable Node local IPC; other native host adapters do not yet implement these
 document operations. No application is launched, no desktop window is activated,
 and no automatic reconnect or action retry occurs.
 
-`status(options)` reports current app/window/document readiness.
+`status(options)` reports current app/window/document readiness, including
+observed window state `Normal`, `Maximized`, `Minimized` or `Fullscreen`.
 `inspect(parameters={},options)` returns complete selected DOM HTML/text
 and live control state. Inspection and actions accept optional `shadowPath`, an
 ordered array of unique CSS host selectors through open shadow roots; their
@@ -9202,7 +9218,8 @@ of the rendered viewport. `act(parameters,options)` requires a returned
 fields.
 
 `key(parameters,options)` requires the observed `documentGeneration` and
-`key:'Tab'`, `'Enter'` or `'Space'`; `shiftKey:true` is supported only for Tab.
+`key:'Tab'`, `'Enter'`, `'Space'` or `'Escape'`; `shiftKey:true` is supported only
+for Tab.
 It sends a fixed ordered press/release pair to the selected WebView's current
 focus, without selecting an element or activating the desktop window. Accepted
 pairs share one keyboard owner. Once a press is attempted, its matching release
@@ -9214,9 +9231,9 @@ or navigation can change between phases.
 
 `resize(parameters,options)` accepts positive integral native client `width`
 and `height` supported by WinForms, plus optional `documentGeneration`. It changes
-only `ClientSize` while the actual window is `Normal`; maximized or minimized
-windows fail before size mutation. Results retain immediate `previous`/`actual`
-native dimensions, requested dimensions, attempted/completed flags and a later
+only `ClientSize` while the actual window is `Normal`; maximized, minimized or
+fullscreen windows fail before size mutation. Results retain immediate
+`previous`/`actual` native dimensions, requested dimensions, attempted/completed flags and a later
 observed CSS `viewport`. Platform constraints can change actual dimensions;
 native and CSS observations are not an atomic snapshot. Restore explicitly with
 the same operation's `previous.width` and `previous.height`, not CSS dimensions

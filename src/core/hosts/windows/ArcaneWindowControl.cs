@@ -148,7 +148,7 @@ namespace Arcane.Core.Hosts.Windows
         {
             return new Dictionary<string, object>
             {
-                { "title", Text }, { "state", WindowState.ToString() },
+                { "title", Text }, { "state", WindowStateName() },
                 { "width", ClientSize.Width }, { "height", ClientSize.Height }
             };
         }
@@ -252,8 +252,8 @@ namespace Arcane.Core.Hosts.Windows
         {
             object value;
             string key = parameters.TryGetValue("key", out value) ? value as string : null;
-            if (key != "Tab" && key != "Enter" && key != "Space")
-                throw new ArgumentException("key must be Tab, Enter, or Space.");
+            if (key != "Tab" && key != "Enter" && key != "Space" && key != "Escape")
+                throw new ArgumentException("key must be Tab, Enter, Space, or Escape.");
             bool shiftKey = false;
             if (parameters.TryGetValue("shiftKey", out value))
             {
@@ -263,14 +263,14 @@ namespace Arcane.Core.Hosts.Windows
             if (shiftKey && key != "Tab") throw new ArgumentException("shiftKey is supported only with Tab.");
             Dictionary<string, object> down = new Dictionary<string, object>
             {
-                { "type", key == "Tab" ? "rawKeyDown" : "keyDown" },
+                { "type", key == "Tab" || key == "Escape" ? "rawKeyDown" : "keyDown" },
                 { "key", key == "Space" ? " " : key }, { "code", key },
-                { "windowsVirtualKeyCode", key == "Tab" ? 9 : key == "Enter" ? 13 : 32 },
+                { "windowsVirtualKeyCode", key == "Tab" ? 9 : key == "Enter" ? 13 : key == "Escape" ? 27 : 32 },
                 { "modifiers", shiftKey ? 8 : 0 }
             };
             Dictionary<string, object> up = new Dictionary<string, object>(down);
             up["type"] = "keyUp";
-            if (key != "Tab")
+            if (key == "Enter" || key == "Space")
             {
                 down["text"] = key == "Enter" ? "\r" : " ";
                 down["unmodifiedText"] = down["text"];
@@ -345,7 +345,7 @@ namespace Arcane.Core.Hosts.Windows
 
         private void RequireAppControlNormalWindow()
         {
-            if (WindowState == FormWindowState.Normal) return;
+            if (WindowStateName() == "Normal") return;
             InvalidOperationException error = new InvalidOperationException("App-control resize requires a Normal window.");
             error.Data["reason"] = "unsupported-window-state";
             error.Data["supportedWindowState"] = "Normal";

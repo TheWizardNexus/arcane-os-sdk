@@ -73,11 +73,11 @@ connection or other business result.
 | Member | Contract |
 | --- | --- |
 | `connectAppControl({endpoint, signal?, onError?})` | Connect once to the explicit running host. It never launches an app, creates Core, changes a profile or reconnects automatically. |
-| `status(options?)` | Returns app identity, platform/host, current URL, document generation, readiness, window title/state/client dimensions and available operations. Readiness describes the document, not models or application services. |
+| `status(options?)` | Returns app identity, platform/host, current URL, document generation, readiness, window title/state/client dimensions and available operations. Window state is `Normal`, `Maximized`, `Minimized`, or `Fullscreen`. Readiness describes the document, not models or application services. |
 | `inspect(parameters={}, options?)` | Optional `shadowPath` selects an open shadow root. Optional CSS `selector` selects zero or more elements within the selected root; omission selects the whole root. Optional `documentGeneration` selects the expected document. Returns complete HTML/text, live control state and DOM-derived role/name hints. |
 | `capture(parameters={}, options?)` | Returns `{mimeType:'image/png', data, documentGeneration, url}`. `data` contains the complete base64 PNG. Optional `documentGeneration` selects the expected document. |
 | `act(parameters, options?)` | Requires `documentGeneration`, one unambiguous CSS `selector` within the root selected by optional `shadowPath`, and the action fields below. |
-| `key(parameters, options?)` | Requires `documentGeneration` and `key:'Tab'`, `'Enter'`, or `'Space'`. Optional `shiftKey:true` is supported only for Tab. Sends one ordered press/release pair to the selected WebView's current focus. |
+| `key(parameters, options?)` | Requires `documentGeneration` and `key:'Tab'`, `'Enter'`, `'Space'`, or `'Escape'`. Optional `shiftKey:true` is supported only for Tab. Sends one ordered press/release pair to the selected WebView's current focus. |
 | `resize(parameters, options?)` | Requires positive integral native client `width` and `height` supported by WinForms. Optional `documentGeneration` selects the expected document. Resizes only a Normal window and returns immediate previous/actual client dimensions plus the subsequently observed CSS viewport. |
 | `close()` | Closes this caller's connection and cancels its pending requests. It never closes the app or Core. Returns the connection's completion promise. |
 | `closed` | Connection lifetime promise; actual transport failures remain observable. |
@@ -207,6 +207,8 @@ const moved = await app.key({documentGeneration: page.documentGeneration, key: '
 console.log(moved.previous.focusPath, moved.actual.focusPath);
 await app.key({documentGeneration: moved.documentGeneration, key: 'Tab', shiftKey: true});
 await app.key({documentGeneration: moved.documentGeneration, key: 'Enter'});
+const current = await app.inspect();
+await app.key({documentGeneration: current.documentGeneration, key: 'Escape'});
 ```
 
 Keys use the selected WebView's current focus. No selector, shadow path, frame
@@ -214,7 +216,10 @@ selection, focus assignment or desktop activation is performed. Tab and
 Shift+Tab use a fixed Tab `rawKeyDown`/`keyUp` pair, with the Shift modifier on
 both events for Shift+Tab. Enter and Space use `keyDown` with their corresponding
 text, followed by `keyUp`, preserving browser default actions and application
-`preventDefault` handling. Shift+Tab does not send a separate Shift key pair.
+`preventDefault` handling. Escape uses `key:'Escape'`, `code:'Escape'` and native
+virtual key 27 in a `rawKeyDown`/`keyUp` pair, without text fields. It follows the
+selected WebView's normal Escape handling; it does not promise that a particular
+dialog closes. Shift+Tab does not send a separate Shift key pair.
 The API exposes these fixed keys, not an arbitrary protocol method or script.
 
 The result contains `key`, `shiftKey`, `previous` and `actual` document views,
@@ -264,7 +269,7 @@ origin. Read `viewport` for the resulting CSS dimensions instead of assuming a
 particular DPI or zoom conversion.
 
 Immediately before the UI-thread mutation, the host checks the actual
-`WindowState` and records `previous:{title,state,width,height}`. It records
+window state and records `previous:{title,state,width,height}`. It records
 `actual` in the same shape immediately after the native setter, then observes
 the CSS `viewport` asynchronously. The result also contains `requested`,
 `resizeAttempted`, `resizeCompleted`, `documentGeneration` and `url`.
@@ -274,12 +279,19 @@ native snapshot and the document observation; these records are not an atomic
 native/CSS snapshot. Completion does not establish that asynchronous application
 resize handlers have settled.
 
-Maximized or minimized windows return `ARCANE_APP_CONTROL_FAILED` before any
+Maximized, minimized or fullscreen windows return `ARCANE_APP_CONTROL_FAILED` before any
 size mutation, with `reason:'unsupported-window-state'`,
 `supportedWindowState:'Normal'` and the complete current `window` in the error's
 `data` entries. The host never automatically restores, maximizes or minimizes a
 window to satisfy this request. Invalid dimensions return `INVALID_ARGUMENT`.
 The same state rule applies to explicit restoration.
+
+Native fullscreen reports `Fullscreen`, including while its underlying WinForms
+state is Normal. A minimized fullscreen window reports `Minimized`. The
+requesting document can select its state through
+[`Arcane.window.setState({state})`](core-client.md#current-window-state); app-control
+does not add a separate state-setting operation. That facade uses lowercase
+state values, while app-control preserves its existing capitalized values.
 
 Restore using the actual `previous.width` and `previous.height` from the
 operation being reversed, never a historical status snapshot or CSS viewport

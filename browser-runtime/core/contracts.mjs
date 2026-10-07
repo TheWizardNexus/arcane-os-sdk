@@ -43,6 +43,16 @@ export const CORE_METHOD_CONTRACTS={
         output: '{requestedTarget,resolvedDevice,resolution,reason}',
         meaning: 'Resolve a saved physical identity. Explicit null selects engine-owned automatic resolution; it does not claim a configured or observed device.'
     },
+    'window.state': {
+        input: '{}',
+        output: '{platform,supported,state}',
+        meaning: 'Current requesting native window; state may be normal, maximized, fullscreen, or minimized. No saved preference is read.'
+    },
+    'window.setState': {
+        input: '{state:"normal"|"maximized"|"fullscreen"}',
+        output: '{platform,supported,state}',
+        meaning: 'Apply to the requesting native window and report its resulting state. No persistence, desktop activation, or Core restart.'
+    },
     'window.setTheme': {
         input: '{backgroundColor?,textColor?}: null reset or {red,green,blue,alpha}',
         output: '{platform,supported,applied,unsupported}',

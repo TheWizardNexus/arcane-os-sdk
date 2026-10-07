@@ -647,6 +647,12 @@ export function createCoreFacade(client){
         preferences:{list:()=>invoke('preferences.list'),get:key=>invoke('preferences.get',{key}),set:(key,value)=>invoke('preferences.set',{key,value}),
             setMany:entries=>invoke('preferences.setMany',{entries}),delete:key=>invoke('preferences.delete',{key})},
         window: {
+            state(options) {
+                return invoke('window.state', {}, {signal: options?.signal});
+            },
+            setState(selection, options) {
+                return invoke('window.setState', selection, {signal: options?.signal});
+            },
             setTheme(presentation, options) {
                 return invoke(
                     'window.setTheme', presentation,

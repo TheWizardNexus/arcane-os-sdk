@@ -33,6 +33,7 @@ namespace Arcane.Core.Hosts.Windows
         public double? InitialClientWidth { get; set; }
         public double? InitialClientHeight { get; set; }
         public bool? Resizable { get; set; }
+        public string InitialWindowState { get; set; }
     }
 
     public static class ArcaneHost
@@ -130,6 +131,7 @@ namespace Arcane.Core.Hosts.Windows
         private bool browserProcessExited;
         private bool closing;
         private bool closeAllowed;
+        private WindowRestoreSnapshot fullscreenRestore;
 
         public ArcaneHostForm(ArcaneHostOptions options, Action<string> onDiagnostic,
             Action<Exception> onError = null)
@@ -138,6 +140,7 @@ namespace Arcane.Core.Hosts.Windows
             if (onDiagnostic == null) throw new ArgumentNullException("onDiagnostic");
             ValidateInitialDimension(options.InitialClientWidth, "InitialClientWidth");
             ValidateInitialDimension(options.InitialClientHeight, "InitialClientHeight");
+            if (options.InitialWindowState != null) ValidateWindowState(options.InitialWindowState);
             this.options = options;
             this.onDiagnostic = onDiagnostic;
             this.onError = onError;
@@ -160,9 +163,13 @@ namespace Arcane.Core.Hosts.Windows
 
         protected override void OnLoad(EventArgs args)
         {
-            // Apply the initial choice once. A composing launcher's Load handler
-            // can then restore its own saved state; later user sizing is untouched.
-            if (!started && !closing) ApplyInitialWindowSize();
+            // Apply the initial choices before the composing launcher's Load
+            // handler. Later app/user sizing remains application-owned.
+            if (!started && !closing)
+            {
+                ApplyInitialWindowSize();
+                if (options.InitialWindowState != null) ApplyWindowState(options.InitialWindowState);
+            }
             base.OnLoad(args);
             if (started || closing) return;
             started = true;
@@ -201,6 +208,263 @@ namespace Arcane.Core.Hosts.Windows
                 Math.Max(workArea.Left, Math.Min(Left, workArea.Right - Width)),
                 Math.Max(workArea.Top, Math.Min(Top, workArea.Bottom - Height)));
         }
+
+        private static void ValidateWindowState(string state)
+        {
+            if (state != "normal" && state != "maximized" && state != "fullscreen")
+                throw new ArgumentException("Select window state normal, maximized, or fullscreen.");
+        }
+
+        private FormWindowState CurrentWindowState()
+        {
+            if (!IsHandleCreated) return WindowState;
+            if (IsIconic(Handle)) return FormWindowState.Minimized;
+            return IsZoomed(Handle) ? FormWindowState.Maximized : FormWindowState.Normal;
+        }
+
+        private string WindowStateName()
+        {
+            FormWindowState state = CurrentWindowState();
+            if (state != FormWindowState.Normal) return state.ToString();
+            return fullscreenRestore != null && FormBorderStyle == FormBorderStyle.None
+                ? "Fullscreen" : "Normal";
+        }
+
+        private Dictionary<string, object> WindowStateRecord()
+        {
+            return new Dictionary<string, object>
+            {
+                { "platform", "windows" }, { "supported", true },
+                { "state", WindowStateName().ToLowerInvariant() }
+            };
+        }
+
+        private void ApplyWindowState(string state)
+        {
+            ValidateWindowState(state);
+            bool visible = IsHandleCreated && IsWindowVisible(Handle);
+            if (visible && state == WindowStateName().ToLowerInvariant()
+                && (state == "fullscreen" || fullscreenRestore == null)) return;
+            // Initial hidden configuration keeps ordinary startup behavior. A
+            // visible WinForms state setter can activate through ShowWindow.
+            WindowStateTransition transition = visible ? new WindowStateTransition(this) : null;
+            Exception mutationError = null;
+            try { ChangeWindowState(state); }
+            catch (Exception error)
+            {
+                mutationError = error;
+                throw;
+            }
+            finally
+            {
+                Exception cleanupError = transition == null ? null : transition.Release();
+                if (cleanupError != null)
+                {
+                    if (mutationError != null)
+                        throw new AggregateException("Window state change and activation-hook cleanup failed.",
+                            mutationError, cleanupError);
+                    throw cleanupError;
+                }
+            }
+        }
+
+        private void ChangeWindowState(string state)
+        {
+            if (state == "fullscreen")
+            {
+                Rectangle screen = Screen.FromControl(this).Bounds;
+                if (fullscreenRestore == null)
+                {
+                    fullscreenRestore = new WindowRestoreSnapshot(
+                        CurrentWindowState() == FormWindowState.Normal ? Bounds : RestoreBounds,
+                        FormBorderStyle, MinimizeBox, MaximizeBox, ControlBox);
+                }
+                // Retain the normal frame and bounds before removing chrome.
+                // This affects this window only: no activation or TopMost.
+                WindowState = FormWindowState.Normal;
+                FormBorderStyle = FormBorderStyle.None;
+                Bounds = screen;
+                return;
+            }
+
+            if (fullscreenRestore != null)
+            {
+                // Restore normal geometry before maximizing so WinForms keeps
+                // the same restore bounds for a later Normal selection.
+                WindowState = FormWindowState.Normal;
+                FormBorderStyle = fullscreenRestore.BorderStyle;
+                MinimizeBox = fullscreenRestore.MinimizeBox;
+                MaximizeBox = fullscreenRestore.MaximizeBox;
+                ControlBox = fullscreenRestore.ControlBox;
+                Bounds = fullscreenRestore.Bounds;
+                fullscreenRestore = null;
+            }
+            WindowState = state == "maximized" ? FormWindowState.Maximized : FormWindowState.Normal;
+        }
+
+        private string WindowStateResponse(Dictionary<string, object> request, string id, bool apply)
+        {
+            Dictionary<string, object> previous = WindowStateRecord();
+            object parameters;
+            request.TryGetValue("parameters", out parameters);
+            Dictionary<string, object> response = new Dictionary<string, object>
+            {
+                { "protocol", "arcane/1" }, { "type", "response" }, { "id", id }
+            };
+            try
+            {
+                if (apply)
+                {
+                    Dictionary<string, object> selection = parameters as Dictionary<string, object>;
+                    object state;
+                    if (selection == null || !selection.TryGetValue("state", out state) || !(state is string))
+                        throw new ArgumentException("Supply a window state selection.");
+                    ApplyWindowState((string)state);
+                }
+                response["ok"] = true;
+                response["result"] = WindowStateRecord();
+            }
+            catch (Exception error)
+            {
+                Dictionary<string, object> record = (Dictionary<string, object>)ArcaneHost.ErrorRecord(error,
+                    error is ArgumentException ? "INVALID_ARGUMENT" : "ARCANE_WINDOW_STATE_FAILED");
+                record["details"] = new Dictionary<string, object>
+                {
+                    { "requested", parameters }, { "previous", previous }, { "actual", WindowStateRecord() }
+                };
+                response["ok"] = false;
+                response["error"] = record;
+            }
+            return ArcaneHost.Serializer().Serialize(response);
+        }
+
+        private sealed class WindowRestoreSnapshot
+        {
+            internal readonly Rectangle Bounds;
+            internal readonly FormBorderStyle BorderStyle;
+            internal readonly bool MinimizeBox;
+            internal readonly bool MaximizeBox;
+            internal readonly bool ControlBox;
+
+            internal WindowRestoreSnapshot(Rectangle bounds, FormBorderStyle borderStyle,
+                bool minimizeBox, bool maximizeBox, bool controlBox)
+            {
+                Bounds = bounds;
+                BorderStyle = borderStyle;
+                MinimizeBox = minimizeBox;
+                MaximizeBox = maximizeBox;
+                ControlBox = controlBox;
+            }
+        }
+
+        private sealed class WindowStateTransition
+        {
+            private const int WhCbt = 5;
+            private const int HcbtActivate = 5;
+            private const int HcbtSetFocus = 9;
+            private delegate IntPtr HookProcedure(int code, IntPtr target, IntPtr details);
+            // A failed native unhook must never retain a collected delegate.
+            private static readonly HookProcedure callback = BeforeWindowChange;
+            [ThreadStatic] private static WindowStateTransition current;
+            [ThreadStatic] private static List<WindowStateTransition> pendingCleanup;
+            private readonly ArcaneHostForm owner;
+            private readonly WindowStateTransition previous;
+            private IntPtr hook;
+            private bool active;
+
+            internal WindowStateTransition(ArcaneHostForm owner)
+            {
+                this.owner = owner;
+                previous = current;
+                hook = SetWindowsHookEx(WhCbt, callback, IntPtr.Zero, GetCurrentThreadId());
+                if (hook == IntPtr.Zero)
+                {
+                    int code = Marshal.GetLastWin32Error();
+                    System.ComponentModel.Win32Exception error = new System.ComponentModel.Win32Exception(code);
+                    error.Data["operation"] = "SetWindowsHookExW";
+                    error.Data["nativeErrorCode"] = code;
+                    throw error;
+                }
+                active = true;
+                current = this;
+            }
+
+            private static IntPtr BeforeWindowChange(int code, IntPtr target, IntPtr details)
+            {
+                if (code == HcbtActivate || code == HcbtSetFocus)
+                {
+                    for (WindowStateTransition transition = current; transition != null; transition = transition.previous)
+                    {
+                        if (!transition.active || !transition.owner.IsHandleCreated) continue;
+                        IntPtr window = transition.owner.Handle;
+                        if (target == window || (code == HcbtSetFocus && IsChild(window, target)))
+                            return new IntPtr(1);
+                    }
+                }
+                return CallNextHookEx(IntPtr.Zero, code, target, details);
+            }
+
+            internal Exception Release()
+            {
+                // Stop vetoing immediately, even if the native unhook fails.
+                active = false;
+                if (current == this) current = previous;
+                if (hook == IntPtr.Zero) return null;
+                if (UnhookWindowsHookEx(hook))
+                {
+                    hook = IntPtr.Zero;
+                    if (pendingCleanup != null) pendingCleanup.Remove(this);
+                    return null;
+                }
+                int code = Marshal.GetLastWin32Error();
+                if (pendingCleanup == null) pendingCleanup = new List<WindowStateTransition>();
+                if (!pendingCleanup.Contains(this)) pendingCleanup.Add(this);
+                System.ComponentModel.Win32Exception error = new System.ComponentModel.Win32Exception(code);
+                error.Data["operation"] = "UnhookWindowsHookEx";
+                error.Data["nativeErrorCode"] = code;
+                return error;
+            }
+
+            internal static void ReleasePending(ArcaneHostForm owner)
+            {
+                if (pendingCleanup == null) return;
+                foreach (WindowStateTransition transition in pendingCleanup.ToArray())
+                {
+                    if (transition.owner != owner) continue;
+                    Exception error = transition.Release();
+                    if (error != null) owner.Report(error);
+                }
+            }
+
+            [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
+            private static extern IntPtr SetWindowsHookEx(int kind, HookProcedure procedure, IntPtr module, uint threadId);
+
+            [DllImport("user32.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+            [DllImport("user32.dll")]
+            private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr target, IntPtr details);
+
+            [DllImport("user32.dll")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool IsChild(IntPtr parent, IntPtr child);
+
+            [DllImport("kernel32.dll")]
+            private static extern uint GetCurrentThreadId();
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr window);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr window);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsZoomed(IntPtr window);
 
         private async Task InitializeAsync()
         {
@@ -296,12 +560,15 @@ namespace Arcane.Core.Hosts.Windows
             {
                 if (documentGeneration != generation || closing)
                     throw new InvalidOperationException("The requesting document is no longer connected.");
+                string method = EnvelopeString(envelope, "method");
                 if (requestId != null && EnvelopeString(envelope, "protocol") == "arcane/1"
-                    && EnvelopeString(envelope, "method") == "window.setTheme")
+                    && (method == "window.setTheme" || method == "window.state" || method == "window.setState"))
                 {
                     // This method belongs to this exact window, not the Core
                     // child or a machine-wide appearance service.
-                    string response = WindowThemeResponse(envelope, requestId);
+                    string response = method == "window.setTheme"
+                        ? WindowThemeResponse(envelope, requestId)
+                        : WindowStateResponse(envelope, requestId, method == "window.setState");
                     pending.Enqueue(
                         new CoreDelivery(documentGeneration, response)
                     );
@@ -747,6 +1014,7 @@ namespace Arcane.Core.Hosts.Windows
             if (bridge != null) bridge.Stop(new InvalidOperationException("The application window is closing."));
             if (activeBridge != null) activeBridge.Stop(new InvalidOperationException("The application window is closing."));
             StopAppControl();
+            WindowStateTransition.ReleasePending(this);
             shutdown = DrainAndCloseAsync();
             shutdown.ContinueWith(ObserveUnexpectedFailure, TaskContinuationOptions.OnlyOnFaulted);
         }

@@ -71,7 +71,8 @@ test('native launch defaults retain complete authored records and remain opt-in'
 });
 
 test('native window configuration preserves explicit choices and omitted defaults',function nativeWindowChoices(){
-    for(const window of [undefined,{}, {width:1280,height:800,resizable:true}, {width:640}, {resizable:false}]){
+    for(const window of [undefined,{}, {width:1280,height:800,resizable:true}, {width:640}, {resizable:false},
+        {state:'normal'}, {state:'maximized'}, {width:1280,height:800,resizable:false,state:'fullscreen'}]){
         const authored=descriptor();
         if(window!==undefined)authored.native.window=window;
         const original=structuredClone(authored);
@@ -85,7 +86,8 @@ test('native window configuration preserves explicit choices and omitted default
 });
 
 test('native window configuration reports malformed public fields',function nativeWindowErrors(){
-    for(const window of [null,[],{width:0},{width:-1},{width:1.5},{width:'1280'},{height:NaN},{height:Infinity},{resizable:1},{resizable:'true'},{left:50}]){
+    for(const window of [null,[],{width:0},{width:-1},{width:1.5},{width:'1280'},{height:NaN},{height:Infinity},{resizable:1},{resizable:'true'},{left:50},
+        {state:null},{state:false},{state:'Normal'},{state:'minimized'},{state:' full screen '}]){
         const authored=descriptor();
         authored.native.window=window;
         assert.throws(function validateWindow(){
@@ -99,7 +101,7 @@ test('native window selection survives registry descriptor synthesis',async func
     const appRoot=path.join(workspaceRoot,'apps','sample-app');
     await mkdir(appRoot,{recursive:true});
     const authored=descriptor();
-    authored.native.window={width:1280,height:800,resizable:true};
+    authored.native.window={width:1280,height:800,resizable:true,state:'maximized'};
     authored.native.launchContext={sharedHost:{},options:{complete:'  Moon cheese 🧀\r\n  '}};
     const registryRoot=path.join(workspaceRoot,'machine_bundles','arcane-os-machine-bundle');
     await mkdir(registryRoot,{recursive:true});

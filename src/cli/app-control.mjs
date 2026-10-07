@@ -18,7 +18,7 @@ an application or change its profile. --output selects the capture filename;
 the other Arcane commands retain their existing output-format option.
 Inspect --request reads the complete parameter object, including shadowPath and
 optional documentGeneration. It cannot be combined with --selector.
-Key --request selects Tab (optionally shiftKey:true), Enter, or Space and the
+Key --request selects Tab (optionally shiftKey:true), Enter, Space, or Escape and the
 observed documentGeneration. Resize --request supplies native client width and
 height for a Normal window; its result includes the previous dimensions.
 `;

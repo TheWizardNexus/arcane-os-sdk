@@ -98,6 +98,7 @@ namespace Arcane.Core.Hosts.Windows
                     InitialClientWidth = OptionalWindowDimension(windowOptions, "width"),
                     InitialClientHeight = OptionalWindowDimension(windowOptions, "height"),
                     Resizable = OptionalWindowResizable(windowOptions),
+                    InitialWindowState = OptionalWindowState(windowOptions),
                     IconPath = String.IsNullOrEmpty(icon) ? null : Path.Combine(directory, icon),
                     ClassicClientSource = File.ReadAllText(Path.Combine(directory, RequiredString(client, "source"))),
                     AppControlEndpoint = appControl == null ? null : RequiredString(appControl, "endpoint"),
@@ -208,6 +209,14 @@ namespace Arcane.Core.Hosts.Windows
             if (window == null || !window.TryGetValue("resizable", out value)) return null;
             if (value is bool) return (bool)value;
             throw new FormatException("The native manifest needs a boolean at window.resizable.");
+        }
+
+        private static string OptionalWindowState(Dictionary<string, object> window)
+        {
+            object value;
+            if (window == null || !window.TryGetValue("state", out value)) return null;
+            if (value is string) return (string)value;
+            throw new FormatException("The native manifest needs a string at window.state.");
         }
 
         private static string QuoteArgument(string value)

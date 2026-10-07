@@ -139,11 +139,12 @@
         "window": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Initial native client dimensions in logical pixels at 96 DPI, and whether the user can resize the window. Omitted fields retain the host defaults.",
+          "description": "Initial normal client dimensions in logical pixels at 96 DPI, resizing behavior, and optional native window state. Omitted fields retain the host defaults.",
           "properties": {
             "width": { "type": "integer", "minimum": 1 },
             "height": { "type": "integer", "minimum": 1 },
-            "resizable": { "type": "boolean" }
+            "resizable": { "type": "boolean" },
+            "state": { "enum": ["normal", "maximized", "fullscreen"] }
           }
         },
         "bundledApps": {

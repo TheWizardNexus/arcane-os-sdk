@@ -47,6 +47,28 @@ test('classic projection installs synchronous shapes and reuses the shared event
     assert.equal(context.arcaneEvents,arcaneEvents);
 });
 
+test('classic projection carries the requesting-window state facade',async function classicWindowState(t){
+    const frames=[];
+    const context=vm.createContext({arcaneEvents,console,setTimeout,clearTimeout,
+        chrome:{webview:{
+            hostObjects:{arcaneBridge:{Send(text){frames.push(JSON.parse(text));return '{"accepted":true}';}}},
+            addEventListener(){},removeEventListener(){}
+        }}
+    });
+    const source=await createCoreClassicSource({eventOwnerModuleURL:'/sdk/event-manager.mjs'});
+    vm.runInContext(source,context);
+    t.after(function closeWindowClient(){context[Symbol.for('arcane-os.core.client')].close();});
+    for(const state of [null,'normal','maximized','fullscreen']){
+        const pending=state===null?context.Arcane.window.state():context.Arcane.window.setState({state});
+        const request=frames.at(-1);
+        assert.equal(request.method,state===null?'window.state':'window.setState');
+        assert.deepEqual(request.parameters,state===null?{}:{state});
+        const result={platform:'windows',supported:true,state:state??'minimized'};
+        context.__arcaneReceive({protocol:'arcane/1',type:'response',id:request.id,ok:true,result});
+        assert.equal(await pending,result);
+    }
+});
+
 test('classic projection preserves its full canonical client and explicit module location',async()=>{
     const source=await createCoreClassicSource({eventOwnerModuleURL:'/sdk/event-manager.mjs?selected=moon'});
     assert.match(source,/function createCoreClient\(/u);

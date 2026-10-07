@@ -161,6 +161,65 @@ pre-aborted signal sends no transcription request; an in-flight abort sends
 service owns interruption and release of its actual engine operation.
 Its optional request observer uses the same pre-dispatch correlation contract.
 
+## Current-window state
+
+`Arcane.window.state({signal}?)` reads the native window hosting the calling
+document. `Arcane.window.setState({state}, {signal}?)` selects `normal`,
+`maximized`, or `fullscreen` for that same window. Both use the existing
+request lifetime and return `{platform:'windows', supported:true, state}`.
+The observed `state` can also be `minimized`; minimize remains a native window
+control rather than a selectable state in this operation.
+
+```js
+async function selectObservatoryWindow(state) {
+    const result=await Arcane.window.setState({state});
+    console.log('Observatory window state:',result.state);
+}
+```
+
+Call this operation when the application's own setting or user action selects
+a state. Initial state belongs to the descriptor's optional
+[`native.window.state`](core-native-packaging.md#initial-native-window-size)
+field. Saved Settings, their loading and the choice to persist a state remain
+application-owned; the SDK adds no saved-state store or page-startup barrier.
+
+The Windows host uses ordinary native normal/maximized states. Fullscreen
+removes the window frame and occupies the selected monitor's full bounds,
+including its taskbar area. It retains the preceding normal bounds and frame
+controls for restoration. Selecting normal restores them; selecting maximized
+restores them before maximizing. This is native window fullscreen, separate
+from the browser Fullscreen API. It does not select TopMost, request foreground
+activation, change the profile/origin or restart Core. A minimized fullscreen
+window reports `minimized` until restored or another state is selected.
+
+Visible transitions use a temporary native callback confined to this window's
+UI thread and synchronous operation. It prevents activation of this window and
+focus assignment to it or its descendants, then releases the callback. Other
+windows and ordinary input remain untouched. Hidden initial configuration and
+already-selected states allocate no callback; the application's ordinary first
+show keeps its existing startup behavior. State reads observe the native
+minimized/maximized state, rather than merely echoing the requested selection.
+
+Malformed selections reject with `INVALID_ARGUMENT`; native operation failures
+reject with `ARCANE_WINDOW_STATE_FAILED`. Complete native error/cause fields
+remain available, with `details.requested`, `details.previous` and
+`details.actual` describing the attempted selection and observed state. A
+partial native change is observable rather than rolled back. Cancellation
+suppresses late responses and does not undo a change the host already applied.
+If native callback cleanup fails, it stops preventing activation immediately,
+its handle remains owned, and the failure is returned. Simultaneous mutation and
+cleanup failures retain both original errors. The owning window makes another
+cleanup attempt during its normal close and reports any remaining failure.
+State changes survive document navigation, while each response remains
+correlated to its originating document. There is no state-change event in this
+contract; `state()` reads the current native state when requested.
+
+These methods require the matching Windows host executable. The current macOS,
+Linux and Android hosts have no implementation of these operations; their
+actual unavailable-method errors remain observable. Ordinary browsers have no
+native window transport. The facade supplies no browser or other-host fallback,
+and importing it does not add support to an older native executable.
+
 ## Current-window theme
 
 `Arcane.window.setTheme(presentation, {signal}?)` changes only the window

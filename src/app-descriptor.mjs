@@ -237,7 +237,7 @@ function validateDocumentCatalog(value){
 
 function validateNativeWindow(value){
     if(value===undefined)return undefined;
-    assertOnlyKeys(value,new Set(['width','height','resizable']),'descriptor.native.window');
+    assertOnlyKeys(value,new Set(['width','height','resizable','state']),'descriptor.native.window');
     for(const dimension of ['width','height']){
         if(value[dimension]!==undefined&&(!is.integer(value[dimension])||value[dimension]<=0)){
             fail(`descriptor.native.window.${dimension} must be a positive integer.`);
@@ -246,10 +246,14 @@ function validateNativeWindow(value){
     if(value.resizable!==undefined&&!is.boolean(value.resizable)){
         fail('descriptor.native.window.resizable must be a boolean.');
     }
+    if(value.state!==undefined&&!['normal','maximized','fullscreen'].includes(value.state)){
+        fail('descriptor.native.window.state must be normal, maximized, or fullscreen.');
+    }
     return completeValue({
         ...(value.width===undefined?{}:{width:value.width}),
         ...(value.height===undefined?{}:{height:value.height}),
-        ...(value.resizable===undefined?{}:{resizable:value.resizable})
+        ...(value.resizable===undefined?{}:{resizable:value.resizable}),
+        ...(value.state===undefined?{}:{state:value.state})
     });
 }
 
