@@ -19,6 +19,7 @@ export const CORE_METHOD_CONTRACTS={
     'capabilities.list':{input:'empty-object',output:'{app,grants,methods}'},
     'platform.status':{input:'empty-object-v1',output:'platform-status-v1'},
     'network.status':{input:'empty-object-v1',output:'network-status-v1',meaning:'A non-loopback interface is present; this is not proof of Internet reachability.'},
+    'documents.acquire':{input:'{url}',output:'document-acquisition-result-v1',meaning:'Complete HTTP(S) GET response and redirects; native application owns any optional destination predicate. Request-scoped documents.progress events.'},
     'apps.list':{input:'empty-object-v1',output:'application-catalog-v1'},
     'apps.launch':{input:'application-launch-v1',output:'application-launch-result-v1',meaning:'Host acceptance, not application readiness.'},
     'external.open':{input:'external-open-v1',output:'external-open-result-v1',meaning:'Host acceptance, not confirmation of a user action.'},

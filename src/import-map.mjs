@@ -44,6 +44,7 @@ const SDK_BROWSER_SELF_IMPORTS=new Map([
     ['arcane-os/websocket-client','sdk/websocket-client.mjs'],
     ['arcane-os/core/client','sdk/core/client.mjs'],
     ['arcane-os/core/contracts','sdk/core/contracts.mjs'],
+    ['arcane-os/document-acquisition','sdk/document-acquisition.mjs'],
     ['arcane-os/logging','sdk/logging.mjs'],
     ['arcane-os/browser-device','sdk/browser-device.mjs'],
     ['arcane-os/pwa','sdk/pwa.mjs'],

@@ -87,6 +87,8 @@ test('the selected npm tarball installs and exposes the public SDK',{
     assert.equal(installedPackage.version,verified.version);
     assert.equal(installedPackage.exports['./mail'],'./src/mail-api.mjs');
     assert.equal(installedPackage.exports['./testing'],'./src/testing.mjs');
+    assert.equal(installedPackage.exports['./core/document-acquisition'],'./src/core/services/document-acquisition.mjs');
+    assert.equal(installedPackage.exports['./document-acquisition'],'./browser-runtime/document-acquisition.mjs');
     assert.equal(
         installedPackage.exports['./ai/twin-cloud'],
         './browser-runtime/ai/twin-cloud.mjs'
@@ -403,6 +405,8 @@ import {parseModelDefinition} from 'arcane-os/model-definition';
 import {hasConversationEntry} from 'arcane-os/chat-records';
 import {normalizeConversationActionItems} from 'arcane-os/conversation-action-items';
 import {formatConversationClosingReportText} from 'arcane-os/conversation-closing-report';
+import {createDocumentAcquisitionService} from 'arcane-os/core/document-acquisition';
+import {acquireCoreDocument} from 'arcane-os/document-acquisition';
 
 test('installed npm sources own maps, development serving and portable output',{timeout:120_000},async function installedPackageOnly(){
     const workspaceRoot=process.cwd();
@@ -435,6 +439,8 @@ test('installed npm sources own maps, development serving and portable output',{
     assert.equal(hasConversationEntry([{role:'user',content:'Complete conversation.'}]),true);
     assert.deepEqual(normalizeConversationActionItems([]),[]);
     assert.equal(typeof formatConversationClosingReportText,'function');
+    assert.equal(typeof createDocumentAcquisitionService,'function');
+    assert.equal(typeof acquireCoreDocument,'function');
 
     const toolchain=createToolchain({workspaceRoot,appId});
     await writeFile(lockPath,JSON.stringify({sdk:{version:'0.0.1'}}));
@@ -539,6 +545,7 @@ test('installed npm sources own maps, development serving and portable output',{
     assert.equal(rootMap.imports[rootTheme],rootTheme);
     assert.equal(rootMap.imports['arcane-os/event-manager'],'./node_modules/arcane-os/browser-runtime/event-manager.mjs');
     assert.equal(rootMap.imports['arcane-os/ai/model-observation'],'./node_modules/arcane-os/browser-runtime/ai/model-observation.mjs');
+    assert.equal(rootMap.imports['arcane-os/document-acquisition'],'./node_modules/arcane-os/browser-runtime/document-acquisition.mjs');
     assert.equal(rootMap.imports['strong-type'],'./node_modules/arcane-os/runtime/strong-type/index.js');
     const rootWebManifest=JSON.parse(await readFile(path.join(workspaceRoot,'arcane.webmanifest'),'utf8'));
     assert.equal(rootWebManifest.id,'/apps/'+rootAppId+'/');

@@ -160,6 +160,7 @@ test('complete runtime inventory produces a mutable named import map without rea
             'sdk/ai/browser-speech.mjs',
             'sdk/ai/twin-cloud.mjs',
             'sdk/ai/model-observation.mjs',
+            'sdk/document-acquisition.mjs',
             'sdk/dependencies/event-pubsub/index.js'
         ],
         readFile:async()=>{
@@ -176,6 +177,7 @@ test('complete runtime inventory produces a mutable named import map without rea
         'arcane-os/ai/browser-wasm':'./arcane/sdk/ai/browser-wasm.mjs',
         'arcane-os/ai/twin-cloud':'./arcane/sdk/ai/twin-cloud.mjs',
         'arcane-os/ai/model-observation':'./arcane/sdk/ai/model-observation.mjs',
+        'arcane-os/document-acquisition':'./arcane/sdk/document-acquisition.mjs',
         'arcane-os/dom-event-instrumentation':'./arcane/sdk/dom-event-instrumentation.mjs',
         'arcane-os/event-manager':'./arcane/sdk/event-manager.mjs',
         'arcane-os/entities/Preference.js':'./arcane/entities/Preference.js',
@@ -615,6 +617,11 @@ test(
             'arcane/sdk/ai/model-observation.mjs',
             'export function attachModelObservation() {}\n'
         );
+        await writeWorkspaceFile(
+            documentRoot,
+            'arcane/sdk/document-acquisition.mjs',
+            'export async function acquireCoreDocument() {}\n'
+        );
         const authoredMap = '<script type="importmap" data-product-map>{"imports":{"host":"../shared/host.js"}}</script>';
         const documents = [
             {
@@ -680,6 +687,10 @@ test(
             assert.equal(
                 imports['arcane-os/ai/model-observation'],
                 '../arcane/sdk/ai/model-observation.mjs'
+            );
+            assert.equal(
+                imports['arcane-os/document-acquisition'],
+                '../arcane/sdk/document-acquisition.mjs'
             );
             assert.equal(imports['../arcane/modules/ThemeBootstrap.js'], target);
             assert.equal(imports['../arcane/modules/ThemeBootstrap.js?arcaneVersion=7.8.9'], undefined);
