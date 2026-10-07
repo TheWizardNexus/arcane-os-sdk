@@ -3,7 +3,7 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.89.0",
+    "sdk": "0.90.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },

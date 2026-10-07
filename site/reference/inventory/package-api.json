@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.89.0",
+  "sdkVersion": "0.90.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -311,14 +311,14 @@
       "name": "createRepositoryWorkspace",
       "displayName": "createRepositoryWorkspace()",
       "kind": "function",
-      "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})",
+      "signature": "createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})",
       "entrypoints": ["arcane-os/core/repositories"],
       "primaryImport": "arcane-os/core/repositories",
       "group": "Native repository workspaces",
       "summary": "Owns one selected native working checkout with ArcaneData/Repos defaults and existing Git/process lifecycle.",
       "availability": "Node with Git on Windows, Linux and macOS; Android requires host process adaptation",
       "protocol": "Git working repository and SDK process adapter",
-      "normalization": "Returns directory, open, status, configuration, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are preserved. Optional longPaths captures a boolean: explicit Windows true/false supplies clone-local core.longpaths before the first checkout, persisting only in the new repository under ordinary Git configuration precedence. Omission preserves configuration; existing repositories and non-Windows clone commands remain unchanged. No global setting or migration. configuration observes the existing root, symbolic HEAD, origin URL/pushURL arrays and branch remote/merge/upstream URL arrays without clone/init/fetch, preserving unset, empty and repeated values. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. pull/push/write accept a captured target {remote,ref} for current-branch fast-forward pull or non-force current-HEAD selected-ref push; omission retains ordinary configured behavior. write snapshots exact text and paths, stages/commits only literal owned paths and preserves unrelated staged files and Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes plus the supplied target. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and identity selection writes no config file. Optional cloneIdentity captures exact name/email strings and persists only supplied fields through clone --config before the first checkout on every supported platform. Empty strings are explicit; omitted or undefined fields preserve inherited/template configuration. Existing checkouts are never reconfigured. Unrepresentable process arguments fail honestly without transforming them. This option changes no global configuration or credentials and does not identify an authenticated account; command-local gitIdentity remains independent."
+      "normalization": "Returns directory, open, status, configuration, pull, push, write and identical close/drain/dispose hooks. Only missing or empty destinations clone; existing roots are preserved. Optional factory remoteBase explicitly selects the initial-clone remote as a local filesystem locator and captures path.resolve(remoteBase, remote) once at construction. A relative base, including an empty string, uses the construction-time working directory. Only the Git argument is derived; the caller's original locator remains unchanged. Omission preserves every Git remote name, URL, SCP-like address and remote-helper string without guessed parsing. Optional longPaths captures a boolean: explicit Windows true/false supplies clone-local core.longpaths before the first checkout, persisting only in the new repository under ordinary Git configuration precedence. Omission preserves configuration; existing repositories and non-Windows clone commands remain unchanged. No global setting or migration. configuration observes the existing root, symbolic HEAD, origin URL/pushURL arrays and branch remote/merge/upstream URL arrays without clone/init/fetch, preserving unset, empty and repeated values. Explicit paths remain selected. Same-directory operations serialize within the process; cancellation and shutdown join accepted process work. pull/push/write accept a captured target {remote,ref,remoteBase?} for current-branch fast-forward pull or non-force current-HEAD selected-ref push; omission retains ordinary configured behavior. An operation's own remoteBase declares local-path intent and captures its native absolute argument once at acceptance, before queueing; factory remote/remoteBase/branch remain independent clone inputs. Targeted pull/push results and writer results/failure outcomes retain the original remote, ref and supplied remoteBase, including relative or empty base text. Unrepresentable base text reports TypeError without transformation. write snapshots exact text and paths, stages/commits only literal owned paths and preserves unrelated staged files and Git filters. Complete outputs and causal failures retain confirmed local/committed/pushed and uncertain outcomes plus the supplied target. Optional gitIdentity captures name/email/username for child Git operations only; omitted fields remain inherited and identity selection writes no config file. Optional cloneIdentity captures exact name/email strings and persists only supplied fields through clone --config before the first checkout on every supported platform. Empty strings are explicit; omitted or undefined fields preserve inherited/template configuration. Existing checkouts are never reconfigured. Unrepresentable process arguments fail honestly without transforming them. This option changes no global configuration or credentials and does not identify an authenticated account; command-local gitIdentity remains independent."
     },
     {
       "id": "core-repositories:readGitIdentity",
@@ -493,14 +493,14 @@
       "name": "createGitTextSnapshot",
       "displayName": "createGitTextSnapshot()",
       "kind": "function",
-      "signature": "createGitTextSnapshot({cacheDirectory,remote,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})",
+      "signature": "createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})",
       "entrypoints": ["arcane-os"],
       "primaryImport": "arcane-os",
       "group": "Workspace, doctor, repository, and server",
       "summary": "Reads complete selected text from one fetched revision using a dedicated bare Git object cache and batched retrieval.",
       "availability": "Node with Git; Android requires a host supplying Git/process capability",
       "protocol": "Git tree and batched blob transport through the shared process owner",
-      "normalization": "Returns {refresh,close,drain,dispose}; refresh yields {revision,files:[{path,content}]}, shares concurrent work, reuses unchanged revisions, preserves exact UTF-8 text, isolates caller cancellation and drains accepted work. Optional gitIdentity captures name/email/username for child Git commands including bare init and fetch, without changing config files, payloads or shared acquisition lifetime. See git-text-snapshot.md."
+      "normalization": "Returns {refresh,close,drain,dispose}; refresh yields {revision,files:[{path,content}]}, shares concurrent work, reuses unchanged revisions, preserves exact UTF-8 text, isolates caller cancellation and drains accepted work. Optional remoteBase explicitly selects remote as a local filesystem locator and derives only its Git fetch argument through path.resolve(remoteBase, remote), once at construction independently of the cache location and later working-directory changes. A relative base, including an empty string, uses the construction-time working directory; original locator/options remain unchanged. Omission preserves every Git remote name, URL, SCP-like address and remote-helper string without guessed parsing. Unrepresentable base text reports TypeError without transformation; existing Git failures remain errors. Optional gitIdentity captures name/email/username for child Git commands including bare init and fetch, without changing config files, payloads or shared acquisition lifetime. See git-text-snapshot.md."
     },
     {
       "id": "diarization:createDiarization",
@@ -2269,7 +2269,7 @@
       "summary": "Runs one fast-forward-only pull into the selected clean worktree, optionally from a captured remote/ref target.",
       "availability": "Node; network-assisted Git",
       "protocol": "Node ESM",
-      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+      "normalization": "Optional target {remote,ref,remoteBase?} is captured before the first asynchronous status operation. A supplied remoteBase declares local-path intent and derives only the Git remote argument using path.resolve(remoteBase, remote), once at acceptance; relative and empty bases use that working directory. Omitted remoteBase preserves Git remote names, URLs, SCP-like addresses and remote-helper strings unchanged. Targeted results retain original remote/ref/supplied remoteBase text and complete stdout/stderr alongside the existing pull result. Unrepresentable base text reports TypeError without transformation. Omitted target preserves configured pull behavior and result shape; clean-worktree, fast-forward-only, cancellation and actual Git error behavior remain unchanged."
     },
     {
       "id": "root:repositoryPush",
@@ -2285,7 +2285,7 @@
       "summary": "Pushes the attached branch through ordinary configured Git or an explicit captured current-HEAD destination without force.",
       "availability": "Node; network-assisted Git",
       "protocol": "Node ESM",
-      "normalization": "SDK-normalized inputs, errors, events, and documented result"
+      "normalization": "Optional target {remote,ref,remoteBase?} is captured before the first asynchronous status operation. A supplied remoteBase declares local-path intent and derives only the Git remote argument using path.resolve(remoteBase, remote), once at acceptance; relative and empty bases use that working directory. Omitted remoteBase preserves Git remote names, URLs, SCP-like addresses and remote-helper strings unchanged. Targeted results retain original remote/ref/supplied remoteBase text and complete stdout/stderr alongside the existing push result. Unrepresentable base text reports TypeError without transformation. Omitted target preserves configured push behavior and result shape; attached-branch, non-force current-HEAD publication, cancellation and actual Git error behavior remain unchanged."
     },
     {
       "id": "root:repositoryStatus",
