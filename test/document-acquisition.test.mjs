@@ -373,15 +373,19 @@ test('browser progress callback promises settle before success or failure and su
     const {client} = wireClient(t, runtime, 'progress-observer');
     const subscribe = client.events.on;
     let subscriptions = 0;
+    let subscriptionClosed;
     client.events.on = function observeSubscription(event, listener) {
         const unsubscribe = subscribe(event, listener);
         subscriptions += 1;
         return function observeUnsubscription() {
             subscriptions -= 1;
-            return unsubscribe();
+            const result = unsubscribe();
+            subscriptionClosed.resolve();
+            return result;
         };
     };
     for (const fail of [false, true]) {
+        subscriptionClosed = deferred();
         const entered = deferred();
         const finish = deferred();
         const original = new Error('Complete asynchronous progress observer failure.');
@@ -403,6 +407,9 @@ test('browser progress callback promises settle before success or failure and su
             return error.cause === original;
         }) : observed;
         await entered.promise;
+        // Progress completion precedes the RPC response. Unsubscription marks
+        // that response's settlement before this deliberately late observer.
+        await subscriptionClosed.promise;
         assert.equal(settled, false);
         finish.resolve();
         await outcome;

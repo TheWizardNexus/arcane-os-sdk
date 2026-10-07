@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.87.0
+
+- Add `createDocumentAcquisitionService` through
+  `arcane-os/core/document-acquisition` and `acquireCoreDocument` through
+  `arcane-os/document-acquisition`. Applications can acquire selected HTTP(S)
+  documents through their existing native Core without depending on browser
+  cross-origin access.
+- Preserve complete response bodies, requested and final URLs, response
+  metadata and ordered redirect evidence. An optional application-owned
+  destination predicate runs before each native request; domain selection and
+  document interpretation remain application policy.
+- Correlate semantic progress and cancellation with the existing Core request,
+  preserve complete error evidence, and return browser bodies as `Blob`
+  objects. Native service disposal cancels and joins its owned operations.
+  No dependency or compiled native host change is required.
+
 ## 0.86.1
 
 - Include the existing public `arcane-os/ai/model-observation` export in
