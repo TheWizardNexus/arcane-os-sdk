@@ -199,13 +199,21 @@ export function coreEntrySource(application, version, services, {localAI, runtim
             '    register(packagedWeb);');
     }
     return [
-        "import {fileURLToPath} from 'node:url';",
+        "import {fileURLToPath, pathToFileURL} from 'node:url';",
         "import path from 'node:path';",
         "import {isSea} from 'node:sea';",
         ...(launchDefaults === undefined ? [] : ["import {mkdir} from 'node:fs/promises';"]),
         "import {readCoreLaunchContext, startCoreHost, startCoreListener, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';",
         "import {createModelObservationService} from 'arcane-os/core/model-observation';",
         '',
+        "const appEntryFlag = process.argv.indexOf('--arcane-app-entry', 2);",
+        'if (appEntryFlag !== -1) {',
+        '    const appEntry = process.argv[appEntryFlag + 1];',
+        "    if (appEntry === undefined || appEntry === '') throw new TypeError('--arcane-app-entry requires an app-relative module path.');",
+        "    const appRoot = fileURLToPath(new URL('../app/', import.meta.url));",
+        '    await import(pathToFileURL(path.resolve(appRoot, appEntry)).href);',
+        '} else {',
+        ...[
         ...(localAI === undefined ? [] : [
             '// Bundled runtime paths are artifact-root-relative POSIX paths.',
             'function runtimePath(relative) {',
@@ -366,6 +374,8 @@ export function coreEntrySource(application, version, services, {localAI, runtim
         '    }',
         "    process.off('SIGINT', closeCore);",
         "    process.off('SIGTERM', closeCore);",
+        '}'
+        ].map(function indentOrdinaryCore(line) { return line ? `    ${line}` : line; }),
         '}',
         ''
     ].join('\n');

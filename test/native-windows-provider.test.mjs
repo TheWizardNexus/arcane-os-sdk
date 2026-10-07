@@ -180,6 +180,32 @@ test('Windows assembly preserves complete selected payloads, app services and th
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
 
+test('Windows app-entry composition reuses the bundled Core executable and filesystem loader', async function appEntryRuntime(t) {
+    const fixture = await createFixture(t);
+    const module = 'native/moon-mcp.mjs';
+    const source = "throw new Error('The app-owned MCP entry must not execute during assembly.');\n";
+    await writeContents(fixture.appReleaseRoot, new Map([[module, Buffer.from(source)]]));
+    fixture.request.release.files.push(module);
+    const artifact = await createWindowsNativeProvider({hostDirectory: fixture.hostDirectory}).build(fixture.request);
+    const root = artifact.target.rootDir;
+    assert.equal(artifact.manifest.host.coreExecutable, 'runtime/ArcaneCore.exe');
+    assert.equal(artifact.manifest.host.coreLoader, 'runtime/arcane-core-loader.cjs');
+    assert.equal(artifact.manifest.core.entry, 'runtime/arcane-core.mjs');
+    assert.equal(await readFile(path.join(root, 'app', module), 'utf8'), source);
+    const entry = await readFile(path.join(root, 'runtime/arcane-core.mjs'), 'utf8');
+    assert.ok(entry.includes("process.argv.indexOf('--arcane-app-entry', 2)"));
+    assert.ok(entry.includes('await import(pathToFileURL(path.resolve(appRoot, appEntry)).href);'));
+    const [sea, loader] = await Promise.all([
+        readFile(path.join(sdkRoot, 'src/core/hosts/sea-launcher.cjs'), 'utf8'),
+        readFile(path.join(sdkRoot, 'src/core/hosts/arcane-core-loader.cjs'), 'utf8')
+    ]);
+    assert.ok(sea.includes('createRequire(process.execPath)'));
+    assert.ok(sea.includes("load(join(dirname(process.execPath), 'arcane-core-loader.cjs'))"));
+    assert.ok(loader.includes("module.exports = import('./arcane-core.mjs');"));
+    assert.equal(sea.includes('process.argv'), false);
+    assert.equal(loader.includes('process.argv'), false);
+});
+
 test('Windows assembly forwards optional window sizing and state without replacing services', async function nativeWindowManifest(t) {
     const fixture = await createFixture(t);
     const window = {width: 1280, height: 800, resizable: false, state: 'fullscreen'};

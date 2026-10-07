@@ -149,6 +149,37 @@ same owner with an origin-root URL, including on nested pages. It does not creat
 a second event implementation. A plain file-URL launch without this host mapping
 is not the native serving contract. No host is launched during packaging.
 
+## App-owned runtime entry
+
+The generated `runtime/arcane-core.mjs` also accepts
+`--arcane-app-entry <app-relative-module>`. This explicit mode imports the
+selected file from the artifact's `app/` directory before ordinary launch-context
+or service initialization. It preserves the complete original `process.argv`
+and converts the native path to a file URL without treating filename characters
+as URL query or fragment syntax. Missing/empty selections and actual import
+failures propagate; there is no fallback to ordinary Core.
+
+Use the existing Windows `runtime/ArcaneCore.exe` with that flag and module path
+directly. On macOS, use bundled `runtime/node` with `runtime/arcane-core.mjs`
+followed by the flag and module path. Portable payloads use the host's supported
+Node executable with that same generated entry. The macOS artifact root is its
+`.app/Contents/Resources` directory. This mode needs no new executable, SEA
+loader, GUI launcher, or copied runtime.
+
+The app includes the module and its complete source closure through
+[`package.nativeResources`](#native-only-application-resources). The imported
+entry starts its own top-level work, not an `import.meta.main`-guarded entry or
+an automatically invoked export. It owns any explicit launch-context read,
+application services, MCP tools, signals and shutdown. No ordinary Core host,
+shared-host bridge, manifest services, model startup or Core pipe framing is
+started by this branch. Static SDK definition imports remain available; the
+ordinary parallel service imports and host lifetime stay unchanged when the
+flag is absent.
+
+For complete client command arrays, optional `--arcane-launch-config` handling,
+and MCP STDIO lifetime ownership, see
+[launch from a native package](mcp-stdio.md#launch-from-a-native-package).
+
 ## Explicit application services
 
 For the ordinary SDK build command, select native service modules in the

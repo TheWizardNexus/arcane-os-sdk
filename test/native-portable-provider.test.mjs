@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import defaultProvider, {arcaneNativeBuilderProvider, createPortableNativeProvider} from '../src/native/portable-provider.mjs';
 import {coreEntrySource} from '../src/native/portable-layout.mjs';
+import {runProcess} from '../src/process.mjs';
 import {ERROR_CODES} from '../src/errors.mjs';
 
 const sdkRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -187,6 +188,67 @@ test(
     }
 );
 
+test('generated app-entry selection precedes ordinary Core setup and keeps parallel service composition', function appEntrySource() {
+    const entry = coreEntrySource({...application, native: {launchContext: {sharedHost: {}}}}, '1.2.3',
+        [{module: 'services/dispatch.mjs', options: {complete: '  Moon dispatch 🧀\r\n  '}}], {packagedWeb: true});
+    const flag = entry.indexOf("const appEntryFlag = process.argv.indexOf('--arcane-app-entry', 2);");
+    const selectedImport = entry.indexOf('await import(pathToFileURL(path.resolve(appRoot, appEntry)).href);');
+    const ordinary = entry.indexOf('} else {', selectedImport);
+    const context = entry.indexOf('    const context = {');
+    assert.ok(flag !== -1 && flag < selectedImport && selectedImport < ordinary && ordinary < context);
+    assert.ok(entry.includes("const appRoot = fileURLToPath(new URL('../app/', import.meta.url));"));
+    assert.ok(entry.includes("throw new TypeError('--arcane-app-entry requires an app-relative module path.');"));
+    assert.ok(entry.indexOf('await readCoreLaunchContext') > ordinary);
+    assert.ok(entry.indexOf('await mkdir(context.stateRoot') > ordinary);
+    assert.ok(entry.indexOf('async function createServices(register) {') > ordinary);
+    assert.ok(entry.indexOf('await Promise.all([') > ordinary);
+    assert.ok(entry.indexOf('import("../app/services/dispatch.mjs")') > ordinary);
+    assert.ok(entry.indexOf('host = startCoreHost(') > ordinary);
+    assert.ok(entry.indexOf('host = await runSharedCoreHost(') > ordinary);
+    assert.ok(entry.indexOf('host = await startSharedCoreBridge(') > ordinary);
+    assert.ok(entry.indexOf("process.on('SIGINT', closeCore)") > ordinary);
+    assert.ok(entry.includes("...(isSea() ? [] : [fileURLToPath(import.meta.url)]), ...process.argv.slice(2)"));
+    assert.equal(/process\.argv\s*=|process\.argv\.(?:shift|splice)\(/u.test(entry), false);
+});
+
+test('generated app entry imports a literal native path from the artifact and retains complete argv', async function appEntryArguments(t) {
+    const fixture = await createFixture(t);
+    const runtime = path.join(fixture.root, 'runtime');
+    const native = path.join(fixture.root, 'app', 'native');
+    const unrelated = path.join(fixture.root, 'caller working directory');
+    await Promise.all([mkdir(runtime), mkdir(native, {recursive: true}), mkdir(unrelated)]);
+    const entry = path.join(runtime, 'arcane-core.mjs');
+    const selected = path.join('native', 'moon # % 🧀.mjs');
+    await writeFile(entry, coreEntrySource(application, '1.2.3', [{module: 'must-not-load.mjs'}]));
+    await writeFile(path.join(fixture.root, 'app', selected), [
+        "import {MCP_PROTOCOL_VERSION} from 'arcane-os/mcp/stdio';",
+        'process.stdout.write(JSON.stringify({argv: process.argv, main: import.meta.main, protocol: MCP_PROTOCOL_VERSION}));',
+        ''
+    ].join('\n'));
+    const args = [entry, '--arcane-app-entry', selected, '--arcane-launch-config', 'absent launch context.json',
+        '--app-choice', '  Entire app argument 🧀\nLast line.  '];
+    const result = await runProcess(process.execPath, args, {cwd: unrelated});
+    const observed = JSON.parse(result.stdout);
+    assert.deepEqual(observed.argv.slice(1), args);
+    assert.equal(observed.main, false);
+    assert.equal(observed.protocol, '2025-11-25');
+    for (const selection of [[], ['']]) {
+        await assert.rejects(runProcess(process.execPath, [entry, '--arcane-app-entry', ...selection], {cwd: unrelated}),
+            function missingSelection(error) {
+                assert.match(error.details.stderr, /--arcane-app-entry requires an app-relative module path\./u);
+                assert.equal(error.details.stdout, '');
+                return true;
+            });
+    }
+    await assert.rejects(runProcess(process.execPath, [entry, '--arcane-app-entry', 'native/absent-entry.mjs'], {cwd: unrelated}),
+        function actualImportFailure(error) {
+            assert.match(error.details.stderr, /ERR_MODULE_NOT_FOUND/u);
+            assert.ok(error.details.stderr.includes('absent-entry.mjs'));
+            assert.equal(error.details.stdout, '');
+            return true;
+        });
+});
+
 test('portable assembly preserves complete app and dependency files and authors service composition without executing it', async function completePayload(t) {
     const fixture = await createFixture(t);
     const dependencyRoot = path.join(fixture.root, 'selected-dependency');
@@ -291,14 +353,14 @@ test('portable Core entry shares explicit launch context without changing author
         {module: 'services/observatory.mjs'}
     ];
     const entry = coreEntrySource(launchApplication, '1.2.3', services);
-    assert.ok(entry.includes("import {fileURLToPath} from 'node:url';"));
+    assert.ok(entry.includes("import {fileURLToPath, pathToFileURL} from 'node:url';"));
     assert.ok(entry.includes("import {readCoreLaunchContext, startCoreHost, startCoreListener, runSharedCoreHost, startSharedCoreBridge} from 'arcane-os/core/host';"));
     assert.ok(entry.includes([
         'const context = {',
         "    appRoot: fileURLToPath(new URL('../app/', import.meta.url)),",
         '    ...await readCoreLaunchContext()',
         '};'
-    ].join('\n')));
+    ].map(function ordinaryCoreLine(line) { return `    ${line}`; }).join('\n')));
     assert.ok(entry.includes(`createService0(JSON.parse(${JSON.stringify(JSON.stringify(options))}), context)`));
     assert.ok(entry.includes('import("../app/services/arrival%20notes.mjs")'));
     assert.ok(entry.includes('createService1(JSON.parse("null"), context)'));
@@ -364,7 +426,7 @@ test('portable Core entry composes only selected local AI with relocatable runti
         '        return resolved;',
         '    }),',
         '    ...await readCoreLaunchContext()'
-    ].join('\n')));
+    ].map(function ordinaryRuntimeLine(line) { return `    ${line}`; }).join('\n')));
     const unselected = coreEntrySource(application, '1.2.3', services, {runtimes});
     assert.equal(unselected.includes('arcane-os/core/local-ai'), false);
     assert.equal(unselected.includes('createLocalAIService'), false);
@@ -390,7 +452,7 @@ test('portable local-AI hosts compose one lazy execution-device catalog with an 
         const catalog = entry.indexOf('const executionDevices = createExecutionDeviceCatalog(');
         const inventory = entry.indexOf('register(createExecutionDeviceService({catalog: executionDevices}));');
         const localAI = entry.indexOf('register(createLocalAIService(');
-        const factoryEnd = entry.indexOf('\n}\nconst application = ');
+        const factoryEnd = entry.indexOf('\n    }\n    const application = ');
         assert.ok(factory !== -1 && factory < catalog && catalog < inventory && inventory < localAI && localAI < factoryEnd);
         assert.match(entry, /register\(createLocalAIService\([^\n]+, \{\.\.\.context, executionDevices\}\)\);/);
         assert.equal(entry.includes('executionDevices.devices('), false);
@@ -409,7 +471,7 @@ test('portable Core shares one model-assets owner for ONNX and image selections'
         const entry = coreEntrySource(application, '1.2.3', [], {localAI: {runtimes: selection}});
         assert.equal([...entry.matchAll(/import\("arcane-os\/core\/model-assets"\)/g)].length, 1);
         assert.equal([...entry.matchAll(/const modelAssets = createModelAssetService\(/g)].length, 1);
-        assert.equal([...entry.matchAll(/^    register\(modelAssets\);$/gm)].length, 1);
+        assert.equal([...entry.matchAll(/^        register\(modelAssets\);$/gm)].length, 1);
         assert.equal(entry.includes('createLocalImageService'), selection.includes('stable-diffusion.cpp'));
         if (selection.includes('stable-diffusion.cpp')) assert.ok(entry.includes('{...context, modelAssets}'));
     }

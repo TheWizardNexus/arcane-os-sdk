@@ -75,7 +75,8 @@ Save this in the consuming application and configure the MCP client's subprocess
 command as `node` with that application's script path. Client configuration
 file formats and process launch policy remain client-owned. Change `menu` to
 change the complete result; no model, repository, or native host is needed for
-this example.
+this example. A native package can instead use its
+[existing bundled runtime](#launch-from-a-native-package).
 
 The application explicitly converts its domain record into an MCP result.
 The SDK does not guess from `content`, `message`, or other domain field names.
@@ -254,6 +255,80 @@ The adapter uses `-32700` for malformed JSON, `-32600` for invalid requests,
 `-32601` for unknown methods, `-32602` for malformed params or unknown tools,
 `-32603` for internal failures, and `-32002` for a missing resource. Its
 `-32000` lifecycle error requests initialization before ordinary operations.
+
+## Launch from a native package
+
+The generated `runtime/arcane-core.mjs` accepts
+`--arcane-app-entry <app-relative-module>` to import an application-owned entry
+instead of starting ordinary Core. Include the entry and its complete local
+source closure in the application's `package.nativeResources`, for example:
+
+```json
+{
+  "package": {
+    "nativeResources": {
+      "include": ["native", "src", "package.json"]
+    }
+  }
+}
+```
+
+Save the complete example above as `native/moon-mcp.mjs`. Native packaging copies
+the selected files beneath the artifact's `app/` directory. It does not discover
+entry dependencies from this runtime argument or execute the entry during
+packaging. Public imports such as `arcane-os/mcp/stdio` use the artifact's
+existing SDK package and Node's ordinary package resolution.
+
+Configure the MCP client's command and argument array for the selected artifact:
+
+| Artifact | Command | Arguments |
+| --- | --- | --- |
+| Windows | `<artifact-root>/runtime/ArcaneCore.exe` | `["--arcane-app-entry", "native/moon-mcp.mjs"]` |
+| macOS | `<artifact-root>/runtime/node` | `["<artifact-root>/runtime/arcane-core.mjs", "--arcane-app-entry", "native/moon-mcp.mjs"]` |
+| Portable | The host's supported Node executable | `["<artifact-root>/runtime/arcane-core.mjs", "--arcane-app-entry", "native/moon-mcp.mjs"]` |
+
+These are placeholders for the actual native paths. For macOS, `artifact-root`
+is `<app-id>.app/Contents/Resources`. The portable provider supplies no Node
+executable. Windows uses its existing SEA executable and filesystem loader;
+do not pass `arcane-core.mjs` as a script argument to that executable. These
+commands select the runtime directly, not the GUI launcher, and create no
+window or second Core host.
+
+The module path resolves from the artifact's `app/`, independently of the
+client's working directory. Native path separators, spaces, Unicode, `#` and
+`%` retain their filesystem meaning through file-URL conversion. The original
+`process.argv` remains complete and unchanged, including this flag, its path,
+and every app argument. The flag is read from user arguments starting at index
+2 for both normal Node and SEA. A missing or empty value throws `TypeError`;
+module-loading failures remain actual errors and never start ordinary Core.
+
+This is a dynamic import: the entry runs its top-level code and observes its
+own session lifetime, as the example's `server.start()` and `await server.closed`
+do. Do not put its only startup behind `if (import.meta.main)`; the imported
+module is not Node's main entry. The SDK calls no default export or factory.
+
+App-entry mode skips ordinary Core launch-context loading, manifest service
+composition, state-directory creation, local-AI startup, shared-host startup,
+and Core signal handlers. If the application wants the existing explicit launch
+JSON or host state-root arguments, append them to the same argument array and
+read them deliberately in its entry:
+
+```javascript
+import {readCoreLaunchContext} from 'arcane-os/core/host';
+
+const context = await readCoreLaunchContext();
+```
+
+For example, append `"--arcane-launch-config", "<selected-launch.json>"`.
+Relative launch JSON paths retain their caller-working-directory meaning. The
+application chooses defaults, services and any connection to an existing Core;
+the entry selector neither reads nor applies the manifest's launch defaults.
+
+The application owns process signals, graceful MCP drain, and its underlying
+service shutdown. Keep stdout exclusively for MCP JSON-RPC and diagnostics on
+stderr; the ordinary Core `arcane/1` transport must not share those MCP pipes.
+When the flag is absent, ordinary Core startup and service lifecycle are
+unchanged. See [native entry composition](core-native-packaging.md#app-owned-runtime-entry).
 
 ## Evidence boundary
 
