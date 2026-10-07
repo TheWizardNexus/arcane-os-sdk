@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.91.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.92.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -5865,7 +5865,7 @@ console.log(registeredTestCount());
 <p>Reads complete application-selected UTF-8 text from one fetched revision using
 a dedicated bare Git cache. It does not create or alter a working checkout.</p>
 <h4 id="signature-lifecycle-and-result">Signature, lifecycle, and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,gitIdentity,onEvent,run=runProcess}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createGitTextSnapshot({cacheDirectory,remote,remoteBase,ref,selectPath,allowUnborn=false,gitIdentity,onEvent,run=runProcess}={})
 </code></pre></div>
 <p>Import from <code>arcane-os</code>. The application owns the cache location, remote, ref,
 path predicate and service factory. The returned <code>refresh({signal}={})</code> returns
@@ -5875,6 +5875,13 @@ ends only that wait. <code>close()</code>, <code>drain()</code> and <code>dispos
 await accepted refresh/process cleanup. Errors remain observable instead of
 returning stale or partial success. See <a href="../git-text-snapshot/">Git text snapshots</a>
 for complete inputs, text semantics, errors, events and Core service composition.</p>
+<p>Optional <code>allowUnborn:true</code> observes the complete remote advertisement on every
+acquisition. Only successful empty output returns
+<code>{revision:null,files:[],unborn:true}</code>; committed results add <code>unborn:false</code> and
+retain the actual commit even for an empty tree. Any advertised HEAD, branch
+or tag continues through ordinary selected-ref fetch; missing refs and actual
+Git failures remain errors. Omitted/false preserves the prior result and commands.
+See <a href="../git-text-snapshot/#unborn-remotes">unborn remotes</a>.</p>
 <p>Optional <code>remoteBase</code> explicitly selects <code>remote</code> as a local filesystem locator.
 Only its Git fetch argument is derived using <code>path.resolve(remoteBase, remote)</code>,
 once at construction, independently of the cache location and later changes to
@@ -5918,6 +5925,26 @@ immediately. With <code>cancellationMode:&#39;close-input&#39;</code>, optional 
 once and stdin remains open until cancellation or a callback/input failure
 requests shutdown. On Microsoft NT, <code>npm</code> and <code>npx</code> are normalized to their Node
 CLI entrypoints.</p>
+<p>For the literal <code>git</code> command on Windows, the default runner reads Git for
+Windows&#39; registered <code>InstallPath</code> in the current-user and machine registry
+views. When that installation&#39;s <code>cmd/git.exe</code> exists, its <code>cmd</code> directory is
+appended only to this child&#39;s effective PATH. Existing entries and native
+command lookup retain priority; duplicate <code>Path</code>/<code>PATH</code> spellings follow Node&#39;s
+lexical selection. Other environment fields, explicit executable paths,
+custom process adapters, other commands and other platforms keep their existing
+behavior. No global environment or registry setting is changed, and no Git
+download, installation or command retry occurs.</p>
+<p>One successful location is retained in memory for this process while its
+executable remains present. A removed executable triggers fresh discovery;
+absent, failed and cancelled lookups are not retained. Concurrent cold callers
+own independent discovery and cancellation. The standard Windows registry
+helper uses the existing process owner; its lifecycle callbacks have
+<code>process.git.discovery.*</code> event names, and its captured metadata is separate
+from the requested command&#39;s output. Missing registration leaves ordinary
+lookup unchanged. Discovery failure emits <code>process.git.discovery.unavailable</code>
+with the complete error before ordinary lookup continues. Cancellation or an
+event-callback failure stops the operation before Git starts. Normal Git
+errors and missing-working-directory errors remain actual command failures.</p>
 <p>An <code>AsyncIterable</code> input instead feeds stdin with awaited writes and closes it
 when the producer finishes. Its <code>return()</code> must cooperate with cancellation of
 an outstanding <code>next()</code>; the process owner drains both input and output work.
@@ -7921,7 +7948,7 @@ const {repositoriesRoot} = resolveArcaneDataPaths();
 <p>Owns one native connected working checkout under <code>ArcaneData/Repos/&lt;name&gt;</code> or an
 explicit existing path. The application owns the remote, branch and Core API.</p>
 <h4 id="signature-and-result-121">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,initialBranch,longPaths,cloneIdentity,gitIdentity,onEvent,run=runProcess}={})
 </code></pre></div>
 <p>Returns <code>{directory,open,status,configuration,pull,push,write,close,drain,dispose}</code>. Construction does
 no I/O. Preparing operations accept <code>{signal}</code>; a missing or empty destination clones once,
@@ -7930,6 +7957,16 @@ Same-directory calls are ordered within the process. Shutdown drains accepted
 work and preserves the checkout. No CLI cwd, launch state, preference, snapshot
 cache or existing user-data location changes. See the <a href="../core-repositories/#one-connected-working-checkout">complete inputs, results,
 errors and lifecycle</a>.</p>
+<p>Optional <code>initialBranch</code> selects <code>refs/heads/&lt;initialBranch&gt;</code> only after a new
+clone, successful complete empty remote advertisement, explicit local
+initial-state observation and a successful empty local-ref listing. Any local
+ref supplied by a Git template or hook remains unchanged. Existing destinations and committed/advertised
+clones keep their branches; <code>branch</code> still means Git&#39;s existing-branch/tag clone
+selection. New-clone <code>open</code> results with this option add complete ordered
+preparation <code>outputs</code>; subsequent failures retain completed outputs and their
+original cause. Omission adds no command or result field. See
+<a href="../core-repositories/#first-publication-from-an-unborn-remote">first-publication composition</a>
+for the direct first commit/push without an implicit pull.</p>
 <p>Optional factory <code>remoteBase</code> explicitly selects the initial-clone <code>remote</code> as
 a local filesystem locator. Only its Git argument is derived through the host&#39;s
 native <code>path.resolve(remoteBase, remote)</code>, once at construction. Relative bases,
@@ -7961,13 +7998,17 @@ Selected author fields override inherited child author/committer fields;
 omitted fields remain inherited. Username remains a credential hint, with
 authentication owned by ordinary Git and its configured helper.</p>
 <p><code>configuration({signal})</code> observes an existing working root without clone,
-initialization or fetch. It returns <code>{repositoryRoot,headRef,origin,upstream}</code>:
+initialization or fetch. It returns <code>{repositoryRoot,headRef,revision,unborn,origin,upstream}</code>:
 full symbolic HEAD (including unborn, null when detached), origin URL/pushURL
 arrays and current branch remote/merge/URL/pushURL arrays. Unset, empty and
-repeated configuration values remain distinct. These are ordinary configured
-values, not authentication or endpoint proof, and are not atomic with later
-operations. Raw stdout is decoded without replacement; unrepresentable text
-reports <code>ARCANE_GIT_CONFIGURATION_NOT_TEXT</code> with full diagnostics.</p>
+repeated configuration values remain distinct. <code>revision:null,unborn:true</code>
+comes only from Git&#39;s explicit porcelain-v2 initial state; committed and
+detached states retain their current revision with <code>unborn:false</code>. Missing
+branch-state output reports <code>ARCANE_REPOSITORY_HEAD_UNAVAILABLE</code>. These are
+ordinary configured values and local branch observations, not authentication
+or endpoint proof, and are not atomic with later operations. Raw stdout is
+decoded without replacement; unrepresentable text reports
+<code>ARCANE_GIT_CONFIGURATION_NOT_TEXT</code> with full diagnostics.</p>
 <p><code>pull({target,signal})</code>, <code>push({target,signal})</code> and
 <code>write({files:[{path,content}],message,target,signal})</code> accept optional
 <code>target:{remote,ref,remoteBase?}</code>, captured as original strings at acceptance. The target
@@ -10655,6 +10696,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.91.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.92.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

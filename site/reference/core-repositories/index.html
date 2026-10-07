@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.91.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native repository workspaces</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-repository-workspaces">Native repository workspaces</h1><p class="doc-lead">arcane-os/core/repositories owns a persistent native location for connected repositories, separate from application code and application preferences. Applications choose their connection names, remotes, branches, files and Core methods. Importing the module and constructing an owner perform no I/O.</p><div class="doc-meta"><span>SDK 0.92.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="./" aria-current="page">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/core-repositories.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#existing-checkout-configuration-and-selected-targets">Existing checkout configuration and selected targets</a><a href="#git-identity-configuration">Git identity configuration</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></details><p><code>arcane-os/core/repositories</code> owns a persistent native location for connected
@@ -78,7 +78,7 @@ const opened = await repository.open({signal});
 const status = await repository.status({signal});
 await repository.close();
 </code></pre></div>
-<p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})</code>
+<p><code>createRepositoryWorkspace({name,directory,dataRoot,remote,remoteBase,branch,initialBranch,longPaths,cloneIdentity,gitIdentity,onEvent,run}={})</code>
 returns <code>{directory,open,status,configuration,pull,push,write,close,drain,dispose}</code>. The <code>directory</code>
 property is the absolute selected working path.</p>
 <ul>
@@ -94,6 +94,10 @@ the process working directory. The path is not relocated or rewritten.</li>
 <code>branch</code>, when supplied, is passed unchanged to Git&#39;s <code>clone --branch</code> option;
 otherwise Git selects the remote&#39;s default branch. Existing checkouts keep
 their own branch, remote, tracked files, untracked files and local changes.</li>
+<li>Optional <code>initialBranch</code> names the branch for first publication from a new
+unborn clone. It is separate from <code>branch</code>, which selects an existing remote
+branch or tag. Omit <code>branch</code> when the remote has no advertised revision.
+See <a href="#first-publication-from-an-unborn-remote">first publication</a>.</li>
 <li>Supplying <code>remoteBase</code> explicitly declares this initial-clone <code>remote</code> to be
 a local filesystem locator. Its native absolute command argument is captured
 during construction. Omission leaves Git&#39;s original string interpretation
@@ -108,7 +112,11 @@ fields in a newly cloned repository&#39;s local Git configuration. Omitted field
 keep Git&#39;s ordinary inheritance; existing checkouts retain their configuration.
 See <a href="#clone-local-author-selection">clone-local author selection</a>.</li>
 <li><code>onEvent</code> and optional <code>run</code> use the existing SDK process owner. The default
-adapter is <code>runProcess</code>; Git must be available on PATH. Credentials and
+adapter is <code>runProcess</code>; Git can be available on PATH or through an installed
+Git for Windows registration. The default Windows runner appends that
+installation&#39;s <code>cmd</code> directory only to the Git child&#39;s PATH, preserving
+existing command lookup priority. See <a href="../sdk-api/#runprocess">Windows Git discovery</a>.
+Custom <code>run</code> adapters retain their own execution behavior. Credentials and
 authentication remain with Git and the native host. The SDK adds no download,
 credential store, polling, network retry or process supervisor.</li>
 </ul>
@@ -193,6 +201,8 @@ Its result is:</p>
 <div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">{
     repositoryRoot,
     headRef: fullSymbolicRef | null,
+    revision: currentCommit | null,
+    unborn: boolean,
     origin: {urls: [...], pushUrls: [...]},
     upstream: {remoteNames: [...], mergeRefs: [...], urls: [...], pushUrls: [...]} | null
 }
@@ -204,6 +214,15 @@ arrays contain that branch&#39;s configured <code>remote</code> and <code>merge<
 <code>pushUrls</code> observe the effective last configured remote name. A <code>.</code> remote
 means the local repository and has no remote URL arrays. Origin is observed
 independently, even when it is not the upstream.</p>
+<p><code>revision</code> and <code>unborn</code> come from Git&#39;s successful
+<a href="https://git-scm.com/docs/git-status#_porcelain_format_version_2" target="_blank" rel="noreferrer">porcelain-v2 branch observation</a>:
+<code>(initial)</code> yields <code>revision:null, unborn:true</code>; a current commit yields that
+opaque revision and <code>unborn:false</code>, including a commit with an empty tree and
+detached HEAD. Symbolic HEAD alone does not establish an unborn branch.
+The command uses <code>--no-optional-locks</code> and omits untracked-file discovery, so
+this observation does not refresh the index on disk. A missing branch-state
+record reports <code>ARCANE_REPOSITORY_HEAD_UNAVAILABLE</code>; unsuccessful commands
+retain their actual failures rather than becoming an initial state.</p>
 <p>Arrays retain configured order, repeated values, complete UTF-8 strings and
 empty strings. <code>[]</code> means unset; <code>[&#39;&#39;]</code> means an explicit empty value. The
 reader honors configured includes and ordinary Git configuration precedence.
@@ -215,8 +234,8 @@ The SDK neither queries a credential helper nor changes configuration here.</p>
 with the process owner, raw stdout remains parser-owned, and undecodable text
 reports <code>ARCANE_GIT_CONFIGURATION_NOT_TEXT</code>. Failures retain complete raw
 stdout, process diagnostics and causal errors using the identity reader&#39;s
-documented attachment behavior. One observation uses four read-only Git
-commands for an attached local branch, or three otherwise. Results are not a
+documented attachment behavior. One observation uses five read-only Git
+commands for an attached local branch, or four otherwise. Results are not a
 transaction with later work or external Git activity. The app owns any decision
 that the current checkout corresponds to its selected repository and branch.</p>
 <p>The optional <code>target:{remote,ref,remoteBase?}</code> on <code>pull</code>, <code>push</code> and <code>write</code> selects
@@ -249,6 +268,61 @@ selection, retry, reset, force, reversal or recommit. The app decides when to
 observe, refresh, write and publish. See Git&#39;s <a href="https://git-scm.com/docs/git-pull" target="_blank" rel="noreferrer">pull</a>,
 <a href="https://git-scm.com/docs/git-push" target="_blank" rel="noreferrer">push</a> and <a href="https://git-scm.com/docs/git-config" target="_blank" rel="noreferrer">configuration</a>
 contracts.</p>
+<h3 id="first-publication-from-an-unborn-remote">First publication from an unborn remote</h3>
+<p>An opt-in <a href="../git-text-snapshot/#unborn-remotes">snapshot refresh</a> can report
+<code>{revision:null,files:[],unborn:true}</code> after a successful complete empty remote
+advertisement. This means no revision was advertised to this connection; it
+does not assert that hidden refs or unreachable objects cannot exist.
+The application retains that explicit state instead of inventing a commit.</p>
+<p>For an application-selected new connection with that state, prepare its first
+branch without passing the existing-branch <code>clone --branch</code> option:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const repository = createRepositoryWorkspace({
+    name: connection.name,
+    remote: connection.locator,
+    remoteBase: connection.localBaseDirectory,
+    initialBranch: &#39;main&#39;
+});
+await repository.open({signal});
+const observed = await repository.configuration({signal});
+// The application matches observed.headRef, unborn and configured URLs to its connection.
+const publication = await repository.write({
+    files: selectedFiles,
+    message: authoredCommitMessage,
+    target: {remote: connection.locator, remoteBase: connection.localBaseDirectory, ref: &#39;refs/heads/main&#39;},
+    signal
+});
+</code></pre></div>
+<p><code>initialBranch</code> is captured during construction. After a successful new clone,
+the SDK observes the complete remote advertisement using the clone&#39;s original
+working-directory context and captured remote argument. Only empty successful
+output followed by the new checkout&#39;s explicit initial state and successful
+empty <code>git for-each-ref --format=%(refname)</code> observation selects
+<code>HEAD</code> as <code>refs/heads/&lt;initialBranch&gt;</code> through
+<a href="https://git-scm.com/docs/git-symbolic-ref" target="_blank" rel="noreferrer">Git symbolic-ref</a>. Git owns branch-name
+validity. Advertised HEAD, branches or tags keep ordinary clone selection;
+an already committed clone and every existing destination remain unchanged.
+Any local ref supplied by Git&#39;s template or hook behavior is preserved and
+leaves HEAD unchanged, even when the remote advertises nothing.
+Omission adds no process and preserves the previous open result.</p>
+<p>For a new clone with <code>initialBranch</code>, <code>open</code> retains its clone <code>stdout</code>/<code>stderr</code>
+and adds ordered <code>outputs:[{operation,stdout,stderr,code,signal}]</code>. Operations
+are <code>clone</code>, <code>observeRemote</code>, <code>observeHead</code>, <code>observeRefs</code> and <code>selectInitialBranch</code>, only as
+performed. A later preparation failure preserves completed outputs in
+<code>error.details:{directory,cloned:true,outputs}</code> and the original complete
+failure as <code>cause</code>; cancellation retains completed observations too. A writer
+that prepares first retains these processes in its existing <code>stage:&#39;prepare&#39;</code>
+output records. Failed preparation leaves the actual directory intact and does
+not retry initialization or rename an existing checkout on the next call.</p>
+<p>There is nothing to pull before the first commit of a confirmed new unborn
+connection. Use the existing exact-file <code>write</code> and explicit non-force
+<code>HEAD:refs/heads/main</code> publication directly. For a committed remote, retain the
+ordinary selected-branch clone and targeted pull/write composition. An existing
+local checkout, different local branch or intervening remote change needs the
+application&#39;s own connection decision; an unborn observation is not permission
+to discard or switch it. Observations and publication are not transactional:
+concurrent remote changes, authentication failures and rejected pushes remain
+actual errors. No pull failure is converted into success, and no retry, force,
+rollback, global setting or fabricated revision is introduced.</p>
 <h3 id="relative-local-repository-locators">Relative local repository locators</h3>
 <p><code>remoteBase</code> is an explicit local-path choice, not a hint for a URL parser.
 With it, the SDK derives the Git remote argument using the host&#39;s native
@@ -581,6 +655,6 @@ continue to operate where they already are.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#persistent-locations">Persistent locations</a><a href="#one-connected-working-checkout">One connected working checkout</a><a href="#existing-checkout-configuration-and-selected-targets">Existing checkout configuration and selected targets</a><a href="#git-identity-configuration">Git identity configuration</a><a href="#write-commit-and-push-selected-text">Write, commit and push selected text</a><a href="#ownership-concurrency-and-shutdown">Ownership, concurrency and shutdown</a><a href="#bare-snapshots-stay-separate">Bare snapshots stay separate</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.91.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.92.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
