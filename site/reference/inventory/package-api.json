@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.90.0",
+  "sdkVersion": "0.91.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
@@ -441,10 +441,10 @@
       "entrypoints": ["arcane-os/core/model-assets"],
       "primaryImport": "arcane-os/core/model-assets",
       "group": "Core model assets",
-      "summary": "Owns selected native working-file projections and engine retain handles while original stored model files remain unchanged.",
+      "summary": "Owns persistent native model acquisitions, temporary browser projections and actual engine retain lifetimes.",
       "availability": "Node Core with an application-selected working directory",
       "protocol": "arcane/1 modelAssets.open/write/complete/release/status and modelAssets.state",
-      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress}) streams complete upstream members through the existing file owner and reports file/phase progress. release(id) relinquishes preparation ownership; cancellation and cleanup join fetches/writes. Native retains survive until actual engine release before deleting only the owned working projection. Startup downloads nothing."
+      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress,refresh=false}) reuses complete exact ordered source selections stored beneath workingDirectory/model-assets or streams every selected upstream member concurrently. Complete acquisitions survive release, disposal and restart. refresh:true acquires a separate complete set without overwriting retained originals; ordinary reuse makes no network freshness claim. Matching same-process callers share acquisition with independent callbacks/cancellation, and the final interested cancellation joins unfinished I/O before removing only that attempt. Separate processes may fetch independently. release(id) relinquishes live preparation ownership; actual native retain lifetimes remain. Browser open/write/complete projections retain temporary cleanup after final native use. Startup downloads nothing; no migration, eviction or partial-transfer resumption."
     },
     {
       "id": "core-model-assets-service:default",
@@ -654,7 +654,7 @@
       "summary": "Explicit-load Laya and Julia-1 decisions with caller-selected precision, complete inputs and graph results.",
       "availability": "Browser module Workers and the selected Transformers.js backend; import/construction starts no model load",
       "protocol": "Caller-owned state/question/options rows; five-input decision graph; native Worker request/result lifecycle",
-      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes actual loader resources through fetchResource outside cloned Worker configuration. By default stored activation also materializes the unchanged runtime entry as a JavaScript object URL, retains its configured URL for later loads and revokes the object URL after Worker termination. Explicit runtime.local:true instead imports same-deployment moduleUrl and wasmPaths.mjs/wasm directly, defaulting to ai/decisions-runtime installed by browserDecisions:true materialization; only those exact executable URLs bypass the model store. It disables upstream executable WASM caching/proxy and selects one WASM thread, preserving the requested inference backend. Stored mode disables competing model caches, preserves complete HTTP responses and joins resource cleanup before outstanding calls settle. Default runtime-entry HTTP failures retain error.response; custom stored entries must support an object URL and changed import.meta.url. Omission retains existing browser behavior; no decision-result persistence or precision fallback"
+      "normalization": "Full field tokenization, raw logits and unrounded softmax; dtype defaults to fp16 for Laya and fp32 for Julia, with explicit values forwarded unchanged. Optional existing SDK store routes actual loader resources through fetchResource outside cloned Worker configuration. By default stored activation also materializes the unchanged runtime entry as a JavaScript object URL, retains its configured URL for later loads and revokes the object URL after Worker termination. Explicit runtime.local:true instead imports same-deployment moduleUrl and wasmPaths.mjs/wasm directly, defaulting to adjacent ai/decisions-runtime acquired by packageApp({browserDecisions:true}) for installed-package routes or by the existing physical materializer option; only those exact executable URLs bypass the model store. It disables upstream executable WASM caching/proxy and selects one WASM thread, preserving the requested inference backend. Stored mode disables competing model caches, preserves complete HTTP responses and joins resource cleanup before outstanding calls settle. Default runtime-entry HTTP failures retain error.response; custom stored entries must support an object URL and changed import.meta.url. Omission retains existing browser behavior; no decision-result persistence or precision fallback"
     },
     {
       "id": "root:acceptWebSocket",
@@ -1858,7 +1858,7 @@
       "summary": "Builds one complete app release with browser selection by default. Nonbrowser targets add explicit nativeResources through a late complete-content copy and separate native input output; moduleFormat is independent. Adapters receive actual target and effective browserPwa. Explicit operation outputDirectory wins; staged replacement preserves source and unrelated outputs. No tests or checks run automatically.",
       "availability": "Node",
       "protocol": "SDK packager and deterministic bundle contract",
-      "normalization": "Normalized SDK validation with complete canonical archive and release content"
+      "normalization": "Complete selected release content. Optional browserDecisions:true acquires bundled Transformers.js 4.3.0 and matched ONNX Runtime 1.31.0-dev.20260914-8d85527a0 asyncify module/WASM plus licenses beside the selected SDK browser-decisions module in staging only, following installed routes and aliases. Acquisition follows native-module and asset rewriting, preserves complete upstream content, and joins the final release inventory and enabled PWA offline selection. Default false and dryRun perform no optional acquisition. Existing workspace.decisions started/progress events, cancellation, full HTTP errors and joined failure cleanup are preserved; prior output, source and installed dependencies remain unchanged on acquisition failure. Repeat the option per selected package build."
     },
     {
       "id": "root:packageApplication",

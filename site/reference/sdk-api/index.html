@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.90.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.91.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -2936,6 +2936,24 @@ application-owned module loader is needed. Source HTML, saved data and the
 ordinary browser output remain unchanged. See
 <a href="../protocols/#native-module-package-output">native-module package output</a>
 for resource handling and the static transformation boundary.</p>
+<p><code>browserDecisions</code> defaults to <code>false</code>. Explicit <code>browserDecisions: true</code>
+acquires the bundled Transformers.js 4.3.0 entry, matching ONNX Runtime
+1.31.0-dev.20260914-8d85527a0 asyncify module/WASM and both licenses into
+the package stage beside the selected SDK <code>ai/browser-decisions.mjs</code>, under
+<code>decisions-runtime/</code>. Installed-package routes retain their configured
+dependency path, including aliases; source and installed dependencies remain
+unchanged, with no workspace-root <code>arcane/</code> projection. The selected SDK decision
+module must be included in the package. Acquisition happens after native-module
+and asset rewriting, preserving upstream content unchanged in both module
+formats. The distribution joins the returned and release-manifest inventories
+and any enabled PWA&#39;s ordinary offline selection. The default and dry runs
+perform no optional acquisition; dry runs report selected inputs. Repeat this
+option on each package build that should acquire the closure. Cancellation and
+HTTP or observer failures abort/join acquisition before stage cleanup and
+preserve previous output. The existing <code>workspace.decisions.started</code> and
+<code>workspace.decisions.progress</code> events report file progress. See the
+<a href="../ai/browser-decisions/#extension-local-executables-manifest-v3">extension-local decision guide</a>
+for <code>runtime.local: true</code>, upstream versions and complete error details.</p>
 <p>An operation may override <code>outputDirectory</code> without changing the saved app
 configuration. For example, package a complete application beneath an
 application-owned extension manifest and launcher:</p>
@@ -3527,6 +3545,11 @@ module/WASM and license files from their upstream distributions into
 <code>transformersVersion</code>, <code>onnxRuntimeVersion</code> and <code>files</code> under
 <code>workspaceRuntime.browserDecisions</code>. The default <code>false</code> performs no optional
 acquisition. Select this option on each refresh that should retain those files.
+For applications with installed-package routes, use
+<code>packageApp({workspaceRoot, appId, browserDecisions: true})</code> to place the
+distribution beside the actual deployed SDK module. This physical materializer
+continues to own only the separate <code>arcane/</code> projection; it does not populate or
+modify <code>node_modules</code>.
 The <a href="../ai/browser-decisions/#extension-local-executables-manifest-v3">extension-local decision guide</a>
 describes <code>runtime.local: true</code>, complete resource ownership and MV3 usage.</p>
 <p>Ordinary acquisition automatically recovers a workspace-operation lock when
@@ -8439,14 +8462,22 @@ directories remain caller-selected. Each projection has its own child
 directory and complete member files.</p>
 <p><code>current()</code> returns <code>{closing,projections}</code>. <code>retain(id)</code> accepts a completed
 projection and returns <code>{id,directory,members,release}</code> for a native owner.
-Native <code>prepare({id,workingDirectory,members,signal,onProgress})</code> accepts
-ordered <code>{path,url}</code> members and returns their ready projection. Explicit calls
-stream complete upstream responses through the same file owner; startup
-downloads nothing. Independent members transfer concurrently and progress
-reports phases and completed files. <code>release(id)</code> relinquishes preparation
-ownership; cancellation, release and disposal join fetches and writes before
-cleanup. Native retain handles keep completed files alive until actual engine
-release. See <a href="../model-assets/#native-ownership">native preparation</a>.
+Native <code>prepare({id,workingDirectory,members,signal,onProgress,refresh=false})</code>
+accepts ordered <code>{path,url}</code> members and returns their ready projection.
+Complete native acquisitions persist beneath <code>workingDirectory/model-assets/</code>
+through unload, disposal and restart; ordinary calls reuse the exact complete
+ordered source selection without a network freshness check. Explicit
+<code>refresh:true</code> acquires a separate complete set without replacing active files.
+Independent members transfer concurrently and progress reports phases and
+completed files. Matching same-process preparations share acquisition with
+independent callbacks and cancellation; the last interested cancellation joins
+unfinished I/O and removes only that attempt. Separate processes may acquire
+the same selection independently. Startup downloads nothing.
+<code>release(id)</code> relinquishes live preparation ownership. Native retains continue
+through actual engine release; completed native acquisitions remain stored.
+Browser <code>open/write/complete</code> projections retain their temporary lifetime and
+are removed only after all native uses end. See
+<a href="../model-assets/#native-ownership">native preparation</a>.
 <code>dispose()</code> releases preparation ownership and joins file writes, closes and
 all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model
@@ -9314,7 +9345,9 @@ selections report its failure without precision fallback. For Laya FP32, pass
 <code>dtype: &#39;fp32&#39;</code>.
 Cancellation terminates that client&#39;s Worker and rejects its in-flight work.
 No decisions are inserted into chat history or durable storage.</p>
-<p>For explicitly selected extension-local execution, supply <code>runtime: {local: true}</code> after materializing with <code>browserDecisions: true</code>. The SDK directly
+<p>For explicitly selected extension-local execution, supply <code>runtime: {local: true}</code> after <code>packageApp({workspaceRoot, appId, browserDecisions: true})</code> for
+installed-package routes, or after opting into the existing physical runtime
+materializer. The SDK directly
 imports its deployment-local <code>decisions-runtime/transformers.min.js</code> and
 matched asyncify module/WASM. Explicit <code>runtime.moduleUrl</code> and
 <code>runtime.wasmPaths: {mjs, wasm}</code> may select other compatible files in that same
@@ -10622,6 +10655,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.90.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.91.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
