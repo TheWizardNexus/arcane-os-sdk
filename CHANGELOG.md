@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.94.0
+
+- Recover all TWiN HTTP 429 quota responses through the shared chat/System One
+  transport. Honor Retry-After or exponential backoff, share a transient
+  same-endpoint/credential cooldown, and pace concurrent recovery dispatches.
+  Fetch rejection, 429 and 529 share three retries; cancellation stops waits.
+  Preserve exact requests and complete terminal errors, including provider
+  status_code and nested error records. Do not replay 400/413 errors, consumed
+  streams, callbacks, or image submissions.
+- Include the completed native Kokoro synthesis capability: retained voices,
+  explicit model preparation, owned cancellation and audio output through the
+  shared native speech contract. Reuse its retained compatible runtime and
+  source archives alongside the existing native host, Whisper and ONNX assets.
+  Package inclusion is distinct from application or native-runtime acceptance.
+
 ## 0.93.0
 
 - Add native desktop notification status, submission, state and removal through

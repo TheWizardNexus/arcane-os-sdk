@@ -210,30 +210,33 @@ Built-in cloud chat decodes an HTTP error body once as JSON or text and rejects
 with that complete value unchanged. It does not reconstruct an Error, replace
 the message, or add `providerMessage`, `status`, or an SDK failure code to the
 provider body. Network errors pass through after the retry policy below;
-decoding errors pass through immediately. Cancellation
+successful-response decoding errors pass through immediately. Cancellation
 retains the existing `ARCANE_AI_REQUEST_ABORTED` contract.
 
-When the HTTP status is `429` and the existing `error.message`, `message`, or
-plain-text body contains `overload`, ignoring case, the request retries after
-three seconds without a retry-count limit. Each warning shows the complete
-message followed by `Retrying in ${retryDelayMs / 1000} seconds` through the
-shared console logger, separately from the provider error. Every attempt uses
-the same destination, headers, complete serialized body, and cancellation
-signal; `onRequest` runs once for the logical request. Cancellation stops the
-delay and prevents another attempt. Retrying happens before a successful
-response is consumed, so partial streams and tool callbacks are never replayed.
-Rejected Fetch calls and HTTP `529` share a separate budget of three retries,
-each after the same `3000` millisecond delay. HTTP `429` overload retries do not
-consume that budget. The final complete network error or provider body passes
-through unchanged when recovery is exhausted. Aborts, other HTTP errors,
-successful-response body reads, stream decoding, and application callbacks
-never start another attempt.
+Rejected Fetch calls and all HTTP `429`/`529` responses share three retries.
+Quota messages need no `overload` keyword. A readable `Retry-After` controls a
+`429` wait; otherwise its upcoming retry number selects `3000`, `6000`, or
+`12000` milliseconds. Fetch rejection and `529` retain `3000` milliseconds.
+After a `429`, active requests to the same endpoint using the same credential
+share its cooldown and dispatch three seconds apart; other endpoints and
+credentials remain independent. The group is released when its last HTTP
+operation settles. See [TWiN recovery](ai/twin-cloud.md#shared-request-behavior)
+for the scope and lifetime.
+
+Every attempt uses the same destination, headers, complete serialized body,
+and signal. `onRequest` runs once. Cancellation stops waits and prevents another
+attempt. Recovery precedes successful-body consumption, so partial streams and
+tool callbacks are never replayed. Complete errors, including provider
+`status_code` and nested records, pass through unchanged on exhaustion.
+Diagnostic-body reading failures for `429`/`529` participate in recovery;
+other HTTP errors, successful-body reads, decoding, and callbacks do not.
 
 `fetchRequest()` and `streamRequest()` accept
 `onRetry({phase,attempt,delayMs,status,error})`. The observer receives
 `phase:'waiting'` before the abortable delay and `phase:'requesting'` immediately
-before the next Fetch. `attempt` is the one-based upcoming retry number across
-both retry policies; `delayMs` is `3000`; `status` is the HTTP status or `null`
+before the next Fetch. `attempt` is the one-based upcoming retry number, or zero
+for an initial request waiting behind a shared quota cooldown. `delayMs` is
+the initially selected wait; shared pacing can extend it. `status` is the HTTP status or `null`
 for rejected Fetch; `error` is the complete original failure value. The SDK
 invokes this observational callback synchronously and observes a returned
 promise without awaiting it. Callback throws and rejections are logged through

@@ -4,6 +4,8 @@ import {arcaneLogging} from '../logging.mjs';
 const is = new Is(false);
 const twinChatURL = 'https://inference.do-ai.run/v1/chat/completions';
 const twinSystemOneURL = 'https://inference.do-ai.run/v1/systemone';
+const activeHTTPRequests = new Map();
+const httpRetryDelayMs = 3000;
 
 /** A stateless TWiN request; browser AI shares the HTTP and format owners below. */
 export async function fetchRequest({
@@ -450,10 +452,24 @@ export function openAIResponseFormat(format){
 /** Shared with browser streaming; consume no successful body at this boundary. */
 export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
     const {signal} = options;
-    const retryDelayMs = 3000;
     const maxRecoveryRetries = 3;
-    let recoveryRetries = 0;
     let attempt = 0;
+    let retry = null;
+    const destination = url?.url ?? String(url);
+    const headers = new Headers(options.headers ?? url?.headers);
+    const requestOptions = {...options, headers};
+    const authorization = headers.get('authorization') ?? '';
+    let accounts = activeHTTPRequests.get(destination);
+    if (!accounts) {
+        accounts = new Map();
+        activeHTTPRequests.set(destination, accounts);
+    }
+    let pacing = accounts.get(authorization);
+    if (!pacing) {
+        pacing = {active: 0, rateLimited: false, resumeAt: 0, nextDispatchAt: 0, error: null};
+        accounts.set(authorization, pacing);
+    }
+    pacing.active += 1;
     try {
         while (true) {
             if (signal?.aborted) {
@@ -462,7 +478,7 @@ export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
             let response;
             let error;
             try {
-                response = await fetch(url, options);
+                response = await dispatchHTTPRequest(url, requestOptions, pacing, onRetry, retry, attempt);
             } catch (fetchError) {
                 if (isAIRequestAbort(fetchError, signal)) {
                     throw normalizeAIRequestAbort(fetchError);
@@ -483,7 +499,7 @@ export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
                         ? await response.json()
                         : await response.text();
                 } catch (bodyError) {
-                    if (status !== 529 || isAIRequestAbort(bodyError, signal)) {
+                    if ((status !== 429 && status !== 529) || isAIRequestAbort(bodyError, signal)) {
                         throw bodyError;
                     }
                     error = bodyError;
@@ -495,61 +511,108 @@ export async function fetchHTTPResponse(url, options, {onRetry = null} = {}) {
             const message = is.string(error)
                 ? error
                 : error?.error?.message ?? error?.message;
-            const overload = status === 429
-                && is.string(message)
-                && message.toLowerCase().includes('overload');
-            if (!overload) {
-                if ((status !== null && status !== 529)
-                    || recoveryRetries >= maxRecoveryRetries) {
-                    throw error;
-                }
-                recoveryRetries += 1;
+            const retryDelayMs = status === 429
+                ? httpRateLimitDelay(response, httpRetryDelayMs * (2 ** Math.min(attempt, maxRecoveryRetries - 1)))
+                : httpRetryDelayMs;
+            if (status === 429) {
+                pacing.rateLimited = true;
+                pacing.resumeAt = Math.max(pacing.resumeAt, Date.now() + retryDelayMs);
+                pacing.error = error;
+            }
+            if ((status !== null && status !== 429 && status !== 529)
+                || attempt >= maxRecoveryRetries) {
+                throw error;
             }
             attempt += 1;
             arcaneLogging.warn(
                 `${message ?? 'AI request transport failed.'}\nRetrying in ${retryDelayMs / 1000} seconds`,
                 error
             );
-            observeRequestRetry(
-                onRetry,
-                {phase: 'waiting', attempt, delayMs: retryDelayMs, status, error}
-            );
-            await new Promise(
-                function waitForRequestRetry(resolve, reject) {
-                    function finishRetryDelay() {
-                        signal?.removeEventListener('abort', cancelRetryDelay);
-                        resolve();
-                    }
-                    function cancelRetryDelay() {
-                        clearTimeout(timer);
-                        signal.removeEventListener('abort', cancelRetryDelay);
-                        reject(normalizeAIRequestAbort(signal.reason));
-                    }
-                    const timer = setTimeout(finishRetryDelay, retryDelayMs);
-                    signal?.addEventListener(
-                        'abort',
-                        cancelRetryDelay,
-                        {once: true}
-                    );
-                    if (signal?.aborted) {
-                        cancelRetryDelay();
-                    }
-                }
-            );
-            if (signal?.aborted) {
-                throw normalizeAIRequestAbort(signal.reason);
-            }
-            observeRequestRetry(
-                onRetry,
-                {phase: 'requesting', attempt, delayMs: retryDelayMs, status, error}
-            );
+            retry = {phase: 'waiting', attempt, delayMs: retryDelayMs, status, error};
+            observeRequestRetry(onRetry, retry);
+            await waitForHTTPDelay(retryDelayMs, signal);
         }
     } catch (error) {
         if (isAIRequestAbort(error, signal)) {
             throw normalizeAIRequestAbort(error);
         }
         throw error;
+    } finally {
+        pacing.active -= 1;
+        if (pacing.active === 0) {
+            // Retain neither credentials nor quota state beyond the active request group.
+            accounts.delete(authorization);
+            if (accounts.size === 0) {
+                activeHTTPRequests.delete(destination);
+            }
+        }
     }
+}
+
+function httpRateLimitDelay(response, fallback) {
+    const value = response.headers.get('retry-after')?.trim();
+    if (!value) return fallback;
+    const seconds = Number(value);
+    if (is.finite(seconds)) {
+        return seconds >= 0 && is.finite(seconds * 1000) ? seconds * 1000 : fallback;
+    }
+    // Accept HTTP weekday date forms, not an arbitrary numeric string interpreted as a date.
+    const date = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i.test(value) ? Date.parse(value) : NaN;
+    return is.finite(date) ? Math.max(0, date - Date.now()) : fallback;
+}
+
+async function dispatchHTTPRequest(url, options, pacing, onRetry, retry, attempt) {
+    const {signal} = options;
+    let observation = null;
+    // Only an observed quota response coordinates otherwise independent requests.
+    while (pacing.rateLimited) {
+        if (signal?.aborted) throw normalizeAIRequestAbort(signal.reason);
+        const delayMs = Math.max(pacing.resumeAt, pacing.nextDispatchAt) - Date.now();
+        if (delayMs <= 0) {
+            // Claim and initiate Fetch in this continuation, with no intervening asynchronous wait.
+            pacing.nextDispatchAt = Date.now() + httpRetryDelayMs;
+            break;
+        }
+        if (!retry && !observation) {
+            observation = {phase: 'waiting', attempt, delayMs, status: 429, error: pacing.error};
+            observeRequestRetry(onRetry, observation);
+        }
+        await waitForHTTPDelay(delayMs, signal);
+    }
+    if (observation && !signal?.aborted) {
+        observeRequestRetry(onRetry, {...observation, phase: 'requesting'});
+    }
+    if (retry) {
+        observeRequestRetry(onRetry, {...retry, phase: 'requesting'});
+    }
+    if (signal?.aborted) throw normalizeAIRequestAbort(signal.reason);
+    return fetch(url, options);
+}
+
+async function waitForHTTPDelay(delayMs, signal) {
+    let remaining = delayMs;
+    do {
+        if (signal?.aborted) throw normalizeAIRequestAbort(signal.reason);
+        // Only split at the host timer range; never shorten the provider's requested wait.
+        const milliseconds = Math.min(remaining, 2147483647);
+        await new Promise(
+            function waitForRequestRetry(resolve, reject) {
+                function finishRetryDelay() {
+                    signal?.removeEventListener('abort', cancelRetryDelay);
+                    resolve();
+                }
+                function cancelRetryDelay() {
+                    clearTimeout(timer);
+                    signal.removeEventListener('abort', cancelRetryDelay);
+                    reject(normalizeAIRequestAbort(signal.reason));
+                }
+                const timer = setTimeout(finishRetryDelay, milliseconds);
+                signal?.addEventListener('abort', cancelRetryDelay, {once: true});
+                if (signal?.aborted) cancelRetryDelay();
+            }
+        );
+        remaining -= milliseconds;
+    } while (remaining > 0);
 }
 
 function observeRequestRetry(onRetry, state) {

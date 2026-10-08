@@ -4206,7 +4206,7 @@
       "summary": "Sends one complete TWiN Cloud request with an explicit caller-owned key and model.",
       "availability": "Node and Browser; remote HTTPS provider",
       "protocol": "TWiN Cloud complete-response chat",
-      "normalization": "Preserves complete messages and parsed provider JSON; maps explicit structured-output, tool, and reasoning options; shares overload-only HTTP 429 retry after 3000 ms and cancellation; retains no browser profile, storage, or request history"
+      "normalization": "Preserves complete messages and provider JSON; Fetch rejection and all HTTP 429/529 share three retries; quota recovery honors Retry-After or exponential delay with transient same-endpoint/credential pacing, complete terminal errors and cancellation; retains no browser profile, storage, or history"
     },
     {
       "id": "twin-cloud:fetchSystemOneRequest",
@@ -4255,21 +4255,21 @@
       "name": "fetchHTTPResponse",
       "displayName": "fetchHTTPResponse()",
       "kind": "function",
-      "signature": "async fetchHTTPResponse(url,options)",
+      "signature": "async fetchHTTPResponse(url,options,{onRetry=null}={})",
       "entrypoints": ["arcane-os/ai/twin-cloud"],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",
       "summary": "Returns a successful unconsumed Fetch Response through the shared AI HTTP owner.",
       "availability": "Node and Browser",
       "protocol": "Shared AI HTTP transport",
-      "normalization": "Preserves caller Fetch options and complete error bodies; repeats only overload HTTP 429 after 3000 ms; signal cancellation uses ARCANE_AI_REQUEST_ABORTED"
+      "normalization": "Preserves caller Fetch options and complete errors; Fetch rejection and all HTTP 429/529 share three retries; Retry-After or exponential quota delay and transient same-endpoint/credential pacing remain abortable; onRetry observes waiting/requesting; cancellation uses ARCANE_AI_REQUEST_ABORTED"
     },
     {
       "id": "twin-cloud:fetchJSONResponse",
       "name": "fetchJSONResponse",
       "displayName": "fetchJSONResponse()",
       "kind": "function",
-      "signature": "async fetchJSONResponse(url,options)",
+      "signature": "async fetchJSONResponse(url,options,{onRetry=null}={})",
       "entrypoints": ["arcane-os/ai/twin-cloud"],
       "primaryImport": "arcane-os/ai/twin-cloud",
       "group": "Shared AI transport integration",

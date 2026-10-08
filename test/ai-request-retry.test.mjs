@@ -13,6 +13,11 @@ test(
         );
         const previousSetTimeout = globalThis.setTimeout;
         const previousClearTimeout = globalThis.clearTimeout;
+        const previousNow = Date.now;
+        let now = Date.UTC(2026, 9, 8, 12);
+        Date.now = function syntheticAIRecoveryTime() {
+            return now;
+        };
         const registrationKey = Symbol.for('arcane.ai.user-ready-registration');
         const previousRegistration = globalThis[registrationKey];
         const values = new Map();
@@ -44,7 +49,7 @@ test(
         const timers = new Set();
         let onDelay = null;
         globalThis.setTimeout = function syntheticAIRecoveryDelay(callback, milliseconds, ...args) {
-            if (milliseconds !== 3000) {
+            if (![3000, 6000, 12000].includes(milliseconds)) {
                 return previousSetTimeout(callback, milliseconds, ...args);
             }
             const timer = {active: true};
@@ -52,6 +57,7 @@ test(
             queueMicrotask(
                 function finishAIRecoveryDelay() {
                     if (timer.active) {
+                        now += milliseconds;
                         onDelay?.();
                     }
                     if (timer.active) {
@@ -103,6 +109,7 @@ test(
                 const controller = new AbortController();
                 const networkError = new TypeError('Failed to fetch.');
                 const overloadError = {message: 'Complete HTTP 529 failure.', details: ['one', 'two']};
+                const quotaError = {error: {message: '  The request quota is exhausted.\nTry later.  ', code: 'quota_exceeded'}, details: ['one', 'two', {remaining: 0}]};
                 const requests = [];
                 const phases = [];
                 const chunks = [];
@@ -118,6 +125,9 @@ test(
                     }
                     if (requests.length === 2) {
                         return jsonResponse(overloadError, 529);
+                    }
+                    if (requests.length === 3) {
+                        return jsonResponse(quotaError, 429);
                     }
                     return method === 'streamRequest' ? streamResponse() : jsonResponse(completion('First second.'));
                 };
@@ -154,18 +164,27 @@ test(
                 const result = await request;
                 assert.equal(requestCallbacks, 1, method);
                 assert.equal(responseCallbacks, 1, method);
-                assert.equal(requests.length, 3, method);
+                assert.equal(requests.length, 4, method);
                 assert.deepEqual(
                     phases.map(
                         function retryPhase(state) {
                             return [state.phase, state.attempt, state.delayMs, state.status];
                         }
                     ),
-                    [['waiting', 1, 3000, null], ['requesting', 1, 3000, null], ['waiting', 2, 3000, 529], ['requesting', 2, 3000, 529]],
+                    [
+                        ['waiting', 1, 3000, null],
+                        ['requesting', 1, 3000, null],
+                        ['waiting', 2, 3000, 529],
+                        ['requesting', 2, 3000, 529],
+                        ['waiting', 3, 12000, 429],
+                        ['requesting', 3, 12000, 429]
+                    ],
                     method
                 );
                 assert.equal(phases[0].error, networkError, method);
                 assert.deepEqual(phases[2].error, overloadError, method);
+                assert.deepEqual(phases[4].error, quotaError, method);
+                assert.deepEqual(phases[5].error, quotaError, method);
                 for (const request of requests) {
                     assert.equal(request.options, requests[0].options, method);
                     assert.equal(Object.hasOwn(request.options, 'onRetry'), false, method);
@@ -389,6 +408,7 @@ test(
                 ai?.stopAudio();
                 await ai?.providerRuntime.disposeAll();
             } finally {
+                Date.now = previousNow;
                 for (const timer of timers) {
                     timer.active = false;
                 }

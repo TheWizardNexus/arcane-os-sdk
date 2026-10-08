@@ -11820,10 +11820,11 @@ the message or response callback payload.
 
 **Node and Browser; Cloud transport.** Uses standard Fetch and cancellation,
 without DOM, browser profiles, user singletons, or storage initialization.
-Import starts no request. HTTP `429` whose message contains `overload`
-(case-insensitive) waits
-`3000` milliseconds and retries the complete request; other HTTP failures
-throw their complete parsed JSON or text bodies. A missing key throws
+Import starts no request. Rejected Fetch and all HTTP `429`/`529` share three
+retries. Quota recovery honors `Retry-After`, otherwise waits `3000`, `6000`,
+or `12000` milliseconds by retry number. Active same-endpoint/credential calls
+share quota cooldown and paced dispatch. Complete error bodies remain unchanged
+on exhaustion; other HTTP failures are not retried. A missing key throws
 `AI_PROVIDER_NOT_CONFIGURED`; a missing model throws `TypeError`. `signal`
 cancellation during transport, body reading, retry waiting,
 or callback settlement prevents successful return and uses
@@ -11973,21 +11974,24 @@ Ordinary TWiN callers use `fetchRequest()` instead.
 ### Signature and result
 
 ```text
-async fetchHTTPResponse(url,options)
+async fetchHTTPResponse(url,options,{onRetry=null}={})
 ```
 
 Returns the successful Fetch `Response` without consuming its body. Both URL
 and Fetch options are caller-supplied; this helper adds no key, model, or
 request envelope. Non-success responses are read completely as JSON when the
-content type contains `application/json`, otherwise as text. Only status 429
-with an overload message repeats after 3000 ms; other error bodies are thrown.
+content type contains `application/json`, otherwise as text. Rejected Fetch
+and all `429`/`529` share three retries with complete terminal errors.
+`429` honors `Retry-After` or exponential delay and coordinates a transient
+same-endpoint/credential cooldown. See [shared request behavior](ai/twin-cloud.md#shared-request-behavior).
 
 ### Availability and normalization
 
 **Node and Browser.** Exported from `arcane-os/ai/twin-cloud` for shared SDK
-integration. `options.signal` cancels Fetch and the overload wait and is checked
+integration. `options.signal` cancels Fetch and recovery/pacing waits and is checked
 after response/error-body reads. Cancellation uses
-`ARCANE_AI_REQUEST_ABORTED`. Overload warnings use the existing shared logger.
+`ARCANE_AI_REQUEST_ABORTED`. Retry warnings use the existing shared logger;
+`onRetry` observes complete waiting/requesting records outside the payload.
 
 ### Example
 
@@ -12007,7 +12011,7 @@ Shared complete JSON-body reader built on `fetchHTTPResponse()`.
 ### Signature and result
 
 ```text
-async fetchJSONResponse(url,options)
+async fetchJSONResponse(url,options,{onRetry=null}={})
 ```
 
 Returns the full parsed JSON value. A successful response whose content type

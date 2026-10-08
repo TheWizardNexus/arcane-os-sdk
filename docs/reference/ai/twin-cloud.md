@@ -94,17 +94,34 @@ The key is
 transport authentication, not part of either callback's message payload. Keep
 credentials out of application logging as well.
 
-Before a successful response is consumed, a rejected Fetch or HTTP `529` can
-retry up to three times, waiting `3000` milliseconds before each retry. These
-two failure types share that three-retry budget. HTTP `429` with a message
-containing `overload` (case-insensitive) retains its unlimited three-second
-retry behavior and does not consume that budget. Each attempt reuses the exact
-destination, Fetch options, serialized request, and signal. Other HTTP errors,
-successful-response decoding failures, and application callback failures do not
-retry. A known HTTP `529` also retries when reading or parsing its diagnostic
-body fails; `onRetry.error` retains that exact failure, which is thrown unchanged
-if recovery is exhausted. Diagnostic-body failures for other HTTP statuses do
-not retry. The last complete failure is thrown unchanged when recovery is exhausted.
+Before a successful response is consumed, rejected Fetch calls and HTTP `429`
+or `529` share a budget of three retries (four total attempts). Every `429`
+qualifies, including request-per-minute and token-per-minute quota responses;
+the error message does not select recovery. A readable `Retry-After` header
+supplies the `429` delay as seconds or an HTTP date. Otherwise the upcoming
+retry number selects a `3000`, `6000`, or `12000` millisecond delay. Rejected
+Fetch and `529` retain their `3000` millisecond delay. A provider's longer wait
+is preserved, split only at the host timer's range when necessary.
+
+After an observed `429`, overlapping requests through this module with the
+same exact endpoint and Authorization value share the latest cooldown and
+dispatch at least three seconds apart. A later quota response extends that
+cooldown, including a terminal quota response while sibling calls remain active;
+its fallback remains at most `12000` milliseconds. Different endpoints and credentials remain independent, and requests
+before any quota response remain concurrent. This is active-operation pacing,
+not a persistent global rate limiter: the module releases the group, including
+its credential key and error, when its last HTTP operation settles. It does not
+coordinate separate tabs, processes, or independently loaded module instances.
+
+Each attempt reuses the exact destination, Fetch option values, serialized request,
+and signal. Headers are normalized once through standard Fetch `Headers` and
+retained for retries, including when the caller supplied a one-shot iterable.
+Other HTTP errors (including `400` and `413`), successful-response
+decoding failures, and application callback failures do not retry. A known
+`429` or `529` also retries when reading its diagnostic body fails;
+`onRetry.error` retains that exact failure. The last complete error is thrown
+unchanged on exhaustion, preserving provider fields such as `status_code` and
+nested `error.type`/`error.message`. No error envelope is rebuilt or sanitized.
 Pass a fresh
 `AbortController`'s `signal` and call `abort()` to cancel. Cancellation during
 the request, response-body read, retry wait, or callback settlement prevents
@@ -114,12 +131,16 @@ A missing key uses `AI_PROVIDER_NOT_CONFIGURED`, a missing explicit model
 throws `TypeError`, and an unsupported `structuredOutput` input uses
 `AI_STRUCTURED_OUTPUT_INVALID`.
 
-Optional `onRetry({phase,attempt,delayMs,status,error})` observes each retry.
+Optional `onRetry({phase,attempt,delayMs,status,error})` observes recovery.
 `phase:'waiting'` arrives before the abortable delay; `phase:'requesting'`
 arrives immediately before the next Fetch. `attempt` is the one-based upcoming
-retry number across both retry policies, `delayMs` is `3000`, `status` is the
+retry number across the shared budget, `delayMs` is the selected wait, `status` is the
 HTTP status or `null` for a rejected Fetch, and `error` is the complete original
-failure value. This observer runs synchronously without awaiting its returned
+failure value. An initial request waiting behind an already observed quota
+reports `attempt:0`, `status:429`, and that complete quota error. Shared pacing
+can extend the actual wait beyond its initial observation; `requesting` is
+emitted only after that wait, immediately before dispatch. This observer runs
+synchronously without awaiting its returned
 promise. Synchronous throws and rejected promises are reported through the
 shared console logger and cannot change the request outcome or trigger another
 retry. `onRequest` still runs once per logical request. Retry observations stay
