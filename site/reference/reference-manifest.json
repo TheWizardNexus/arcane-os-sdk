@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.92.0",
+    "sdk": "0.94.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 57,
+    "markdownPages": 58,
     "collectionPages": 2,
     "generatedPages": 95,
     "runtimeModulePages": 93,
-    "htmlPages": 154,
+    "htmlPages": 155,
     "inventories": 4
   },
   "pages": [
@@ -326,6 +326,12 @@
       "source": "docs/reference/native-decisions.md",
       "output": "site/reference/native-decisions/index.html",
       "route": "reference/native-decisions/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/native-diagnostics.md",
+      "output": "site/reference/native-diagnostics/index.html",
+      "route": "reference/native-diagnostics/",
       "kind": "markdown"
     },
     {

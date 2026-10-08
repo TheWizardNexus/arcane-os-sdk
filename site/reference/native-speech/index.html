@@ -13,16 +13,17 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.92.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.94.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
 native speech engines into one Core service. It is the named and default export
 from <code>arcane-os/core/speech</code>.</p>
 <p>The host supplies an STT engine, a TTS engine, or both. Construction performs no
 installation, model download, model loading, or inference. Core registration
-exposes <code>speech.status</code>, <code>speech.transcribe</code>, and <code>speech.synthesize</code>; an
-operation whose engine was omitted rejects with <code>SPEECH_ENGINE_UNAVAILABLE</code>.
+exposes <code>speech.status</code>, <code>speech.load</code>, <code>speech.unload</code>, <code>speech.transcribe</code>,
+and <code>speech.synthesize</code>; an operation whose engine was omitted rejects with
+<code>SPEECH_ENGINE_UNAVAILABLE</code>.
 The optional <code>signal</code> controls the service lifetime.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreRuntime} from &#39;arcane-os/core/runtime&#39;;
 import {createSpeechService} from &#39;arcane-os/core/speech&#39;;
@@ -32,11 +33,11 @@ const speech = createSpeechService({stt: transcriptionEngine});
 const core = createCoreRuntime({services: [speech]});
 core.start();
 </code></pre></div>
-<p>This service is the shared integration layer. It does not supply or install a
-Kokoro or Sherpa-ONNX engine. Engine preparation, model resources, device
-selection, supported formats, and native process ownership remain with the
-selected engine and its host composition. Browser-only operation remains
-independent of this native service.</p>
+<p>This service is the shared integration layer. The SDK separately exports the
+<a href="#native-kokoro-engine">native Kokoro engine</a> from <code>arcane-os/local-ai/kokoro</code>.
+Engine preparation, model resources, device selection, supported formats, and
+native process ownership remain with the selected engine and its host
+composition. Browser-only operation remains independent of this native service.</p>
 <p>The SDK&#39;s <a href="../local-whisper/">retained Whisper engine</a> supplies native STT.
 Its optional <a href="../guides/native-whisper-openvino/">Intel NPU encoder</a> uses the
 same service, readiness events, complete request/result contract and cancellation
@@ -92,6 +93,21 @@ File presence, a spawned process, and a callable bridge do not establish loaded
 model readiness. Existing readiness consumers additionally recognize
 the engine IDs <code>whisper.cpp</code> and <code>kokoro-onnx</code>; another engine ID requires the
 corresponding consumer integration.</p>
+<h2 id="explicit-role-activation">Explicit role activation</h2>
+<p><code>speech.load({role, ...selection})</code> and <code>speech.unload({role, ...selection})</code>
+route only to the selected <code>stt</code> or <code>tts</code> engine. The service separates the
+<code>role</code> routing field and forwards the remaining selection fields unchanged,
+with the operation&#39;s signal. Each call returns that engine&#39;s complete result.
+An invalid role reports <code>SPEECH_ROLE_INVALID</code>; an engine without the requested
+method reports <code>SPEECH_OPERATION_UNAVAILABLE</code>. These calls do not alter the
+other speech role or select a browser provider.</p>
+<p>The browser facade is <code>Arcane.speech.load(request, {signal, onRequest})</code> and
+<code>Arcane.speech.unload(request, {signal, onRequest})</code>. Both use an unlimited Core
+request duration (<code>timeoutMs: 0</code>). Synthesis retains its existing
+<code>Arcane.speech.synthesize(request, {signal})</code> facade and 180-second timeout.
+Call <code>client.invoke(&#39;speech.synthesize&#39;, request, {signal, timeoutMs: 0, onRequest})</code>
+when the owning application explicitly needs an unlimited request duration or
+the actual request ID. The synthesis payload is the same through either path.</p>
 <h2 id="events-and-subscriptions">Events and subscriptions</h2>
 <p><code>subscribe(listener, {replay = true, signal} = {})</code> immediately delivers the
 current snapshot by default and returns an unsubscribe function. The optional
@@ -107,22 +123,27 @@ that initial request is pending.</p>
 <p><code>speech.progress</code> carries <code>{requestId, role, status: &#39;Thinking&#39;, progress}</code>.
 The service emits <code>progress: {phase: &#39;accepted&#39;}</code> synchronously when accepting
 a speech request. Subsequent progress is the selected engine&#39;s actual report;
-cancelled requests publish no later progress.</p>
+cancelled requests publish no later progress.
+Role load/unload acknowledgements additionally carry <code>operation: &#39;load&#39;</code> or
+<code>&#39;unload&#39;</code> in that progress record.</p>
 <h2 id="engine-interface">Engine interface</h2>
 <p>Each supplied engine implements:</p>
 <ul>
 <li><code>current()</code> returning the actual selected-model state.</li>
 <li><code>subscribe(listener)</code> with immediate current-state replay and an unsubscribe
 function.</li>
-<li><code>load({signal})</code>, resolving only after the constructor-selected model has
-loaded. Independent engines may load concurrently.</li>
+<li><code>load({signal, ...selection})</code>, applying that engine&#39;s explicit selection
+contract. Independent engines may load concurrently. Kokoro without selected
+assets resolves to its ordinary unloaded state.</li>
+<li>Optional <code>unload(selection)</code>, releasing the selected engine&#39;s model through
+<code>speech.unload</code>; engines without this method report it unavailable.</li>
 <li><code>transcribe(request, {signal, onProgress, requestId})</code> for STT, or
 <code>synthesize(request, {signal, onProgress, requestId})</code> for TTS. <code>requestId</code> is
 the actual Core request&#39;s control metadata, separate from the unchanged payload.</li>
 <li><code>close()</code>, cancelling and joining its native work and releasing its resources.</li>
 </ul>
-<p>The service forwards each complete request and result unchanged. It applies
-no input trimming, content limits, model or voice substitution, transcript
+<p>The service forwards each complete transcription/synthesis request and result
+unchanged. It applies no input trimming, content limits, model or voice substitution, transcript
 rewriting, or audio conversion. The engine owns any format decoding,
 phonemization, required model segmentation, output encoding, and supported
 model selection. Necessary processing must preserve complete ordered input
@@ -143,6 +164,178 @@ share one shutdown promise. Actual engine cleanup failures reject with an
 <code>AggregateError</code> and remain in role diagnostics. <code>dispose()</code> additionally
 releases the service&#39;s event subscriptions. New work after shutdown begins
 rejects with <code>CORE_CLOSING</code>.</p>
+<h2 id="native-kokoro-engine">Native Kokoro engine</h2>
+<p><code>createNativeKokoroRuntime</code> is the named and default export from
+<code>arcane-os/local-ai/kokoro</code>. It uses the existing native ONNX owner for model
+execution and one retained C++ helper for eSpeak phonemization and Ogg Opus
+encoding. The Kokoro route requires no Python, Sherpa-ONNX or FFmpeg runtime.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createNativeKokoroRuntime} from &#39;arcane-os/local-ai/kokoro&#39;;
+import {createSpeechService} from &#39;arcane-os/core/speech&#39;;
+
+const tts = createNativeKokoroRuntime({
+  onnx,          // The existing Core local-ai owner&#39;s getONNXRuntime() result.
+  modelAssets,   // The existing Core model-assets service.
+  runtime,       // Prepared helperExecutable, espeakDataDirectory, libraryDirectory.
+  executionPreference: &#39;cpu&#39;,
+  sessionOptions: {executionProviders: [&#39;cpu&#39;]}
+});
+const speech = createSpeechService({tts});
+</code></pre></div>
+<p>The constructor accepts <code>{onnx, modelAssets, runtime, prepare, modelId, model, revision, dtype, paths, assetProjectionId, resourcePaths, sessionOptions, executionPreference, executionTarget, signal, onEvent}</code>. At least <code>onnx</code> or
+<code>prepare</code> must be supplied. Optional <code>prepare({signal})</code> returns <code>{onnx, runtime}</code>
+and runs only when an activation has selected assets and either its ONNX owner
+is absent or closed, or its helper descriptor is absent. It returns the host&#39;s
+existing ONNX owner; it does not construct another one. Construction performs
+no acquisition or loading.
+The helper data path is the <strong>parent</strong> containing <code>espeak-ng-data</code>.</p>
+<p>The provider ID is <code>kokoro-onnx</code>; the public <code>modelId</code> alias defaults to <code>kokoro</code>.
+The implemented model is <code>onnx-community/Kokoro-82M-v1.0-ONNX</code>, revision
+<code>1939ad2a8e416c0acfeecc08a694d14ef25f2231</code>, with <code>dtype: &#39;fp32&#39;</code>. Another model,
+revision or dtype reports incompatibility. The module also exports
+<code>KOKORO_MODEL</code>, <code>KOKORO_REVISION</code>, <code>KOKORO_SAMPLE_RATE</code> (<code>24000</code>) and
+<code>KOKORO_VOICES</code>.</p>
+<h3 id="resources-and-loading">Resources and loading</h3>
+<p>Supply either prepared native <code>paths</code> or an existing completed
+<a href="../model-assets/"><code>model-assets</code> projection</a>. Both mappings have
+<code>{model, tokenizer, tokenizerConfig, voices: {[voiceId]: path}}</code>: native paths
+identify prepared files, while <code>resourcePaths</code> identifies projection members.
+Projection loading requires the existing <code>modelAssets</code> service. Direct-path
+callers keep their prepared files available until engine cleanup completes.
+The complete selection contains <code>onnx/model.onnx</code>, <code>tokenizer.json</code>,
+<code>tokenizer_config.json</code>, and all 28 <code>voices/&lt;voiceId&gt;.bin</code> files from the same
+revision. The engine does not download models or create another model store.</p>
+<p><code>load({modelId, assetProjectionId, resourcePaths, executionTarget, signal})</code>
+activates that selection. Omitted selection fields retain the previous choice;
+an omitted or undefined target retains the previous target, and <code>null</code> requests
+automatic selection. <code>modelId</code>, when supplied, must match this engine&#39;s alias.
+With neither constructor paths nor a projection selected, loading resolves
+unloaded without preparing the helper. Actual readiness requires the frontend
+resources, live helper and loaded ONNX session.</p>
+<p>For a complete DBOPFS-to-Core projection already prepared by the application:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">await Arcane.speech.load({
+  role: &#39;tts&#39;,
+  modelId: &#39;kokoro&#39;,
+  assetProjectionId: projection.id,
+  resourcePaths,
+  executionTarget: {deviceId: &#39;cpu&#39;}
+}, {signal});
+</code></pre></div>
+<p>The engine retains the incoming projection before retiring a previous
+activation, including replacement using the same projection. It releases that
+retain only after frontend loading settles and the actual ONNX worker and
+helper exit. The preparation owner retains its own independent release duty.
+Cancelling a caller&#39;s <code>load</code> signal stops that caller&#39;s wait; explicit unload,
+replacement or engine close owns cancellation of the shared activation.
+After <code>localai.services.recover({runtimes: [&#39;onnx&#39;]})</code> completes, a subsequent
+explicit <code>speech.load</code> uses the composition&#39;s <code>prepare</code> callback to reacquire
+the current ONNX owner after the previous activation&#39;s cleanup has joined.</p>
+<p><code>executionPreference</code> defaults to <code>&#39;gpu&#39;</code> and accepts the existing ONNX CPU/GPU
+selection contract. <code>sessionOptions</code> and <code>executionTarget</code> reach that same
+owner unchanged. Explicit providers take precedence, and an explicit physical
+target is never retried on another device or provider. The automatic route&#39;s
+provider attempts and possible CPU selection remain visible in <code>execution</code>.
+STT keeps its own independent device selection. See
+<a href="../local-ai/#physical-execution-targets">native ONNX execution targets</a>;
+accepted configuration and actual physical execution are separate facts.</p>
+<h3 id="synthesis-voices-and-state">Synthesis, voices and state</h3>
+<p><code>synthesize(request, {signal, onProgress, requestId} = {})</code> accepts
+<code>{input, model?, voice?, speed?, responseFormat?}</code>. <code>input</code> is the complete
+string; optional <code>model</code> must match the alias. Defaults are voice <code>af_heart</code>,
+speed <code>1</code>, and format <code>wav</code>. Speed must be a positive finite float32 value.</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>English voice set</th>
+<th>Exact supported IDs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>US female</td>
+<td><code>af_heart</code>, <code>af_alloy</code>, <code>af_aoede</code>, <code>af_bella</code>, <code>af_jessica</code>, <code>af_kore</code>, <code>af_nicole</code>, <code>af_nova</code>, <code>af_river</code>, <code>af_sarah</code>, <code>af_sky</code></td>
+</tr>
+<tr>
+<td>US male</td>
+<td><code>am_adam</code>, <code>am_echo</code>, <code>am_eric</code>, <code>am_fenrir</code>, <code>am_liam</code>, <code>am_michael</code>, <code>am_onyx</code>, <code>am_puck</code>, <code>am_santa</code></td>
+</tr>
+<tr>
+<td>GB female</td>
+<td><code>bf_emma</code>, <code>bf_isabella</code>, <code>bf_alice</code>, <code>bf_lily</code></td>
+</tr>
+<tr>
+<td>GB male</td>
+<td><code>bm_george</code>, <code>bm_lewis</code>, <code>bm_daniel</code>, <code>bm_fable</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>The selected voice determines US or GB phonemization. Unsupported voices,
+formats and emitted phonemes report their actual errors; there is no silent
+voice substitution or phoneme omission. An embedded NUL or unpaired Unicode
+surrogate reports the public eSpeak interface&#39;s inability to consume that
+complete string. The engine preserves source text, consumes all returned
+clauses and divides model tokens into ordered segments according to the model&#39;s
+context. Each segment&#39;s complete waveform contributes to the final audio.</p>
+<p>The result is <code>{audioBase64, contentType, sampleRate: 24000, channels: 1, model, voice, speed}</code>. <code>wav</code> returns IEEE float32 WAV with <code>audio/wav</code>;
+<code>opus</code> and <code>ogg</code> both return finalized Ogg Opus with
+<code>audio/ogg; codecs=opus</code>. The result contains the complete encoded audio rather
+than a playback side effect. Synthesis requires a ready activation and proceeds
+in FIFO order. Progress reports the actual <code>phonemizing</code>, <code>synthesizing</code> and
+<code>encoding</code> phases; segment progress is not streamed audio.</p>
+<p><code>current()</code> returns the selected model/provider, <code>state</code>, <code>loaded</code>, <code>busy</code>,
+active <code>requestId</code> (or <code>null</code> when omitted), <code>queuedRequests</code>, <code>pendingActivation</code>, <code>execution</code>,
+complete <code>progress</code> and serialized <code>error</code>, plus <code>defaultVoice</code> and <code>voices</code>.
+<code>subscribe(listener, {replay = true, signal} = {})</code> returns an unsubscribe
+function and replays that current state. Through Core, it appears in
+<code>speech.status().roles.tts</code> and <code>speech.state</code>.</p>
+<p>Cancelling a queued synthesis removes only that request. Cancelling active
+synthesis retires its native session/helper and joins their actual exit before
+settlement. Surviving queued requests retain their complete input and order;
+the next request reopens the same activation with the accepted provider options
+and the resolved device when known. It does not replay the cancelled synthesis or search for
+another provider. With no queued work, explicitly <code>load()</code> before new synthesis.
+Native ONNX cancellation can wait for an in-flight native call to return.</p>
+<p><code>unload()</code> cancels the activation and its queued work, joins native cleanup and
+releases retained model assets. <code>close()</code> also disposes engine subscriptions;
+both preserve the host&#39;s shared ONNX owner and other engines. Cleanup errors
+remain complete and observable. The Core equivalent is
+<code>Arcane.speech.unload({role: &#39;tts&#39;})</code>.</p>
+<h3 id="native-helper-production-and-availability">Native helper production and availability</h3>
+<p>Windows x64 has a selected SDK helper archive, <code>arcane-kokoro-windows-x64.tar.gz</code>.
+<a href="../local-ai/#native-kokoro-selection">Runtime preparation</a> resolves it from the
+installed SDK version&#39;s release. Linux and macOS use the shared JavaScript
+engine and native CMake source with an explicitly prepared, platform-matching
+complete helper tree or archive. Automatic Linux/macOS helper distributions
+are not provided; execution on those hosts remains unverified.</p>
+<p>SDK selected-output verification on October 7, 2026 used Node <code>26.7.0</code> and
+ONNX Runtime Node <code>1.30.0</code> with explicit CPU selection for the selected Windows
+helper and FP32 model. It covered US <code>af_heart</code> and GB <code>bf_emma</code> synthesis to WAV and Ogg Opus,
+including queued/active cancellation and a surviving queued request. This
+establishes that selected CPU output boundary, not GPU execution, other voices&#39;
+pronunciation, listening acceptance or consumer application behavior.
+The subsequent Core-recovery reacquisition correction received source review
+only and was not part of those execution runs.</p>
+<p>The repository&#39;s <code>tools/build-kokoro-runtime-windows.ps1</code>
+builds from prepared <code>espeak-ng</code>, <code>opus</code> and <code>libopusenc</code> source directories.
+Its selected inputs are the <code>csukuangfj/espeak-ng</code> fork at
+<code>ed530aa113046142eb5115cf2fc9157854d0ffe1</code> with its matching UCD and language data,
+libopus <code>1.6.1</code>, and libopusenc <code>0.3</code>. It uses installed CMake and Visual Studio
+2022 Build Tools, defaulting to MSVC <code>14.44.35207</code> and Windows SDK
+<code>10.0.26100.0</code>; it acquires no dependencies or model files.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>powershell</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-powershell">&amp; ./tools/build-kokoro-runtime-windows.ps1 `
+  -SourceRoot ./.arcane/kokoro-source `
+  -OutputDirectory ./.arcane/kokoro-build `
+  -Component espeak
+</code></pre></div>
+<p>Run <code>espeak</code>, <code>opus</code> and <code>opusenc</code> components independently, concurrently when
+desired, using the same output directory. After all three complete, run
+<code>helper</code>, then <code>stage</code>. Each component retains complete command/result logs;
+do not run the same component concurrently in that output. The output must
+belong to <code>ProjectDirectory</code> and be separate from the prepared source tree.
+The staged helper, matching complete data, corresponding source and included
+terms travel together. The recipe statically links its selected libraries and
+retains their upstream notices alongside the SDK license. Model/voice assets
+and the separately selected ONNX runtime remain outside the helper package.
+This reusable recipe was source-reviewed; its publication does not claim a
+fresh execution of every component or a build on another operating system.</p>
 <h2 id="ai-built-in-native-speech-readiness">AI built-in native speech readiness</h2>
 <p>The <code>AI</code> module&#39;s <code>LOCAL_SPEACH</code> adapter observes <code>speech.state</code> before reading
 <code>Arcane.speech.status()</code>. A newer event takes precedence over an outstanding
@@ -184,9 +377,9 @@ subscriptions. They do not close the host&#39;s shared engines or alter complete
 speech requests and results. Browser and explicitly registered speech providers
 retain their existing lifecycle contracts.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.92.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.94.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

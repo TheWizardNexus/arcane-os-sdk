@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient, getInstalledCoreClient and subscribeCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.92.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Core browser client</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="core-browser-client">Core browser client</h1><p class="doc-lead">arcane-os/core/client is the browser-safe arcane/1 RPC owner. It exports createCoreClient, createCoreFacade, installCoreClient, getInstalledCoreClient and subscribeCoreClient. arcane-os/core/contracts exports COREPROTOCOL, COREREADYEVENTS, COREFRAMECONTRACTS, COREMETHODCONTRACTS, CoreError and serializeCoreError. Contracts describe transport and existing method shapes; they do not select application policy or decide which services are installed.</p><div class="doc-meta"><span>SDK 0.94.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="./" aria-current="page">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-state">Current-window state</a><a href="#current-window-theme">Current-window theme</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
+      <article class="prose reference-prose" data-reference-source="docs/reference/core-client.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-state">Current-window state</a><a href="#current-window-theme">Current-window theme</a><a href="#native-desktop-notifications">Native desktop notifications</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></details><p><code>arcane-os/core/client</code> is the browser-safe <code>arcane/1</code> RPC owner. It exports
 <code>createCoreClient</code>, <code>createCoreFacade</code>, <code>installCoreClient</code>,
 <code>getInstalledCoreClient</code> and <code>subscribeCoreClient</code>.
 <code>arcane-os/core/contracts</code> exports <code>CORE_PROTOCOL</code>, <code>CORE_READY_EVENTS</code>,
@@ -257,6 +257,116 @@ window closes. Responses belong to their originating document.</p>
 forwards the app&#39;s computed <code>--background</code> and <code>--text-color</code> in native hosts.
 Applications using that owner need no duplicate theme listener. Ordinary
 browsers keep their CSS presentation without making a native request.</p>
+<h2 id="native-desktop-notifications">Native desktop notifications</h2>
+<p><code>Arcane.notifications</code> uses the existing Core request transport to the actual
+application window&#39;s native host. The Windows adapter is source implementation;
+selected native build and actual OS delivery verification remain pending. A
+matching published host is required for delivery. The portable facade is the
+same on Windows, Linux and macOS, with Android requiring a host adapter; other
+unimplemented hosts and direct shared-Core listener connections are unavailable.
+Those listener connections bypass the window bridge. There is no browser
+<code>Notification</code>, audio or simulated delivery substitute.</p>
+<div class="table-wrap" data-columns="3" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameters</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>status(options?)</code></td>
+<td>Request options only</td>
+<td>Actual native <code>supported</code>, <code>available</code> and <code>permissionDisabled</code>, with the host&#39;s reason/error when present</td>
+</tr>
+<tr>
+<td><code>show(request, options?)</code></td>
+<td><code>{id,title,body,data}</code></td>
+<td>Complete notification record for the actual submission outcome</td>
+</tr>
+<tr>
+<td><code>state(selection = {}, options?)</code></td>
+<td>Optional <code>{id}</code> selects one owned ID; omission selects all retained records</td>
+<td><code>{revision,notifications:[complete records]}</code></td>
+</tr>
+<tr>
+<td><code>close(selection, options?)</code></td>
+<td><code>{id}</code></td>
+<td>Complete record after the exact owned notice&#39;s removal operation</td>
+</tr></tbody>
+</table>
+</div>
+<p>Every method accepts the standard <code>invoke</code> options <code>signal</code>, <code>timeoutMs</code> and
+<code>onRequest({requestId})</code>. Requests, title/body strings and opaque JSON-compatible
+<code>data</code> pass through unchanged. The application owns recipients, triggers, text,
+deduplication and navigation. The OS controls presentation; preserving the
+complete request does not establish that every character was visibly displayed.</p>
+<p><code>status()</code> changes no OS permissions or preferences. Only the exact Core error
+<code>METHOD_NOT_ALLOWED</code> with <code>reason:&#39;core-namespace-unavailable&#39;</code> becomes
+<code>{supported:false,available:false,permissionDisabled:null, reason:&#39;host-notifications-unavailable&#39;,error}</code>; <code>error</code> is the original complete
+error and no platform is invented. All other invocation rejections propagate
+unchanged. The native adapter can return an unavailable result with the complete
+OS initialization or settings error. <code>permissionDisabled:null</code> means the permission state is
+unknown. Use this status operation to discover the window adapter; Core&#39;s
+service capability list does not describe host-intercepted notification methods.
+Native <code>supported:null</code> means initialization could not establish OS support;
+<code>available:false</code> retains its actual reason and complete error when supplied.</p>
+<p>A retained record contains <code>{id,title,body,data,state,revision}</code> and the actual
+timestamps, reasons and complete errors supplied by its owner. <code>submitted</code> means
+the native <code>Show</code> call returned. It does not establish visible display or human
+receipt. Later activation, dismissal and failure remain observable and retained.
+A dismissal due to timeout does not establish removal from Notification Center.
+Use <code>close({id})</code> for explicit OS removal. Closing retains the record; showing
+the same caller ID again during this host lifetime rejects with its existing
+record instead of resending or replacing it.
+The top-level <code>event</code> names the latest observation, while <code>events</code> retains the
+complete ordered history. An activation racing successful removal can report
+<code>event:&#39;activated&#39;</code> with <code>state:&#39;closed&#39;</code>; the application owns action routing.</p>
+<p>The live <code>notifications.state</code> event carries one complete updated record. It is
+future-only. Subscribe before requesting the snapshot, then merge records by
+their revisions so a delayed snapshot cannot overwrite a newer event:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const records = new Map();
+function receiveNotification(record) {
+    const previous = records.get(record.id);
+    if (!previous || record.revision &gt;= previous.revision) records.set(record.id, record);
+}
+const stop = Arcane.events.on(&#39;notifications.state&#39;, receiveNotification);
+try {
+    const snapshot = await Arcane.notifications.state();
+    for (const record of snapshot.notifications) receiveNotification(record);
+} catch (error) {
+    stop();
+    throw error;
+}
+// Call stop() when this observation ends; it does not remove native notices.
+</code></pre></div>
+<p>When the installed Core client changes, detach the old event listener and ignore
+its outstanding snapshot response. Recreate the records map for the new
+client/host lifetime so an earlier host&#39;s revisions cannot suppress its records.
+Subscribe and read the new client&#39;s snapshot
+through <a href="#observe-installation-and-retirement">installation observation</a>.
+Accepted notices and their records survive renderer navigation within the same
+native host. There is no persisted cross-process recovery or cold-process
+activation contract.</p>
+<p>Windows reuses an SDK-created native identity and shortcut for the existing
+WebView profile across launches, preserving that profile&#39;s OS notification
+preferences. Its owned <code>AppUserModelId</code> registration stores the application&#39;s
+display name, icon and live activator identity without changing notification
+preferences or registering a cold-start launch command.
+The SDK persists registration metadata only; its notification text
+and data records remain in host memory. OS notification retention remains
+platform-owned.
+Distinct profiles have independent notification settings. One live notifier
+owns a profile&#39;s COM activation registration; a second simultaneous host using
+that profile reports <code>available:false</code> with
+<code>reason:&#39;notification-owner-already-running&#39;</code> and may retry explicitly later.
+Shutdown releases live COM ownership and owned notices while preserving the
+identity registration for a later launch.</p>
+<p>Cancellation observed before submission prevents that pending show from
+submitting. After submission, request cancellation or renderer retirement cannot
+reverse human interaction and does not remove the accepted notice; <code>close</code> is
+explicit. Host shutdown drains owned operations, removes owned notices and
+detaches callbacks, surfacing complete cleanup errors.</p>
 <h2 id="events-and-request-lifetime">Events and request lifetime</h2>
 <p><code>events.on(name, listener)</code>, <code>once(name, listener)</code> and
 <code>when(name, listener)</code> return unsubscribe functions. Named listeners receive
@@ -416,9 +526,9 @@ Core runtime and selected app services without a native-provider checkout.
 It does not distribute a Core executable or change OS callers. Executable
 platform hosts and their cutover remain separately owned work.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-state">Current-window state</a><a href="#current-window-theme">Current-window theme</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#native-connection-and-explicit-adapters">Native connection and explicit adapters</a><a href="#current-window-state">Current-window state</a><a href="#current-window-theme">Current-window theme</a><a href="#native-desktop-notifications">Native desktop notifications</a><a href="#events-and-request-lifetime">Events and request lifetime</a><a href="#optional-webkit-document-lifetime">Optional WebKit document lifetime</a><a href="#classic-native-host-injection">Classic native-host injection</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.92.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.94.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Native diagnostics retain errors from the actual packaged application&#39;s top-level document in its native host session. Read them through the existing app-control connection, without foregrounding a window, desktop input, or arbitrary script execution. This is a developer inspection surface, separate from ordinary product status and saved conversation history.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-diagnostics/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native application diagnostics · Arcane OS SDK"><meta property="og:description" content="Native diagnostics retain errors from the actual packaged application&#39;s top-level document in its native host session. Read them through the existing app-control connection, without foregrounding a window, desktop input, or arbitrary script execution. This is a developer inspection surface, separate from ordinary product status and saved conversation history."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-diagnostics/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native application diagnostics · Arcane OS SDK"><meta name="twitter:description" content="Native diagnostics retain errors from the actual packaged application&#39;s top-level document in its native host session. Read them through the existing app-control connection, without foregrounding a window, desktop input, or arbitrary script execution. This is a developer inspection surface, separate from ordinary product status and saved conversation history."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native application diagnostics | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native application diagnostics</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-application-diagnostics">Native application diagnostics</h1><p class="doc-lead">Native diagnostics retain errors from the actual packaged application&#39;s top-level document in its native host session. Read them through the existing app-control connection, without foregrounding a window, desktop input, or arbitrary script execution. This is a developer inspection surface, separate from ordinary product status and saved conversation history.</p><div class="doc-meta"><span>SDK 0.94.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-diagnostics.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#report-a-caught-application-error">Report a caught application error</a><a href="#retrieve-retained-errors">Retrieve retained errors</a><a href="#complete-error-property-representation">Complete error property representation</a><a href="#host-ownership-and-availability">Host ownership and availability</a></nav></details><p>Native diagnostics retain errors from the actual packaged application&#39;s top-level
+document in its native host session. Read them through the existing app-control
+connection, without foregrounding a window, desktop input, or arbitrary script
+execution. This is a developer inspection surface, separate from ordinary product
+status and saved conversation history.</p>
+<p>The Windows WebView2 host installs the fixed observer at document creation, before
+the ordinary Core client and application scripts. It captures <code>window.error</code> and
+<code>unhandledrejection</code> events and accepts explicit reports of application-caught
+errors. It leaves the browser&#39;s ordinary error behavior intact. It does not
+intercept console output, inspect application state, collect resource/request
+bodies, or capture errors from other applications or frame documents.</p>
+<h2 id="report-a-caught-application-error">Report a caught application error</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {reportNativeError} from &#39;arcane-os/core/native-diagnostics&#39;;
+
+const receipt = await reportNativeError(error, {
+    details: {operation: &#39;source.load&#39;, sourceId}
+});
+// receipt: {accepted: true, sessionId, sequence}
+</code></pre></div>
+<p><code>error</code> is the actual caught value, including non-Error rejection values.
+<code>details</code> is optional application-selected diagnostic context. Supply diagnostic
+information only; credentials, secrets, user documents and provider/tool payloads
+do not belong in this report. The SDK adds document/session metadata outside the
+reported values and does not rewrite their text. Reporting does not change the
+application&#39;s own handling of the original failure.</p>
+<p>The promise resolves after the native host retains the record. A missing document
+observer or native handler rejects with
+<code>ARCANE_NATIVE_DIAGNOSTICS_UNAVAILABLE</code>. A negative host acknowledgement rejects
+with <code>ARCANE_NATIVE_DIAGNOSTIC_REJECTED</code>, preserving the complete host reply in
+<code>details</code> and its error in <code>cause</code>. Reflection, encoding and native transport
+failures reject with their actual error. A lost reply can leave the caller&#39;s
+outcome unknown; the SDK does not automatically retry and duplicate the report.</p>
+<p>Automatic capture observes its own reporting failures through the existing
+console, with the original error, without recursively manufacturing an unhandled
+rejection. Console output remains ordinary console output; it is not retained
+diagnostic history. Applications must observe explicit reporting promises.</p>
+<h2 id="retrieve-retained-errors">Retrieve retained errors</h2>
+<p>Use the endpoint of the selected running app from its existing app-control launch
+configuration. Connecting does not launch the application.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {connectAppControl} from &#39;arcane-os/core/app-control&#39;;
+
+const control = await connectAppControl({endpoint});
+try {
+    const snapshot = await control.diagnostics();
+    console.dir(snapshot, {depth: null});
+} finally {
+    await control.close();
+}
+</code></pre></div>
+<p><code>control.diagnostics({afterSequence?, documentId?}, {signal?})</code> invokes
+<code>app.control.diagnostics</code>. Omitted filters return every retained error.
+<code>afterSequence</code> selects records with a greater session sequence;
+<code>documentId</code> selects one actual document. Retrieval is non-consuming: independent
+inspectors can read the same complete records. Connection/cancellation behavior is
+the existing app-control contract. Retrieval does not wait for renderer, Core,
+model or application readiness and does not evaluate a script in the document.</p>
+<p>The result is:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const result = {
+    sessionId,
+    captureStartedAt,
+    captureInstalled,
+    latestSequence,
+    documents: [{documentId, documentUrl, time, receivedAt}],
+    records: [{
+        sequence, receivedAt, documentId, documentUrl, time,
+        kind, error, details, valueFormat, values, location, message
+    }]
+};
+</code></pre></div>
+<p><code>sessionId</code> identifies this native window/host lifetime. <code>captureStartedAt</code> is the
+time its in-memory ledger was created. <code>captureInstalled</code> means document-start
+script registration completed; it does not prove that any application failure
+occurred or that a particular operation succeeded. <code>documents</code> records actual
+ingress from observed documents. Each document has one identity, shared with app
+control, independent of Core bridge generations. A cancelled navigation that
+leaves the same document alive keeps that identity.</p>
+<p><code>sequence</code> is assigned when an error is retained, in host arrival order.
+<code>latestSequence</code> describes the whole session even when filters select fewer
+records. <code>time</code> comes from document capture; <code>receivedAt</code> comes from the host.
+<code>kind</code> is <code>window.error</code>, <code>unhandledrejection</code>, or <code>application</code>. Window errors
+include <code>location: {file, line, column}</code> when the browser exposes those fields.
+Their browser <code>message</code> is retained separately from <code>error</code>, preserving a null
+or undefined error value rather than replacing it with that message.
+<code>details</code> and <code>location</code> are otherwise omitted.</p>
+<p>Records survive document navigation and Core transport failure within the host
+session. Closing the inspector leaves them retained. Closing the native host ends
+the session; this API does not persist, migrate, prune, or recover records across
+host restarts. An empty snapshot means no matching records were retained in this
+session, not that earlier failures never occurred. Errors before capture existed,
+handled failures never explicitly reported, errors the browser does not expose,
+and vanished documents whose pending reports never reached the host remain
+unavailable. Earlier never-retained failures cannot be reconstructed through this API.</p>
+<h2 id="complete-error-property-representation">Complete error property representation</h2>
+<p>Each record uses <code>valueFormat: &#39;arcane.diagnostic-value/1&#39;</code>. <code>error</code> and optional
+<code>details</code> are roots into the single <code>values</code> graph. JSON-native primitives remain
+their original values. Undefined, bigint, non-finite numbers and negative zero
+have explicit typed representations. <code>{ref: id}</code> identifies a graph node.
+Repeated references and cycles retain the same identity within the record.</p>
+<p>Object nodes retain every own property descriptor, including non-enumerable and
+symbol-keyed fields. This includes full Error messages and stacks, <code>cause</code>,
+AggregateError members and custom diagnostic details. Standard error fields
+inherited from a prototype appear in <code>inherited</code>. Data descriptors contain
+<code>value</code>; accessor descriptors contain references for <code>get</code> and <code>set</code> without
+invoking either function. An accessor supplied as the <code>details</code> option is likewise
+represented rather than called. No <code>toJSON</code> method on reported content is called.
+Maps and sets retain their entries, dates their numeric time, and regular
+expressions their source and flags, alongside their own properties.</p>
+<p>This is a diagnostic property representation, not an executable object snapshot:
+functions retain their property identity, not executable closures; platform-private
+internal state and private class fields are not observable properties. The host
+stores and returns the graph without reconstructing or executing those objects.
+An object that rejects reflection causes an observable reporting failure rather
+than a silently incomplete success. Inspect the complete graph in developer
+diagnostics; do not flatten it into ordinary chat or user-facing status.</p>
+<h2 id="host-ownership-and-availability">Host ownership and availability</h2>
+<p><code>installNativeDiagnostics(globalThis)</code> installs one observer per document and
+returns its owner <code>{documentId, ready, report}</code>. <code>ready</code> resolves after the document
+announcement is accepted, and <code>report</code> has the same report contract. Importing
+the ESM module alone installs no observer. The packaged native host owns
+installation and lifetime; ordinary applications use <code>reportNativeError</code>.</p>
+<p><code>createNativeDiagnosticsSource()</code> from
+<code>arcane-os/core/native-diagnostics-source</code> projects that same canonical helper
+into the top-level document-start script. It adds no second observer or serializer.
+Windows binds the script to the dedicated <code>arcaneDiagnostics.Send</code> host object.
+This route is independent of <code>arcaneBridge</code> and the Core subprocess. Host close
+stops new ingress and removes the object/script during existing shutdown.</p>
+<p>The implementation here supplies Windows WebView2 capture and app-control
+retrieval. macOS, Linux and Android require their native host ingress/session and
+app-control adapters; this source change does not claim those adapters exist.
+The helper recognizes the same fixed-name WebKit reply handler when a host
+provides it; that transport seam is not platform availability. A browser preview
+cannot establish actual native acceptance.</p>
+<p>Native delivery requires the corresponding rebuilt SDK Windows host asset and
+consumer adoption through the published SDK package. Source inspection, authored
+fixtures and configured capture are distinct from executed built-application
+verification. Existing host stderr/log diagnostics, live Core events, readiness
+replay and <code>Arcane.diagnostics.recentErrors/get</code> retain their existing semantics;
+this API does not turn them into a historical error service.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#report-a-caught-application-error">Report a caught application error</a><a href="#retrieve-retained-errors">Retrieve retained errors</a><a href="#complete-error-property-representation">Complete error property representation</a><a href="#host-ownership-and-availability">Host ownership and availability</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.94.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>
