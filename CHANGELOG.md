@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.95.0
+
+- Add retained native Nemotron streaming recognition and optional diarization,
+  with ordered complete snapshots, explicit utterance endpoints, speaker scope,
+  and joined cancellation. Preserve existing Whisper and complete transcription.
+- Add native Magpie/NanoCodec synthesis with model-owned voice selection,
+  per-request language, ordered PCM streaming, complete WAV/PCM export, and
+  exact-utterance cancellation. Preserve authored input and natural model rate;
+  the caller supplies upstream runtime and model assets without SDK vendoring.
+- Extend shared Core speech and browser clients with correlated streaming
+  capture/output, consumed-audio acknowledgements and native cleanup joins.
+  Connect AI playback through its existing queues and shared AudioContext,
+  retaining per-utterance pause/resume/stop and complete-audio APIs.
+- Keep capture ownership, recognition segments and model-owned conversational
+  decisions distinct. Windows x64 native helpers compiled and installed against
+  the approved NeMo 0.2.0 runtime; inference, microphone/audio acceptance and
+  other-platform execution remain separate evidence boundaries.
+
 ## 0.94.0
 
 - Recover all TWiN HTTP 429 quota responses through the shared chat/System One
