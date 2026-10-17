@@ -93,11 +93,43 @@ See [the complete selection contract](protocols.md#native-only-application-resou
 
 ## Output and host contract
 
-Each build creates a fresh `arcane-portable-*` directory beneath `outputRoot`.
-The result is `{app, target, manifest}`, with its actual directory at
-`target.rootDir`. Existing artifacts are preserved. Cancellation or a failed
-assembly removes only that build's newly created directory. Source/release roots
-cannot be overwritten with generated output.
+Each build assembles in a fresh temporary directory beneath `outputRoot`, then
+publishes the complete artifact to one stable app-specific child. Portable and
+Windows outputs use `<outputRoot>/<app-id>/`; macOS uses
+`<outputRoot>/<app-id>.app/`. The result remains `{app, target, manifest}`, with
+its actual payload directory at `target.rootDir` and the macOS bundle directory
+also returned as `bundleRoot`. A later successful build replaces that app's
+previous generated output instead of accumulating completed build directories.
+Windows device-name spellings such as `con` receive an underscore in the output
+folder name (`_con` or `_con.app`) on every build host; the app ID stays unchanged.
+
+Assembly leaves the current output available. Publication uses same-filesystem
+renames and retains the previous output in a temporary backup until the
+`native.payload.completed` callback accepts the new final paths. A callback
+rejection or cancellation restores the previous output; a successful build
+removes its backup and temporary assembly. The completion callback runs before
+build acceptance, including the following cancellation check; receiving that
+event alone does not establish an accepted build. `native.payload.started` identifies
+the temporary assembly, while `native.payload.completed` identifies the final
+payload and, on macOS, final bundle. Manifest paths stay relative to that payload;
+application content and explicitly supplied configuration paths stay unchanged.
+
+Only final replacement of the same app is reserved; independent assemblies and
+other apps remain concurrent. A competing publication reports the exact
+`.arcane-publish-<app-output-name>` reservation so its owner can finish before
+retrying. If recovery or backup cleanup fails, the error identifies the actual
+output, assembly and reservation paths, and whether publication committed.
+The reservation's `owner.json` records the process, acquisition time, advisory
+five-minute TTL/expiry and recovery locations. Expiry never permits automatic
+takeover or deletion. After an interrupted build, inspect those paths before restoring the previous
+output or removing the reservation. A running or locked app may prevent Windows
+replacement; close that app and retry the build after the reported failure.
+
+Replacement applies only to the matching app's generated artifact directory.
+Source/release roots, unrelated outputs, host/runtime download caches and the
+host's separate saved profile/model directories remain outside replacement.
+Existing randomly named outputs from earlier SDK versions are left untouched;
+the new stable-output lifecycle does not sweep old directories or user data.
 
 The selected app is copied unchanged under `app/`. Dependencies are copied
 unchanged under `dependencies/<index>/`; the manifest relates each directory to
@@ -751,7 +783,7 @@ produce their actual download error. SDK collaborators may select an existing
 version, another architecture or a browser-only artifact.
 
 The complete unchanged portable payload lives at
-`<app-id>.app/Contents/Resources/`. That directory remains `target.rootDir` and
+`<outputRoot>/<app-id>.app/Contents/Resources/`. That directory remains `target.rootDir` and
 contains `arcane-native.json`, `app/`, dependency releases, installed SDK files,
 Core entry/client and `runtime/node`. The additive `bundleRoot` identifies the
 `.app` directory. `Contents/MacOS/Arcane` and `Contents/Info.plist` belong to the

@@ -7,6 +7,8 @@ import Is from 'strong-type';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
 import {createPortableNativeProvider} from './portable-provider.mjs';
+import {assemblePortable} from './portable-assembly.mjs';
+import {publishNativeOutput} from './publish-output.mjs';
 import {outputFile, writeOutput} from './portable-layout.mjs';
 
 const is = new Is(false);
@@ -224,19 +226,19 @@ export function createMacOSNativeProvider({services, hostDirectory} = {}) {
             const target = macosTarget(request.targetRequest);
             const selected = hostDirectory ?? request.toolchain?.hostDirectory;
             const selectedHost = selected === undefined ? null : await requireHostDirectory(selected);
-            const artifact = await portable.build({
+            const artifact = await assemblePortable({
                 ...request, targetRequest: portableRequest(target),
                 async onEvent(event) {
-                    if (event.type !== 'native.payload.completed') await emit(onEvent, {...event, target: target.target});
+                    await emit(onEvent, {...event, target: target.target});
                 }
-            });
+            }, {services, packagedWeb: true, webKitDocumentLifecycle: true});
             const portableRoot = artifact.target.rootDir;
             let assembly;
             try {
                 const host = selectedHost ?? await releasedHostDirectory(path.resolve(request.outputRoot), artifact.manifest.sdk.version, target, {signal, onEvent});
                 throwIfAborted(signal);
                 assembly = await mkdtemp(path.join(path.resolve(request.outputRoot), 'arcane-macos-'));
-                const plist = outputFile(assembly, `${request.appDescriptor.id}.app/Contents/Info.plist`);
+                const plist = outputFile(assembly, 'Contents/Info.plist');
                 const contents = path.dirname(plist);
                 const root = path.join(contents, 'Resources');
                 const bundleRoot = path.dirname(contents);
@@ -256,9 +258,14 @@ export function createMacOSNativeProvider({services, hostDirectory} = {}) {
                 };
                 await writeFile(path.join(root, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, {signal});
                 throwIfAborted(signal);
-                await emit(onEvent, {type: 'native.payload.completed', target: target.target, appId: request.appDescriptor.id, outputRoot: root, bundleRoot});
-                throwIfAborted(signal);
-                return {...artifact, target: {...target, rootDir: root}, bundleRoot, manifest};
+                const publishedBundle = await publishNativeOutput({
+                    sourceRoot: bundleRoot, outputRoot: path.dirname(portableRoot), appId: request.appDescriptor.id, bundle: true, signal,
+                    async onPublished(finalBundle) {
+                        await emit(onEvent, {type: 'native.payload.completed', target: target.target, appId: request.appDescriptor.id,
+                            outputRoot: path.join(finalBundle, 'Contents', 'Resources'), bundleRoot: finalBundle});
+                    }
+                });
+                return {...artifact, target: {...target, rootDir: path.join(publishedBundle, 'Contents', 'Resources')}, bundleRoot: publishedBundle, manifest};
             } catch (error) {
                 return removeOwnedDirectories(assembly ? [portableRoot, assembly] : [portableRoot], error);
             }

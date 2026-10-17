@@ -128,6 +128,8 @@ test('macOS bundles preserve the complete portable payload and selected executab
         const root = artifact.target.rootDir;
         assert.equal(root, path.join(artifact.bundleRoot, 'Contents', 'Resources'));
         assert.equal(path.basename(artifact.bundleRoot), 'moon-cheese-hotline.app');
+        assert.equal(artifact.bundleRoot, path.join(await realpath(fixture.outputRoot), 'moon-cheese-hotline.app'));
+        assert.deepEqual(await readdir(fixture.outputRoot), ['moon-cheese-hotline.app']);
         assert.deepEqual(artifact.target, {...selected, rootDir: root});
         assert.equal(artifact.manifest.kind, 'arcane-macos-native');
         assert.deepEqual(artifact.manifest.target, selected);
@@ -207,20 +209,26 @@ test('macOS host collisions preserve selected content and earlier bundles', asyn
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
 
-test('macOS completion cancellation cleans only the unaccepted owned assembly', async function completionCancellation(t) {
+test('macOS completion cancellation restores the previous complete bundle', async function completionCancellation(t) {
     const fixture = await createFixture(t);
     const controller = new AbortController();
     const reason = new Error('Caller cancelled at the complete macOS payload boundary.');
     const provider = createMacOSNativeProvider({hostDirectory: fixture.hostDirectory});
+    const previous = await provider.build(fixture.request);
+    const changed = new Map(fixture.contents);
+    changed.set('index.html', Buffer.from('<p>Unaccepted moon cheese shipment.</p>'));
     await assert.rejects(provider.build({
         ...fixture.request, signal: controller.signal,
+        async readReleaseFile(relative) { return changed.get(relative); },
         onEvent: function observe(event) { if (event.type === 'native.payload.completed') controller.abort(reason); }
     }), function cancelled(error) {
         assert.equal(error.code, ERROR_CODES.cancelled);
         assert.equal(error.cause, reason);
         return true;
     });
-    assert.deepEqual(await readdir(fixture.outputRoot), []);
+    assert.deepEqual(await readdir(fixture.outputRoot), ['moon-cheese-hotline.app']);
+    await assertContents(path.join(previous.target.rootDir, 'app'), fixture.contents);
+    assert.equal(await readFile(path.resolve(previous.target.rootDir, previous.manifest.host.executable), 'utf8'), fixture.assets.get('Arcane').toString());
     await assertContents(fixture.hostDirectory, fixture.assets);
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });

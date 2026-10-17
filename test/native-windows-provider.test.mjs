@@ -135,6 +135,7 @@ test('Windows assembly preserves complete selected payloads, app services and th
         onEvent: function observe(event) { events.push(event); }
     });
     const root = artifact.target.rootDir;
+    assert.equal(root, path.join(await realpath(fixture.outputRoot), fixture.request.appDescriptor.id));
     assert.deepEqual(artifact.target, {...target, rootDir: root});
     assert.equal(artifact.manifest.kind, 'arcane-windows-native');
     assert.deepEqual(artifact.manifest.target, target);
@@ -295,22 +296,42 @@ test('Windows host collisions preserve selected content and earlier outputs whil
     await assertContents(fixture.appReleaseRoot, fixture.contents);
 });
 
-test('Windows completion cancellation remains observable and removes the unaccepted assembly', async function completionCancellation(t) {
+test('Windows completion cancellation remains observable and restores the accepted app', async function completionCancellation(t) {
     const fixture = await createFixture(t);
     const controller = new AbortController();
     const reason = new Error('Caller cancelled at the complete Windows payload boundary.');
     const provider = createWindowsNativeProvider({hostDirectory: fixture.hostDirectory});
+    const previous = await provider.build(fixture.request);
+    const changed = new Map(fixture.contents);
+    changed.set('index.html', Buffer.from('<p>Unaccepted moon cheese shipment.</p>'));
     await assert.rejects(provider.build({
         ...fixture.request, signal: controller.signal,
+        async readReleaseFile(relative) { return changed.get(relative); },
         onEvent: function observe(event) { if (event.type === 'native.payload.completed') controller.abort(reason); }
     }), function cancelled(error) {
         assert.equal(error.code, ERROR_CODES.cancelled);
         assert.equal(error.cause, reason);
         return true;
     });
-    assert.deepEqual(await readdir(fixture.outputRoot), []);
+    assert.deepEqual(await readdir(fixture.outputRoot), [fixture.request.appDescriptor.id]);
+    await assertContents(path.join(previous.target.rootDir, 'app'), fixture.contents);
     await assertContents(fixture.hostDirectory, fixture.assets);
     await assertContents(fixture.appReleaseRoot, fixture.contents);
+});
+
+test('Windows rebuild replaces the app at one stable path and keeps its host cache', async function latestOutput(t) {
+    const fixture = await createFixture(t);
+    const provider = createWindowsNativeProvider({hostDirectory: fixture.hostDirectory});
+    const first = await provider.build(fixture.request);
+    await writeContents(fixture.outputRoot, new Map([['.arcane-native-hosts/keep.txt', Buffer.from('Keep the host cache.\n')]]));
+    const changed = new Map(fixture.contents);
+    changed.set('index.html', Buffer.from('<p>The latest complete cheese shipment. 🧀</p>'));
+    const second = await provider.build({...fixture.request, async readReleaseFile(relative) { return changed.get(relative); }});
+    assert.equal(second.target.rootDir, first.target.rootDir);
+    await assertContents(path.join(second.target.rootDir, 'app'), changed);
+    await assertContents(second.target.rootDir, assembledHostAssets(fixture.assets));
+    assert.deepEqual((await readdir(fixture.outputRoot)).sort(), ['.arcane-native-hosts', fixture.request.appDescriptor.id].sort());
+    assert.equal(await readFile(path.join(fixture.outputRoot, '.arcane-native-hosts/keep.txt'), 'utf8'), 'Keep the host cache.\n');
 });
 
 test('Windows download failures preserve complete upstream diagnostics and select the installed SDK numeric release', async function downloadFailure(t) {

@@ -279,6 +279,7 @@ test('portable assembly preserves complete app and dependency files and authors 
         onEvent: function observe(event) { events.push(event); }
     });
     const output = artifact.target.rootDir;
+    assert.equal(output, path.join(await realpath(fixture.outputRoot), application.id));
     assert.deepEqual(reads, fixture.release.files);
     await assertReleasePreserved(path.join(output, 'app'), fixture.contents);
     await assertReleasePreserved(fixture.releaseRoot, fixture.contents);
@@ -660,18 +661,18 @@ test('portable assembly completes the selected app SDK from its own source and p
     await assertReleasePreserved(fixture.releaseRoot, fixture.contents);
 });
 
-test('flat and nested signing inputs both assemble without replacing previous artifacts', async function signingCompatibility(t) {
+test('flat and nested signing inputs publish the same stable app output', async function signingCompatibility(t) {
     const fixture = await createFixture(t);
     const provider = createPortableNativeProvider();
     const first = await provider.build(fixture.request);
     const nested = {...target, signing: {mode: 'unsigned-local-test', profileId: null}};
     const second = await provider.build({...fixture.request, targetRequest: nested});
-    assert.notEqual(first.target.rootDir, second.target.rootDir);
+    assert.equal(first.target.rootDir, second.target.rootDir);
     assert.deepEqual(first.manifest.target, target);
     assert.deepEqual(second.manifest.target, nested);
-    await assertReleasePreserved(path.join(first.target.rootDir, 'app'), fixture.contents);
     await assertReleasePreserved(path.join(second.target.rootDir, 'app'), fixture.contents);
-    assert.deepEqual((await readdir(fixture.outputRoot)).sort(), [path.basename(first.target.rootDir), path.basename(second.target.rootDir)].sort());
+    assert.deepEqual(await readdir(fixture.outputRoot), [application.id]);
+    assert.deepEqual(JSON.parse(await readFile(path.join(second.target.rootDir, 'arcane-native.json'), 'utf8')), second.manifest);
 });
 
 test('explicit portable verification inspects the selected artifact files and reports a missing file', async function selectedVerification(t) {

@@ -7,6 +7,8 @@ import Is from 'strong-type';
 import {ArcaneError, ERROR_CODES, throwIfAborted} from '../errors.mjs';
 import {runProcess} from '../process.mjs';
 import {createPortableNativeProvider} from './portable-provider.mjs';
+import {assemblePortable} from './portable-assembly.mjs';
+import {publishNativeOutput} from './publish-output.mjs';
 import {outputFile, writeOutput} from './portable-layout.mjs';
 import {createWindowsApplicationIcon} from './windows-icon.mjs';
 
@@ -275,13 +277,13 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
             const target = windowsTarget(request.targetRequest);
             const selected = hostDirectory ?? request.toolchain?.hostDirectory;
             const selectedHost = selected === undefined ? null : await requireHostDirectory(selected);
-            const artifact = await portable.build({
+            const artifact = await assemblePortable({
                 ...request,
                 targetRequest: portableRequest(target),
                 async onEvent(event) {
-                    if (event.type !== 'native.payload.completed') await emit(onEvent, {...event, target: 'windows-x64'});
+                    await emit(onEvent, {...event, target: 'windows-x64'});
                 }
-            });
+            }, {services});
             const root = artifact.target.rootDir;
             try {
                 const host = selectedHost ?? await releasedHostDirectory(path.resolve(request.outputRoot), artifact.manifest.sdk.version, {signal, onEvent});
@@ -304,9 +306,13 @@ export function createWindowsNativeProvider({services, hostDirectory} = {}) {
                 };
                 await writeFile(path.join(root, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, {signal});
                 throwIfAborted(signal);
-                await emit(onEvent, {type: 'native.payload.completed', target: 'windows-x64', appId: request.appDescriptor.id, outputRoot: root});
-                throwIfAborted(signal);
-                return {...artifact, target: {...target, rootDir: root}, manifest};
+                const output = await publishNativeOutput({
+                    sourceRoot: root, outputRoot: path.dirname(root), appId: request.appDescriptor.id, signal,
+                    async onPublished(outputRoot) {
+                        await emit(onEvent, {type: 'native.payload.completed', target: 'windows-x64', appId: request.appDescriptor.id, outputRoot});
+                    }
+                });
+                return {...artifact, target: {...target, rootDir: output}, manifest};
             } catch (error) {
                 return removeOwnedDirectory(root, error);
             }
