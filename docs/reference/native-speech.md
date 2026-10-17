@@ -36,6 +36,15 @@ continues calling `speech.transcribe` without loading native libraries itself.
 
 ## Startup and status
 
+A speech-only interface can construct the shared browser AI API with explicit
+`null` for both the language-model service and model:
+`new AI(null, 'LOCAL_SPEACH', 'LOCAL_SPEACH', null, ttsModel, sttModel)`.
+This leaves both LLM routes unselected from construction onward; it does not
+register or activate the historical default language provider. Select a real
+language model later through `configureProviders`. Omitted or empty constructor
+arguments keep their historical defaults, and `setAI` retains its existing
+omitted/null/empty-field semantics.
+
 `start(context)` subscribes to each configured engine and starts their loads
 independently. It returns immediately, allowing Core and `speech.status` to
 respond while models load. A failure in one role leaves the other role usable.

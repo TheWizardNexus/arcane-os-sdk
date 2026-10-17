@@ -1152,14 +1152,18 @@ class AI {
             }
         );
 
+        const speechOnly=llmService===null&&model===null;
         const preferences=[
-            llmService||'TWIN',
+            speechOnly?'':llmService||'TWIN',
             sttService||'LOCAL_SPEACH',
             ttsService||'LOCAL_SPEACH',
-            model||'TWIN',
+            speechOnly?'':model||'TWIN',
             modelTTS||'LOCAL_SPEACH',
             modelSTT||'LOCAL_SPEACH'
         ];
+        // Explicitly absent LLM selection must not briefly register or load a
+        // default provider. setAI retains empty entries from this initial tuple.
+        if(speechOnly)this.#preferenceTuple=preferences.slice();
         this.setAI(
             ...preferences
         );
