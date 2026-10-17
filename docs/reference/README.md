@@ -76,6 +76,9 @@ alone does not make bare module names resolve in a browser.
 | Select FLUX.2 Klein 4B and its three complementary model resources | [FLUX.2 Klein 4B through Core](local-image-flux.md) |
 | Select the complete SDXL Base 1.0 checkpoint for generation and whole-image editing | [SDXL Base 1.0 through Core](local-image-sdxl.md) |
 | Compose independently loaded transcription and synthesis engines | [Native speech service](native-speech.md) |
+| Stream complete native recognition with retained speaker scope | [Native Nemotron](native-nemotron.md) and [Core speech streaming](native-speech.md#continuous-transcription-and-streaming-synthesis) |
+| Produce native PCM speech with selected voice and language | [Native Magpie](native-magpie.md) |
+| Capture and play native speech through shared AI controls | [Shared AI capture and playback](native-speech.md#shared-ai-capture-and-playback) |
 | Keep a native Whisper model loaded across complete recordings | [Native Whisper transcription](local-whisper.md) |
 | Select the optional Intel NPU encoder with independent CUDA or CPU decoding | [Intel NPU Whisper](../guides/native-whisper-openvino.md) |
 | Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
@@ -242,6 +245,12 @@ and their current source inventories remain authoritative; the catalogs explain
 what those artifacts let a developer do.
 
 ## Normalized AI
+
+A speech-only interface explicitly passes `null` for both the first and fourth
+`AI` constructor arguments:
+`new AI(null, 'LOCAL_SPEACH', 'LOCAL_SPEACH', null, ttsModel, sttModel)`.
+This leaves the LLM unselected from construction; omitted or empty arguments
+retain their historical defaults. See [native speech startup](native-speech.md#startup-and-status).
 
 Portable applications start with the provider-neutral runtime rather than an
 Ollama, Wllama, Whisper, Kokoro, native, or cloud transport:

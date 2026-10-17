@@ -239,6 +239,39 @@ const definition = parseModelDefinition(
 console.log(definition.system);`
     },
     {
+        name:'NativeSpeechCapture.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Construction opens no microphone or model. Explicit start opens one capture graph and one Core recognition stream; endpoint retains them, stop drains and closes them, and cancellation joins both cleanup owners.',
+        paramsResults:'createNativeSpeechCapture({speech,model,sampleRate=16000,pcmChunkMs=100,activityThreshold=0.02,streamOptions,mediaConstraints,onUpdate,onInterim,onSegment,onActivity,onState,onError,onProgress,onRequest}) returns start({signal,mediaConstraints}), forceEndpoint, stop, requestStop, cancel(reason), destroy(reason), done and current. Start resolves boolean. Exact mono Float32 PCM uses the declared actual rate; complete native snapshots are preserved. Callbacks receive (result,{requestStop}); requestStop requests a terminal drain without joining it. External callers join stop or done and invoke forceEndpoint outside recognition callbacks. Partial snapshots replace; finals remain distinct segments, never inferred conversation completion.',
+        events:['onUpdate for every snapshot, then onSegment for final or onInterim for provisional','onActivity and onState describe capture only','onProgress and onRequest preserve Core metadata'],
+        errors:['Original capture, native, callback and cleanup failures remain observable through done and onError.','A capture/native sample-rate mismatch reports an error without reinterpreting samples.'],
+        capabilitiesCore:'Browser microphone and AudioWorklet plus an explicitly selected ready streaming Core speech engine. No chat dispatch, persistence, semantic endpoint detector or fallback.',
+        example:`import createNativeSpeechCapture from 'arcane-os/modules/NativeSpeechCapture.js';
+
+function prepareDragonInterpreter(speech, model, showSnapshot) {
+    return createNativeSpeechCapture({speech, model, onUpdate: showSnapshot});
+}
+// The owning user action starts the returned capture; the owner joins stop/done.`
+    },
+    {
+        name:'NativeSpeechPlayback.js',
+        classification:'public-first-party',
+        lifecycleSideEffects:'Preparation is inert. Explicit play calls the supplied streaming speech API, schedules PCM on the caller-owned AudioContext and owns only this utterance and its nodes. It never closes the shared output context.',
+        paramsResults:'prepareNativeSpeechPlayback({speech,request,getAudioContext,signal=null}) returns {kind:native-speech,input,voice,language,speed,play}. play({signal,onState}) returns finished, released, state/error getters and pause/resume/stop boolean controls. Ordered s16le PCM is converted to Web Audio samples at the supplied rate and channel count; awaited consumption provides audio-clock backpressure. finished resolves true after natural playback or false after stop, and rejects actual failures; released additionally joins native synthesis and cleanup. Pause retains the unplayed position. Cancellation targets only this utterance, independently of microphone capture.',
+        events:['Optional onState({state,error}) observes queued, waiting-for-audio, playing, paused, complete, stopped or error.'],
+        errors:['TypeError for missing streaming speech or AudioContext owner.','ARCANE_AI_SPEECH_PLAYBACK_FAILED for unusable PCM or closed audio output.','Native synthesis, playback and cleanup failures remain observable; combined failures retain their causes.'],
+        capabilitiesCore:'Browser Web Audio and a supplied streaming speech API; application selection, native engine availability and output-context lifetime remain with their owners.',
+        example:`import prepareNativeSpeechPlayback from 'arcane-os/modules/NativeSpeechPlayback.js';
+
+function prepareDragonAnnouncement(speech, getAudioContext, signal) {
+    return prepareNativeSpeechPlayback({
+        speech, getAudioContext, signal,
+        request: {input: 'The dragon has landed.', languageCode: 'en-US'}
+    });
+}
+// Call descriptor.play() from the owning playback action, then join released.`
+    },
+    {
         name:'Ollama.js',
         classification:'public-first-party',
         lifecycleSideEffects:'Import creates and freezes a singleton, installs non-writable globalThis.arcaneOllama once, and dispatches arcane-ollama-ready. Calls resolve globalThis.Arcane.ollama at call time and never access localhost directly.',
@@ -766,9 +799,9 @@ const chart = new uPlot(
     {
         name:'VoiceCaptureWorklet.js',
         classification:'internal-worker',
-        lifecycleSideEffects:'The ContinuousVoiceCapture owner loads this static AudioWorklet processor. Audio rendering supplies microphone samples; the processor keeps rolling pre-roll, cuts activity-bearing pause/periodic segments without overlap, and transfers complete mono Float32 WAV audio. Stop flushes the final active clip and acknowledges completion.',
-        paramsResults:'Processor arcane-continuous-voice-capture receives processorOptions {preRollMs,quietMs,chunkMs,activityThreshold}. activityThreshold is RMS amplitude over fixed 20 ms audio-frame windows, not individual peaks; callback lengths do not change classification. Quiet duration counts original audio frames. Stop classifies any partial final window using its actual samples and flushes the active clip with softer trailing audio. Original samples, pre-roll and periodic adjacency are preserved. Owner messages use {type:"stop"}. Processor messages use {type:"segment",audio:ArrayBuffer,sampleRate,sequence,reason,durationMs} followed by {type:"stopped"} at stop. Inactive audio produces no clip; RMS detection does not recognize semantic speech.',
-        events:['owner-local MessagePort segment and stopped messages'],
+        lifecycleSideEffects:'The ContinuousVoiceCapture owner loads this static AudioWorklet processor. Audio rendering supplies microphone samples; mode:pcm transfers every sample with actual sample rate and amplitude activity events, without semantic selection. In default segment mode the processor keeps rolling pre-roll, cuts activity-bearing pause/periodic segments without overlap, and transfers complete mono Float32 WAV audio. Stop flushes the final active clip and acknowledges completion.',
+        paramsResults:'Processor arcane-continuous-voice-capture receives processorOptions {preRollMs,quietMs,chunkMs,activityThreshold,mode,pcmChunkMs}. activityThreshold is RMS amplitude over fixed 20 ms audio-frame windows, not individual peaks; callback lengths do not change classification. Quiet duration counts original audio frames. Stop classifies any partial final window using its actual samples and flushes the active clip with softer trailing audio. Original samples, pre-roll and periodic adjacency are preserved. PCM mode emits {type:"pcm",audio:ArrayBuffer,sampleRate,sequence} and {type:"activity",active,audioTime}; pcmChunkMs is transport scheduling. Owner {type:"flush",id} emits pending PCM then {type:"flushed",id} without closing. Owner messages also use {type:"stop"}. Processor messages use {type:"segment",audio:ArrayBuffer,sampleRate,sequence,reason,durationMs} followed by {type:"stopped"} at stop. Inactive audio produces no clip; RMS detection does not recognize semantic speech.',
+        events:['owner-local MessagePort segment, pcm, activity, flushed and stopped messages'],
         errors:['Native AudioWorklet processor errors are observed by ContinuousVoiceCapture.'],
         capabilitiesCore:'Internal AudioWorkletGlobalScope only; no ESM exports, model, persistence, or Core service. Applications use ContinuousVoiceCapture or voice-transcription.html.',
         example:`import ContinuousVoiceCapture from '/arcane/modules/ContinuousVoiceCapture.js';

@@ -161,6 +161,41 @@ pre-aborted signal sends no transcription request; an in-flight abort sends
 service owns interruption and release of its actual engine operation.
 Its optional request observer uses the same pre-dispatch correlation contract.
 
+## Streaming native speech
+
+`Arcane.speech.openStream(request, {signal, onUpdate, onProgress, onRequest})`
+returns `{streamId, ready, completion, current, push, forceEndpoint, finish, cancel}`
+immediately. Await `ready` before feeding ordered mono `Float32Array` input at
+the request's actual `sampleRate`. This API opens no microphone.
+`forceEndpoint()` drains the current utterance and its ordered update callbacks
+without closing the retained stream; `finish()` drains accepted input and final
+delivery terminally. Partial snapshots replace prior partials; finals retain
+their engine-defined segment and speaker scope. Recognition never decides a
+human turn, instruction or approval.
+
+An `onUpdate` callback must return before its own `forceEndpoint()`,
+`finish()`, or `completion` join. Explicit `cancel(reason)` immediately
+suppresses later callbacks and awaits the matching native cleanup control.
+Aborting the signal instead follows ordinary request cancellation, whose browser
+promise may settle before native cleanup.
+
+`Arcane.speech.synthesizeStream(request, {signal, onAudio, onProgress, onRequest})`
+requires an `onAudio` consumer and resolves to the engine's complete terminal
+metadata. Every callback receives `{pcm: Uint8Array, format, sampleRate, channels, ...}`
+in order. The facade awaits each callback before acknowledging that contribution
+to the native producer. It does not play audio. An utterance abort joins its
+explicit native cancellation and callback cleanup; actual failures remain
+observable. A callback may abort its caller-owned signal and return, then the
+external owner joins synthesis completion.
+
+Both streaming operations have no fixed request timeout. Their scoped events
+and controls retain exact request ownership through client close, document
+retirement and transport loss. Engine support and loaded readiness are separate;
+a facade method alone supplies neither. Complete-recording transcription and
+complete-audio synthesis retain their existing contracts. See
+[Core streaming speech](native-speech.md#continuous-transcription-and-streaming-synthesis)
+for the complete protocol, cancellation and engine interfaces.
+
 ## Current-window state
 
 `Arcane.window.state({signal}?)` reads the native window hosting the calling

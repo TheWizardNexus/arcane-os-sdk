@@ -15,7 +15,8 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'AI.js':[
         'setAI','configureProviders','transitionAI','transitionProviders',
         'startProviders','setSpeechMuted','streamRequest','streamMessage','fetchRequest','fetch',
-        'configureTTSSegmentation','streamTTS','prepareTTS','prepareTTSPlayback','playPreparedTTS','finishTTS','fetchSTT',
+        'configureTTSSegmentation','streamTTS','prepareTTS','prepareTTSPlayback','playPreparedTTS','finishTTS','fetchTTS','fetchSTT',
+        'supportsTranscriptionCapture','createTranscriptionCapture',
         'stopAudio','resumeAudio','playAudio'
     ],
     'AIModelSelectionController.js':[
@@ -32,6 +33,7 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
         'providerIdentity','selection','ownsSelection','validateConfiguration',
         'configure','configureFromTuple','status','catalog','inspect','start',
         'load','unload','dispose','disposeAll','request','chat','stream',
+        'supportsTranscriptionCapture','createTranscriptionCapture',
         'transcribe','synthesize','cancel','setSpeechMuted'
     ],
     'AIResponseURLPolicy.js':[
@@ -110,6 +112,8 @@ export const RUNTIME_DOCUMENTED_CALLABLE_MEMBERS={
     'ModelDefinition.js':[
         'parseModelDefinition','loadModelDefinitionSystemPrompt'
     ],
+    'NativeSpeechCapture.js':['createNativeSpeechCapture'],
+    'NativeSpeechPlayback.js':['prepareNativeSpeechPlayback'],
     'OllamaModelIdentifier.js':[
         'normalizeOllamaModelIdentifier','isOllamaModelIdentifier','sameOllamaModelIdentifier'
     ],

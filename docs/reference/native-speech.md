@@ -66,9 +66,10 @@ An engine's state includes `providerId`, `modelId`, `state`, `loaded`, and
 `busy`, with its complete error or progress information when present. An
 omitted role has `state: 'unavailable'`, `loaded: false`, and `busy: false`.
 File presence, a spawned process, and a callable bridge do not establish loaded
-model readiness. Existing readiness consumers additionally recognize
-the engine IDs `whisper.cpp` and `kokoro-onnx`; another engine ID requires the
-corresponding consumer integration.
+model readiness. The shared AI adapter follows the selected engine identity
+and model in these per-role snapshots, including Nemotron and Magpie. Only the
+older aggregate-only fallback retains fixed `whisper.cpp`/`whisper-small` and
+`kokoro-onnx`/`kokoro` expectations.
 
 Each role also reports `supportsStreaming`: STT requires the configured
 engine's `openStream()` method, and TTS requires its `synthesizeStream()` method.

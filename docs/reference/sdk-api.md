@@ -81,6 +81,10 @@ runtime layouts.
 | `arcane-os/ai/core-image` | Browser image lifecycle and complete PNG Blobs through an available Core service. |
 | `arcane-os/core/image` | Native image Core service with independent runtime preparation and retained model ownership. |
 | `arcane-os/core/speech` | Independent injected STT/TTS engine loading, request cancellation and joined Core service lifetime. |
+| `arcane-os/local-ai/nemotron` | Retained native streaming recognition with complete timed words and optional diarization. |
+| `arcane-os/local-ai/nemotron/build` | First-party ASR helper build against a prepared NeMo runtime. |
+| `arcane-os/local-ai/magpie` | Retained native Magpie/NanoCodec synthesis with complete audio or ordered PCM. |
+| `arcane-os/local-ai/magpie/build` | First-party TTS helper build against a prepared NeMo runtime. |
 | `arcane-os/local-ai/whisper` | Retained native Whisper model, complete recordings and joined helper lifetime. |
 | `arcane-os/local-ai/kokoro` | Retained native Kokoro synthesis using the existing ONNX/model-resource owners and a compiled phonemization/Opus helper. |
 | `arcane-os/local-ai/whisper/build` | First-party persistent helper build against selected installed Whisper headers and libraries. |
@@ -476,6 +480,14 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `KOKORO_REVISION` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Selected upstream model revision |
 | `KOKORO_SAMPLE_RATE` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Native PCM sample rate |
 | `KOKORO_VOICES` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Complete 28-voice US/GB selection |
+| `createNemotronRuntime()` | function | `arcane-os/local-ai/nemotron` | Core native speech | Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation |
+| `createNemotronRuntime default export` | function | `arcane-os/local-ai/nemotron` | Core native speech | Same named function |
+| `buildNemotronHelper()` | function | `arcane-os/local-ai/nemotron/build` | Core native speech | Node with CMake 3.26+, C++17 toolchain and platform-matching public NeMo ASR headers/libraries/CMake package |
+| `buildNemotronHelper default export` | function | `arcane-os/local-ai/nemotron/build` | Core native speech | Same named function |
+| `createMagpieRuntime()` | function | `arcane-os/local-ai/magpie` | Core native speech | Node with a matching first-party helper, selected NeMo TTS runtime, Magpie/tokenizer and NanoCodec assets; Windows/Linux/macOS source, Android host adaptation |
+| `createMagpieRuntime default export` | function | `arcane-os/local-ai/magpie` | Core native speech | Same named function |
+| `buildMagpieHelper()` | function | `arcane-os/local-ai/magpie/build` | Core native speech | Node with CMake 3.26+, C++17 toolchain, platform threads and matching public NeMo TTS headers/libraries/CMake package |
+| `buildMagpieHelper default export` | function | `arcane-os/local-ai/magpie/build` | Core native speech | Same named function |
 | `createWhisperRuntime()` | function | `arcane-os/local-ai/whisper` | Core native speech | Node with a prepared matching helper, runtime, decoder and selected model |
 | `createWhisperRuntime default export` | function | `arcane-os/local-ai/whisper` | Core native speech | Same retained native engine factory |
 | `buildWhisperHelper()` | function | `arcane-os/local-ai/whisper/build` | Core native speech | Node with installed CMake/C++17 toolchain and matching Whisper source/runtime |
@@ -7232,6 +7244,18 @@ no engine. The native routes of `AI.fetchTTS(payload, signal)` and
 `AI.fetchSTT(audio, signal)` forward their signals through these calls and
 normalize cancellation to `AbortError` with `ARCANE_AI_REQUEST_ABORTED`.
 
+`facade.speech.openStream(request,options)` returns
+`{streamId,ready,completion,current,push,forceEndpoint,finish,cancel}`.
+Ordered Float32 input retains the actual declared sample rate. Endpoint preserves
+stream/speaker scope and waits preceding updates; finish drains terminally.
+Do not await endpoint/finish/completion from their own update callback. Explicit
+cancel joins its native cleanup control, unlike ordinary signal cancellation.
+`synthesizeStream(request,{signal,onAudio,onProgress,onRequest})` awaits each
+complete ordered Uint8Array PCM contribution and its consumption acknowledgement,
+returns terminal metadata, and joins native cancellation. It plays no audio.
+Both streaming operations have no fixed timeout. Engine support/readiness remains
+independent from facade availability. See [streaming native speech](core-client.md#streaming-native-speech).
+
 `facade.window.state({signal}?)` reads the calling document's native window;
 `facade.window.setState({state}, {signal}?)` selects `normal`, `maximized` or
 `fullscreen` for that same window. The matching Windows host returns
@@ -8961,6 +8985,211 @@ US/GB voice identifiers. The engine uses `af_heart` when the caller omits
 `voice`; an explicit unsupported selection reports an error. Use this complete
 array to populate a native Kokoro voice selector.
 
+## createNemotronRuntime()
+
+### Overview and syntax
+
+Creates one retained native recognizer and optional diarizer without opening a
+microphone, loading a model or starting inference at construction.
+
+```javascript
+createNemotronRuntime({
+    runtime, prepare, modelId = 'nemotron-3.5-asr-streaming-0.6b',
+    modelPath, diarizationModelPath, gpu, onEvent
+} = {})
+```
+
+Supply a prepared `runtime` or lazy `prepare({signal,onEvent})` descriptor
+with `helperExecutable` and selected native library paths. Select `gpu`
+explicitly (native ordinal, or `-1` for CPU). Model paths may come from the
+descriptor; omit the diarization path when speaker labels are not requested.
+Preparation, models and device selection remain caller-owned.
+
+### Returned members and lifetime
+
+The engine exposes `current/subscribe/load/unload/transcribe/openStream/close`.
+Current state and replaying subscriptions report actual loaded readiness,
+native version, requested device, active speaker scope, error and reset state.
+`load` initializes the selection; `unload` and `close` join owned cleanup.
+
+`openStream({sampleRate=16000,languageCode,model,onUpdate,signal})` resolves an
+owned `push/forceEndpoint/finish/cancel/completion/current` handle plus
+`sampleRate` and `speakerScope`. Feed mono `Float32Array` or
+`{encoding:'f32le',data:BASE64}` at the actual declared rate. The native sample
+rate contract accepts integer 8000–96000 or 0 for model rate. No encoded-media
+decoder is supplied. Updates preserve every alternative, text, word, timestamp,
+numeric speaker and final/provisional status.
+
+`forceEndpoint` drains an utterance while retaining stream and speaker scope;
+`finish` terminally drains accepted input. Partial snapshots replace; finals
+remain separate recognition segments, never inferred conversational completion.
+`transcribe({audio,sampleRate,model?,languageCode?},options)` uses this same
+stream and returns complete `{text,words,results,speakerScope}`.
+
+Cancellation joins native and callback cleanup. Terminating genuinely
+noninterruptible helper work exposes `resetRequired` and requires explicit
+reload; no engine restarts silently. Callbacks must return before joining their
+own stream/engine lifecycle, otherwise `NEMOTRON_CALLBACK_WAIT` is reported.
+Unsupported input reports `NEMOTRON_AUDIO_FORMAT_UNSUPPORTED`; native, callback
+and cleanup failures remain observable.
+
+### Availability and example
+
+Node on Windows, Linux and macOS with the first-party helper and matching
+upstream NeMo ASR runtime/models; Android requires host adaptation. Selected
+Windows helper compilation is recorded in the [engine guide](native-nemotron.md);
+that is separate from inference, microphone or other-platform execution.
+
+```javascript
+import {createNemotronRuntime} from 'arcane-os/local-ai/nemotron';
+
+function prepareDragonInterpreter(runtime, modelPath, gpu) {
+    return createNemotronRuntime({runtime, modelPath, gpu});
+}
+// The native owner explicitly loads, supplies PCM and joins close.
+```
+
+See [native Nemotron](native-nemotron.md) for complete options, snapshots,
+callback rules and cancellation/reset outcomes.
+
+## createNemotronRuntime default export
+
+The default export from `arcane-os/local-ai/nemotron` is the same
+`createNemotronRuntime` function, with identical inputs, results and lifetime.
+
+## buildNemotronHelper()
+
+### Overview and syntax
+
+`buildNemotronHelper({runtime,outputRoot,signal,onEvent}={})` configures, builds
+and installs only the first-party Nemotron helper. `runtime.cmakeDirectory`
+selects an installed NeMo CMake package with its matching public ASR headers and
+libraries; `outputRoot` is the caller-owned output directory.
+
+### Result, availability and example
+
+Returns `{platform,architecture,root,helperExecutable,executable,diagnostics}`;
+`executable` aliases `helperExecutable`, and diagnostics retains complete
+configure/compile/install results. Requires Node, CMake 3.26+, a C++17 compiler
+and matching platform runtime. It downloads no dependency or model and performs
+no inference. Cancellation and process failures remain observable.
+
+```javascript
+import {buildNemotronHelper} from 'arcane-os/local-ai/nemotron/build';
+
+async function buildSelectedRecognizer(runtime, outputRoot, signal, onEvent) {
+    return buildNemotronHelper({runtime, outputRoot, signal, onEvent});
+}
+```
+
+See [preparation and selection](native-nemotron.md#preparation-and-selection).
+
+## buildNemotronHelper default export
+
+The default export from `arcane-os/local-ai/nemotron/build` is the same
+`buildNemotronHelper` function.
+
+## createMagpieRuntime()
+
+### Overview and syntax
+
+Creates one retained native Magpie/NanoCodec synthesis owner. Construction
+downloads, loads and plays nothing.
+
+```javascript
+createMagpieRuntime({
+    runtime, prepare, paths, modelAssets, assetProjectionId, resourcePaths,
+    modelId = 'magpie', voice = 'Aria', languageCode = 'en-US',
+    executionTarget, signal, onEvent
+} = {})
+```
+
+Supply a prepared executable/library descriptor or `prepare({signal})`.
+Select matching Magpie, NanoCodec and tokenizer `paths`, or an existing
+model-assets projection and `resourcePaths`. Explicit `executionTarget`
+selects CPU or CUDA with the host's visible device/UUID; no provider or device
+fallback is inferred. The tokenizer's own speaker map determines voice IDs.
+
+### Returned members and lifetime
+
+The engine exposes `current/subscribe/load/unload/synthesize/synthesizeStream/stop/close`.
+State includes independent loaded readiness, active/queued requests, voice and
+language defaults, model-owned voices and streaming/format capability.
+`load` retains selected models; `unload` and `close` join owned work/assets.
+
+Both synthesis methods accept exact `{input,model?,voice?,languageCode?,speed?}`;
+language is separate control information, and native speed must be 1.
+`synthesize(request,{signal,requestId,onProgress})` returns complete base64
+WAV (default) or PCM audio, MIME/format and speech metadata. Select
+`responseFormat:'pcm'` explicitly when needed.
+`synthesizeStream(request,{signal,requestId,onProgress,onAudio})` requires an
+awaited ordered `onAudio({pcm,format,sampleRate,channels,requestId})` callback.
+PCM is a Node Buffer of signed 16-bit little-endian samples; terminal metadata
+has `complete:true` without retaining the complete audio again. Playback
+belongs to the caller.
+
+Requests retain FIFO ownership. `stop({requestId})` stops only that queued or
+active utterance and joins native/callback cleanup; cancellation rejects
+synthesis. In-flight native interruption is observed at a PCM callback boundary.
+A callback can abort its caller-owned signal and return; self-joining lifecycle
+calls reject `MAGPIE_CALLBACK_WAIT`. Complete native and cleanup errors remain
+observable. An interrupted request never returns fabricated complete audio.
+
+### Availability and example
+
+Node on Windows, Linux and macOS with a matching helper, upstream NeMo TTS
+runtime and selected model assets; Android needs host adaptation. The
+[engine guide](native-magpie.md) separates selected Windows compilation from
+unverified inference, playback and other-platform execution.
+
+```javascript
+import {createMagpieRuntime} from 'arcane-os/local-ai/magpie';
+
+function prepareDragonAnnouncer(runtime, paths, executionTarget) {
+    return createMagpieRuntime({runtime, paths, executionTarget});
+}
+// The native owner loads explicitly; synthesis returns audio, not playback.
+```
+
+See [native Magpie](native-magpie.md) for complete selection, language, voices,
+callback constraints and request lifetime.
+
+## createMagpieRuntime default export
+
+The default export from `arcane-os/local-ai/magpie` is the same
+`createMagpieRuntime` function, with identical inputs, results and lifetime.
+
+## buildMagpieHelper()
+
+### Overview and syntax
+
+`buildMagpieHelper({runtime,outputRoot,signal,onEvent}={})` configures, builds
+and installs the first-party Magpie helper against the caller's installed
+`runtime.cmakeDirectory`, public NeMo TTS headers and matching libraries.
+
+### Result, availability and example
+
+Returns `{platform,architecture,root,helperExecutable,diagnostics}`, preserving
+complete configure/compile/install results. Requires Node, CMake 3.26+, C++17,
+platform threads and matching NeMo libraries. `outputRoot` belongs to the
+caller. It downloads no dependency, model or voice and performs no inference.
+Cancellation and process failures remain observable.
+
+```javascript
+import {buildMagpieHelper} from 'arcane-os/local-ai/magpie/build';
+
+async function buildSelectedAnnouncer(runtime, outputRoot, signal, onEvent) {
+    return buildMagpieHelper({runtime, outputRoot, signal, onEvent});
+}
+```
+
+See [helper build prerequisites](native-magpie.md#build-the-first-party-helper).
+
+## buildMagpieHelper default export
+
+The default export from `arcane-os/local-ai/magpie/build` is the same
+`buildMagpieHelper` function.
+
 ## createWhisperRuntime()
 
 ### Overview
@@ -9114,6 +9343,18 @@ requests and results unchanged. Format decoding, model processing and encoding
 remain with that engine. This factory supplies no speech engine or automatic
 browser/native provider selection.
 
+Optional engine `openStream({...options,signal,onUpdate})` supplies continuous
+recognition; optional `synthesizeStream(request,{signal,onProgress,onAudio,requestId})`
+supplies awaited ordered PCM output. Each role reports `supportsStreaming`
+independently from loaded readiness. The Core streaming methods are
+`speech.open`, `push`, `endpoint`, `finish`, `cancel`, `synthesizeStream`,
+`audioConsumed` and `cancelSynthesis` (each under `speech.`). Request-scoped
+`speech.opened`, `speech.transcription` and `speech.audio` events retain stream
+ownership; TTS acknowledgements apply backpressure while control traffic continues.
+Endpoint drains an utterance without closing its stream; finish closes terminally.
+ASR finals are recognition segments, not conversational decisions. Cancellation
+joins the selected engine's native work. See the [complete streaming contract](native-speech.md#continuous-transcription-and-streaming-synthesis).
+
 ### Members, results and events
 
 The returned object has `name: 'speech'`, `current`, `subscribe`, `close`,
@@ -9170,10 +9411,12 @@ their operation with `SPEECH_ENGINE_UNAVAILABLE`; work after shutdown begins
 rejects with `CORE_CLOSING`. Engine errors remain observable, and engine cleanup
 failures reject shutdown with `AggregateError`. Asynchronous listener failures
 reach developer diagnostics. Engine platform support remains its own contract;
-this Node composition layer adds no engine dependency. Existing AI readiness
-consumers recognize `whisper.cpp` and `kokoro-onnx` IDs independently of the
-service's engine-neutral interface. See the [complete engine and lifetime
-contract](native-speech.md).
+this Node composition layer adds no engine dependency. The shared AI adapter
+follows the selected model and engine in per-role snapshots, including Nemotron
+and Magpie. Only its older aggregate-only fallback retains fixed
+`whisper.cpp`/`whisper-small` and `kokoro-onnx`/`kokoro` expectations.
+Unavailable streaming operations reject `SPEECH_OPERATION_UNAVAILABLE` without
+fallback. See the [complete engine and lifetime contract](native-speech.md).
 
 ## createSpeechService default export
 

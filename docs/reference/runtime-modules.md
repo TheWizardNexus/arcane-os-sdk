@@ -115,6 +115,8 @@ own asynchronous work, cancellation, and backpressure.
 | [`MemoryRecords.js`](#memoryrecordsjs) | esm | Normalizes memory content and detects meaningful stored memory. | Cross-host | Fully normalized string/boolean results. |
 | [`MessageAdvisory.js`](#messageadvisoryjs) | esm | Normalizes message content advisories and contains per-message inspection failures. | Cross-host | Normalized advisory records; inspector failures converted to unavailable results. |
 | [`ModelDefinition.js`](#modeldefinitionjs) | esm | Parses the deterministic packaged Modelfile subset and extracts the SYSTEM prompt. | Cross-host | Complete mutable definition with coded malformed-input errors. |
+| [`NativeSpeechCapture.js`](#nativespeechcapturejs) | esm | Connects microphone PCM to one retained Core recognition stream. | Browser / native WebView with streaming Core speech | Complete snapshots, retained endpoint scope and joined capture/native cleanup. |
+| [`NativeSpeechPlayback.js`](#nativespeechplaybackjs) | esm | Prepares and plays ordered native PCM using shared Web Audio. | Browser / native WebView with streaming speech | Inert preparation, exact audio order and separate playback/release completion. |
 | [`Ollama.js`](#ollamajs) | esm | Provides the first-class Arcane Ollama client without direct access to localhost:11434. | Native bridge | Principal methods preserve provider-native envelopes; readiness/text/unload helpers normalize. |
 | [`OllamaModelIdentifier.js`](#ollamamodelidentifierjs) | esm | Validates and canonicalizes the syntax of Ollama model identifiers without granting model admission. | Cross-host | Fully normalized string/boolean result. |
 | [`OllamaSettings.js`](#ollamasettingsjs) | esm | Defines complete runtime/service preference schemas and deterministic Arcane brain alias names. | Cross-host | Fully normalized settings/name contract. |
@@ -155,6 +157,12 @@ own asynchronous work, cancellation, and backpressure.
 
 ### Overview
 
+Explicit speech-only construction uses
+`new AI(null, 'LOCAL_SPEACH', 'LOCAL_SPEACH', null, ttsModel, sttModel)`.
+Both LLM arguments must be `null`; no default LLM is selected or activated.
+Omitted or empty arguments retain historical defaults, and an existing
+`window.ai` singleton is reused. Later `configureProviders` can select an LLM.
+
 Provider-selectable chat, speech-to-text, text-to-speech, tool calling,
 structured output, streaming, bounded synthesis, and ordered audio-clock
 playback.
@@ -174,6 +182,7 @@ read-only `ttsSegmentation`, `configureTTSSegmentation()`,
 `readPreparedTTS({parts,textFormat,storage,identity,signal,onState})`,
 `prepareAudioOutput()`, `playPreparedTTS(prepared,{signal,onState,audioOutput})`,
 `finishTTS()`, `prepareTTSPlayback()`, `fetchTTS()`, `fetchSTT()`, `stopAudio()`, `resumeAudio()`,
+`supportsTranscriptionCapture()`, `createTranscriptionCapture(options={})`,
 `playAudio()`; consumes `user-entity-loaded` and `arcane-ollama-ready`,
 installs `window.ai`, and emits `ai-ready`, `ai-tts-failure`, and
 `AI_AUDIO_OUTPUT_STATE_EVENT` (`'ai-audio-output-state'`).
@@ -415,7 +424,7 @@ physical accelerator; WebNN may execute unsupported operations through WASM.
 Calling `status()` without options keeps
 the existing sticky lifecycle snapshot and does not inspect provider execution.
 Provider inspection failures are surfaced to the caller.
-`fetchTTS({model,voice,input,responseFormat,speed},signal,preparation={})` accepts the public
+`fetchTTS({model,voice,input,responseFormat,languageCode,speed},signal,preparation={})` accepts the public
 provider-neutral synthesis shape, requires any explicit model to match the
 selected route, and fills an omitted voice only from the selected model
 catalog's `defaultVoice`. An omitted response format preserves the instance's
@@ -438,13 +447,15 @@ default cleanup. The third `preparation` argument is reserved for SDK-internal
 delegation, where `{speechInputPrepared:true}` prevents a second cleanup pass;
 applications omit it. `streamTTS(text='',end=false,options={})` and
 `finishTTS()` use the selected playback boundary. The third-argument options below
-are available in SDK `0.5.12`. In these streaming options, the `textFormat`
+are available from SDK `0.5.12`, with `languageCode` added in `0.95.0`.
+In these streaming options, the `textFormat`
 compatibility extra added in SDK `0.5.16` remains ignored:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `voice` | Current selected model's default voice | A supplied voice is captured for every segment extracted by this call and forwarded unchanged to `fetchTTS()`. It does not change the instance or provider default. |
 | `speed` | Current `ai.voiceSpeed` | A supplied positive speed is captured for those segments and forwarded to `fetchTTS()`. It does not change `ai.voiceSpeed`. |
+| `languageCode` | Selected engine's language default | Per-utterance language control, separate from the unchanged text. Support belongs to the selected engine/tokenizer; Magpie uses natural speed `1`. |
 | `pauseAfterMs` | `0` | Finite, nonnegative milliseconds placed after the final extracted segment on the existing audio clock. Invalid values throw `RangeError`; no pause is inserted between this call's other segments. |
 | `waitForPlayback` | `false` | Omission retains the preparation promise. With `true`, the promise resolves after every extracted segment reaches a terminal playback state: `true` when all naturally end, or `false` after terminal cancellation or failure. |
 | `textFormat` | Ignored streaming compatibility extra | Streaming narration retains automatic cleanup. The public plain selection belongs to complete synthesis payloads or `prepareTTS` options. |
@@ -461,12 +472,23 @@ formatting state. Streaming `textFormat` is not an opt-out.
 
 Voice, speed, pause, and playback overrides belong to the segments
 extracted in that invocation, including any text buffered by an earlier call.
-Those overrides are not retained with an unfinished `end:false` remainder; a
-later call supplies its own options, and `finishTTS()` uses their defaults
-while flushing any pending formatting mark. Use `end:true`
-for a complete passage. A call extracting no segments resolves
-`true` without waiting for earlier jobs; `finishTTS()` remains a preparation
+Voice, speed and languageCode are retained with an unfinished `end:false`
+utterance through continuation and `finishTTS()`. Explicitly changed language
+first queues the old remainder under its prior selection, then accepts new text.
+End, mute and stop clear the retained selection. Pause and waitForPlayback
+remain per-call controls.
+
+Use `end:true` for a complete passage. A call extracting no segments resolves
+`true` without waiting for earlier jobs, except that a language-change call also
+joins its preceding remainder preparation. `finishTTS()` remains a preparation
 flush, not a queue-wide playback barrier. A muted call resolves `false`.
+
+A native engine catalog with `speech.streaming:true` selects an inert PCM
+playback descriptor through `prepareTTSPlayback`. Explicit play uses the shared
+provider lane and Web Audio output; `released` joins native cleanup independently
+of `finished`. Magpie also retains complete-audio `fetchTTS`; browser-native
+voices without audio export retain their existing unsupported result. See
+[shared native capture/playback](native-speech.md#shared-ai-capture-and-playback).
 
 `prepareTTSPlayback(payload,signal,preparation={})` is the silent playback-oriented
 request. Audio-file providers retain the `fetchTTS()` Blob contract; a selected
@@ -1129,6 +1151,17 @@ The singleton exposes read-only `protocol`, `configured`, and `speechMuted`;
 `synthesize(payload,options={},preparation={})`; and
 `setSpeechMuted(muted,{signal}={})`. Provider payloads must be data-only; callbacks,
 accessors, symbols, and cycles are rejected at the provider boundary.
+
+`supportsTranscriptionCapture(providerId=null)` checks the selected provider's
+capture implementation and optional capability predicate. Construction of
+`createTranscriptionCapture(options)` performs no capture; it returns null or
+an owned `start/stop/cancel/destroy/done` wrapper with `forceEndpoint` when the
+provider supplies it. Start must originate in the user's capture action and
+requires an idle ready STT role; it is never queued. The role remains owned
+until `done` joins cleanup, including on cancellation or provider retirement.
+Native streaming TTS likewise uses the existing provider request lane rather
+than an application-owned synthesis queue. See
+[shared native capture/playback](native-speech.md#shared-ai-capture-and-playback).
 
 `setSpeechMuted(false,{signal})` shares pending activation while retaining an
 independent interest for each caller. Aborting one signal rejects only that
@@ -2046,11 +2079,22 @@ component adds ordered STT, persistence, retry, and presentation.
 ### Public surface
 
 Default export `ContinuousVoiceCapture` accepts
-`{preRollMs=1500,quietMs=2000,chunkMs=30000,activityThreshold=0.02,onSegment,onError,onState}`.
-`start({mediaConstraints={audio:true},signal}={})` acquires microphone input and
+`{preRollMs=1500,quietMs=2000,chunkMs=30000,activityThreshold=0.02,mode='segments',pcmChunkMs=100,onPCM,onActivity,onSegment,onError,onState}`.
+`start({mediaConstraints={audio:true},sampleRate,signal}={})` acquires microphone input and
 resolves `true` once capture starts, or `false` after cancellation or a
 reported start failure. Starting capture is an explicit caller action.
 
+Select `mode:'pcm'` to deliver every captured sample through ordered awaited
+`onPCM({samples:Float32Array,sampleRate,channels:1,sequence})` callbacks.
+The record reports the actual AudioContext rate. `pcmChunkMs` is transport
+scheduling, never a recording limit. `onActivity({active,audioTime})` reports
+amplitude changes without gating PCM or interpreting speech. `flush()` sends
+pending samples and awaits preceding delivery while leaving capture open.
+Stop drains accepted PCM and joins actual AudioContext closure. Cancel/destroy
+suppress queued delivery and join in-flight delivery and close; genuine delivery
+and cleanup failures reject rather than being reported as success.
+
+In the default `mode:'segments'`:
 `onSegment({audio,sequence,reason,durationMs})` receives a complete
 `audio/wav` Blob containing mono Float32 audio. Sequence starts at one for
 each capture session; reason is `pause`, `periodic`, or `stop`. The detector
@@ -2073,7 +2117,8 @@ cancellation boundary. The optional signal cancels this capture session.
 flushes the active clip before reporting interruption while the worklet remains
 available. A failed audio context or processor reports interruption directly;
 audio still inside an unavailable processor cannot be recovered. Callback
-promises are observed without delaying capture or stop acknowledgement.
+promises for segment/state/activity observers are observed without delaying
+capture; ordered PCM delivery and actual context closure are joined at stop.
 Capture state is independent
 of model readiness, STT processing, and application save state.
 
@@ -3410,6 +3455,100 @@ import * as module from '/arcane/modules/ModelDefinition.js';
 
 console.log(Object.keys(module));
 ```
+
+## NativeSpeechCapture.js
+
+### Overview
+
+Default `createNativeSpeechCapture({speech,model,...options})` connects one
+microphone lifetime to one retained Core ASR stream. Construction opens no
+microphone or model. Applications normally use `ai.createTranscriptionCapture`,
+which also owns the selected provider slot.
+
+### Public surface and lifetime
+
+Options are `sampleRate=16000`, `pcmChunkMs=100`, `activityThreshold=0.02`,
+`streamOptions`, `mediaConstraints`, `onUpdate`, `onInterim`, `onSegment`,
+`onActivity`, `onState`, `onError`, `onProgress` and `onRequest`.
+The handle exposes `start({signal,mediaConstraints})` (boolean promise),
+`forceEndpoint()`, `stop()`, `requestStop()`, `cancel(reason)`,
+`destroy(reason)`, `done`, and `current()`. Capture uses the actual selected
+sample rate; `streamOptions.sampleRate` overrides the factory rate. Every PCM
+contribution is retained in order.
+
+Recognition callbacks receive `(result,{requestStop})`; `onUpdate` precedes
+the appropriate final `onSegment` or provisional `onInterim`. Partials replace,
+finals preserve complete native segments and speaker scope. Call `requestStop()`
+without awaiting it, return from the callback, then join `stop()` or `done`
+externally. Never await those or `forceEndpoint()` from their own callback.
+External endpoint flushes pending audio and recognition while keeping capture
+and the stream open. Stop closes capture and drains terminally. Cancel/destroy
+join both cleanup owners without claiming a complete transcript. `current()`
+returns the latest snapshot or null. Actual failures remain in `done` and
+`onError`. No snapshot or control sends chat or decides conversational meaning.
+
+### Availability and example
+
+Requires microphone, Web Audio and AudioWorklet in a browser/native WebView,
+plus an explicitly selected ready streaming Core speech engine.
+
+```javascript
+import createNativeSpeechCapture from 'arcane-os/modules/NativeSpeechCapture.js';
+
+function prepareDragonInterpreter(speech, model, showSnapshot) {
+    return createNativeSpeechCapture({speech, model, onUpdate: showSnapshot});
+}
+// Start from the application's capture action; its owner joins stop/done.
+```
+
+See [Core speech](native-speech.md) and [Nemotron](native-nemotron.md) for complete
+native formats, results, callback constraints, reset and platform prerequisites.
+
+## NativeSpeechPlayback.js
+
+### Overview
+
+Default `prepareNativeSpeechPlayback({speech,request,getAudioContext,signal=null})`
+prepares an inert native speech descriptor. It creates no model, microphone or
+separate utterance queue. Applications normally use `ai.prepareTTSPlayback`.
+
+### Public surface and lifetime
+
+The result is `{kind:'native-speech',input,voice,language,speed,play}`.
+`play({signal,onState})` returns `finished`, `released`, live `state` and
+`error`, plus boolean `pause()`, `resume()` and `stop()` controls.
+Preparation performs no synthesis/playback. Play consumes ordered signed
+16-bit little-endian PCM at its supplied rate and channel count through the
+caller-owned AudioContext, with awaited audio-clock backpressure.
+Pause retains unplayed audio; stop cancels only this utterance.
+
+`finished` resolves true after natural playback or false after stop, and
+rejects actual failure. `released` additionally joins native synthesis and
+cleanup. Both preparation and play signals can cancel. The shared output
+context remains open for its owner. `onState({state,error})` observes queued,
+waiting-for-audio, playing, paused, complete, stopped or error.
+Missing callable dependencies throw TypeError; unusable PCM or a closed context
+reports `ARCANE_AI_SPEECH_PLAYBACK_FAILED`. Native, playback and cleanup
+failures remain observable, including combined causes.
+
+### Availability and example
+
+Requires browser Web Audio plus a supplied streaming speech API.
+
+```javascript
+import prepareNativeSpeechPlayback from 'arcane-os/modules/NativeSpeechPlayback.js';
+
+function prepareDragonAnnouncement(speech, getAudioContext, signal) {
+    return prepareNativeSpeechPlayback({
+        speech, getAudioContext, signal,
+        request: {input: 'The dragon has landed.', languageCode: 'en-US'}
+    });
+}
+// Play from the owning action, then join the control's released promise.
+```
+
+See [Magpie](native-magpie.md) and
+[shared native playback](native-speech.md#shared-ai-capture-and-playback).
 
 ## Ollama.js
 
@@ -4826,7 +4965,7 @@ the audio rendering thread. It performs no semantic speech detection or STT.
 No ESM exports. The capture owner loads this static file with
 `audioContext.audioWorklet.addModule()` and creates the
 `arcane-continuous-voice-capture` processor with
-`{preRollMs,quietMs,chunkMs,activityThreshold}` in `processorOptions`.
+`{preRollMs,quietMs,chunkMs,activityThreshold,mode,pcmChunkMs}` in `processorOptions`.
 `activityThreshold` measures root-mean-square amplitude over fixed 20 ms
 windows counted from the audio sample rate, independently of browser callback
 lengths. Brief peaks do not reset the quiet duration when the window's RMS
@@ -4842,6 +4981,13 @@ using its actual samples and flushes the final active clip, including softer
 trailing audio before the quiet boundary. Analysis adds at most one 20 ms
 window of capture-to-segmentation delay; model processing is independently
 owned by the transcription queue.
+
+In `mode:'pcm'`, the processor transfers every sample through
+`{type:'pcm',audio:ArrayBuffer,sampleRate,sequence}` and reports
+`{type:'activity',active,audioTime}` on amplitude-state changes. It keeps no
+semantic classifier and does not omit quiet audio. `{type:'flush',id}` sends
+pending PCM then `{type:'flushed',id}` without stopping. The capture owner
+adds `channels:1` and joins ordered delivery before resolving its flush.
 
 The owner sends `{type:'stop'}`. The processor transfers each complete
 `{type:'segment',audio:ArrayBuffer,sampleRate,sequence,reason,durationMs}`

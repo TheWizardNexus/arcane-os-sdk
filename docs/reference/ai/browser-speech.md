@@ -233,6 +233,53 @@ Choose preparation according to the result the application needs:
 | `ai.fetchTTS(payload,signal)` | Promise resolving a real audio Blob | Audio-file providers only; does not play |
 | `ai.prepareTTS(options)` | Preparation handle with `ready` and `getAudio(index)` | Audio-file providers only; optional caller-owned durable storage |
 
+## Native Core streaming speech
+
+The shared AI controls also consume an explicitly selected native Core speech
+service. [Nemotron](../native-nemotron.md) supplies retained streaming recognition
+and optional diarization; [Magpie](../native-magpie.md) supplies streamed PCM and
+complete WAV/PCM audio. These are separate from browser Web Speech voices:
+Magpie can export audio, whereas the browser-native synthesis provider exposes
+playback only. No selected route silently falls back to another engine.
+
+For speech-only construction, pass `null` for both LLM arguments:
+`new AI(null, 'LOCAL_SPEACH', 'LOCAL_SPEACH', null, ttsModel, sttModel)`.
+This leaves the LLM unselected; omitted or empty arguments preserve defaults.
+The existing per-realm AI singleton is reused if already present. Import and
+construction do not prove native readiness.
+
+After the selected STT role is ready, `ai.supportsTranscriptionCapture()`
+reports its capture capability. `ai.createTranscriptionCapture(options)`
+returns `null` without a provider capture implementation, otherwise an owned
+`{start, stop, cancel, destroy, done, forceEndpoint?}` handle. Start from the
+user's capture action with `{signal, mediaConstraints}`. Native options include
+`sampleRate` (default 16000), `pcmChunkMs` (default 100),
+`activityThreshold` (default 0.02), `streamOptions`, `onUpdate`,
+`onInterim`, `onSegment`, `onActivity`, `onState`, `onError`,
+`onProgress`, and `onRequest`. The actual capture rate must match the native
+stream; every PCM contribution is delivered in order.
+
+Native recognition callbacks receive `(result, {requestStop})`. Keep full
+snapshots: interim results replace, and final segments retain their native
+boundaries, words, timestamps and speaker scope. A callback can call
+`requestStop()` without awaiting it and return; the external owner awaits
+`stop()` or `done`. Never await those joins or `forceEndpoint()` from their
+own callback. External `forceEndpoint()` flushes pending capture PCM and
+recognition callbacks while leaving the microphone and native stream open.
+`stop()` closes capture and drains recognition; `cancel()` and `destroy()`
+join cleanup without claiming a complete transcript. No control sends chat.
+
+For a streaming TTS catalog, `ai.prepareTTSPlayback({input, voice, languageCode, speed}, signal)`
+returns an inert descriptor. Its explicit `play()` uses the shared provider
+lane and Web Audio output. The returned control exposes `finished`,
+`released`, `state`, `error`, `pause()`, `resume()`, and `stop()`.
+`finished` describes playback completion, while `released` joins native
+cleanup. Stop targets that utterance, independently of capture.
+`fetchTTS({input, languageCode, ...}, signal)` still returns complete audio
+when the selected engine supports it. Language is caller-selected control data,
+separate from the text; Magpie supports natural speed `1` only. See
+[shared native capture/playback](../native-speech.md#shared-ai-capture-and-playback).
+
 <a id="digitalocean-fal-text-to-speech"></a>
 
 ## TWiN Cloud text-to-speech
@@ -665,13 +712,13 @@ selected execution device or assess the generated audio.
 ## Queue complete passages and wait for playback
 
 For a complete page or passage, call
-`ai.streamTTS(text, true, {voice, speed, pauseAfterMs, waitForPlayback:true})`.
+`ai.streamTTS(text, true, {voice, speed, languageCode, pauseAfterMs, waitForPlayback:true})`.
 The existing AI queue owns segmentation, concurrent synthesis, ordered
 playback, and cancellation. Supply the exact text; there is no need for an
 application sentence queue, audio cache, or playback scheduler.
 
 This function uses the configured `ai` above. Its application-supplied
-`passages` argument is an ordered array of `{text, voice?, speed?, pauseAfterMs?}`
+`passages` argument is an ordered array of `{text, voice?, speed?, languageCode?, pauseAfterMs?}`
 records. An omitted voice uses the selected model's default voice, an omitted
 speed uses `ai.voiceSpeed`, and an omitted pause is zero. Each supplied voice
 must be supported by the selected model; speed must be positive. A pause is
@@ -689,6 +736,7 @@ async function speakPassages(passages) {
                 {
                     voice: passage.voice,
                     speed: passage.speed,
+                    languageCode: passage.languageCode,
                     pauseAfterMs: passage.pauseAfterMs,
                     waitForPlayback: true
                 }
@@ -709,14 +757,17 @@ streamed speech and prepared playback owned by that AI instance and settles
 pending playback results `false`. Detached preparation described below keeps
 its independent lifetime.
 
-The selected voice and speed are captured for segments extracted by that call.
-That includes any text left in the same AI instance's partial-stream buffer;
-finish the previous producer before starting a separate complete passage.
-Voice, speed, pause, and playback options are not retained with an unfinished
-`end:false` remainder. A later call supplies its own options, and `finishTTS()`
-uses their defaults while flushing any pending single formatting mark through
-the same automatic speech-input cleanup.
-A call extracting no segments returns `true` without waiting for earlier jobs.
+Voice, speed and languageCode remain associated with an unfinished `end:false`
+utterance and its later `finishTTS()` flush; a supplied option replaces its retained
+selection. An explicitly changed language first queues the preceding remainder
+with its old selection, then accepts the new text. Language is separate control
+information and does not rewrite the text. End, mute and stop clear the retained
+selection. Pause and waitForPlayback remain per-call options. Finish a producer
+before starting an independent passage; the automatic speech-input cleanup
+still retains a pending single formatting mark until final flush.
+
+A call extracting no segments returns `true` without waiting for earlier jobs,
+except that a language-change call also joins its preceding remainder preparation.
 An already muted call returns `false`.
 
 Autoplay permission waiting and recoverable audio-resume attempts leave the
