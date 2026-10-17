@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.26)
+project(ArcaneNemotron LANGUAGES CXX)
+
+find_package(NeMoSpeech REQUIRED COMPONENTS ASR)
+
+add_executable(arcane-nemotron main.cpp)
+target_compile_features(arcane-nemotron PRIVATE cxx_std_17)
+target_link_libraries(arcane-nemotron PRIVATE NeMoSpeech::ASR)
+if(MSVC)
+    target_compile_options(arcane-nemotron PRIVATE /utf-8 /EHsc)
+endif()
+if(APPLE)
+    set_target_properties(arcane-nemotron PROPERTIES INSTALL_RPATH "@loader_path;@loader_path/../lib")
+elseif(UNIX)
+    set_target_properties(arcane-nemotron PROPERTIES INSTALL_RPATH "$ORIGIN;$ORIGIN/../lib")
+endif()
+install(TARGETS arcane-nemotron RUNTIME DESTINATION bin)
