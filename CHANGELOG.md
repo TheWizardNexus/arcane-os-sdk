@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.97.0
+
+- Share native model storage across applications for the same operating-system
+  user on Windows, Linux and macOS. Preserve explicit model locations and
+  app-private settings, profiles and chat history without moving existing data.
+- Retain completed model companions and interrupted partial downloads. Explicit
+  retries resume compatible HTTP transfers or restart only the affected member;
+  completed shards are reused and selected TAR companions remain preserved.
+- Coordinate same-selection acquisition across processes, recover after an
+  exited transfer owner, and preserve independent caller cancellation.
+- Expose actual activity, waiting, stalled, resumed and terminal download states
+  through the shared model-assets API. Deliver queued failure progress before
+  browser cleanup, with complete technical errors in developer inspection.
+
 ## 0.96.0
 
 - Publish successful portable, Windows and macOS native builds to one stable
