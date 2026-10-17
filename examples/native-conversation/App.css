@@ -12,3 +12,8 @@ textarea { width: 100%; min-height: 7rem; padding: .75rem; }
 #conversation p, #partial, pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 #microphone { font-weight: 700; }
 details { margin-top: 1.5rem; }
+.model-download { margin-top: 1rem; }
+#model-directory, #download-status { overflow-wrap: anywhere; }
+#download-status progress { display: block; width: 100%; }
+#download-status progress[hidden] { display: none; }
+select { max-width: 100%; }

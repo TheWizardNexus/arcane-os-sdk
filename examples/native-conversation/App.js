@@ -3,10 +3,20 @@ import AI from 'arcane-os/ai';
 import {getAIProviderRuntime} from 'arcane-os/ai-provider-runtime';
 import {subscribeAIRuntimeState} from 'arcane-os/ai-runtime-state';
 import {createCoreLocalAIProvider} from 'arcane-os/ai/core-local';
+import {getInstalledCoreClient} from 'arcane-os/core/client';
+import {openExistingCoreModelAssets, downloadCoreModelAssets} from 'arcane-os/ai/core-model-assets';
 import ConfiguredAIChatSession from 'arcane-os/modules/ConfiguredAIChatSession.js';
 
 const modelSelect = document.querySelector('#model');
 const refreshButton = document.querySelector('#refresh');
+const availableModel = document.querySelector('#available-model');
+const downloadModelButton = document.querySelector('#download-model');
+const downloadShardsButton = document.querySelector('#download-shards');
+const loadSpeechButton = document.querySelector('#load-speech');
+const cancelDownloadButton = document.querySelector('#cancel-download');
+const modelURLs = document.querySelector('#model-urls');
+const modelDirectory = document.querySelector('#model-directory');
+const downloadStatus = document.querySelector('#download-status');
 const talkButton = document.querySelector('#talk');
 const stopButton = document.querySelector('#stop');
 const replyButton = document.querySelector('#reply');
@@ -19,8 +29,18 @@ const partial = document.querySelector('#partial');
 const transcript = document.querySelector('#conversation');
 const inspection = document.querySelector('#inspection');
 const runtime = getAIProviderRuntime();
-const provider = createCoreLocalAIProvider();
+const modelRecords = new Map();
+const provider = createCoreLocalAIProvider({async prepareModel({selection, signal}) {
+    const record = modelRecords.get(selection.modelId);
+    if (!record) return;
+    const projection = await openExistingCoreModelAssets({directory: record.directory,
+        members: record.members, signal});
+    return {assetProjectionId: projection.id, resourcePaths: {model: record.entryPath}, release: projection.release};
+}});
 runtime.register(provider);
+let catalog;
+let runtimeModels = [];
+let preparation;
 let ai;
 let session;
 let selectedModel = '';
@@ -53,23 +73,34 @@ function report(error) {
 
 function controls() {
     const speechReady = runtime.status('stt').loaded && runtime.status('tts').loaded;
-    modelSelect.disabled = configuring || Boolean(capture || response || utterance || stopping || starting || retired);
-    refreshButton.disabled = configuring || retired;
-    talkButton.disabled = !ai || !speechReady || Boolean(capture || utterance || stopping || starting || configuring || retired);
+    const setupBusy = Boolean(preparation || capture || response || utterance || configuring || retired);
+    modelSelect.disabled = configuring || Boolean(preparation || capture || response || utterance || stopping || starting || retired);
+    refreshButton.disabled = configuring || Boolean(preparation) || retired;
+    downloadModelButton.disabled = !catalog || !availableModel.value || setupBusy;
+    downloadShardsButton.disabled = !catalog || setupBusy;
+    loadSpeechButton.disabled = !ai || setupBusy;
+    cancelDownloadButton.disabled = !preparation;
+    talkButton.disabled = !ai || !speechReady || Boolean(preparation || capture || utterance || stopping || starting || configuring || retired);
     stopButton.disabled = !capture && !response && !utterance && !starting;
     replyButton.disabled = !capture || !selectedModel || Boolean(response || stopping || starting || configuring);
-    speakButton.disabled = !ai || !speechReady || Boolean(utterance || response || stopping || starting || configuring || retired);
+    speakButton.disabled = !ai || !speechReady || Boolean(preparation || utterance || response || stopping || starting || configuring || retired);
     interruptButton.disabled = !utterance;
 }
 
 function showModels(state) {
+    if (state) runtimeModels = state.models ?? [];
     const previous = modelSelect.value;
     modelSelect.replaceChildren(new Option('Choose a model…', ''));
-    for (const model of state?.models ?? []) {
+    for (const [id, record] of modelRecords) {
+        const item = catalog?.catalog.find(model => model.id === record.catalogId);
+        modelSelect.add(new Option(item?.name ?? record.entryPath, id));
+    }
+    for (const model of runtimeModels) {
+        if (modelRecords.has(model.id)) continue;
         modelSelect.add(new Option(model.name ?? model.id, model.id));
     }
     modelSelect.value = previous;
-    if (selectedModel && !(state?.models ?? []).some(model => model.id === selectedModel)) {
+    if (selectedModel && !modelRecords.has(selectedModel) && !runtimeModels.some(model => model.id === selectedModel)) {
         response?.controller.abort(new Error('The selected local model is no longer available.'));
         selectedModel = '';
         status.textContent = 'The selected local model is unavailable. Choose an installed model.';
@@ -81,12 +112,153 @@ async function refreshModels() {
     if (!globalThis.Arcane?.localAI?.status || !globalThis.Arcane?.speech?.status) {
         throw new Error('Open the SDK-built native application with its selected local-AI and speech services.');
     }
-    const [models, speech] = await Promise.all([Arcane.localAI.status(), Arcane.speech.status()]);
+    const [models, speech, discovered] = await Promise.all([
+        Arcane.localAI.status(), Arcane.speech.status(), getInstalledCoreClient().invoke('conversationModels.catalog', {}, {timeoutMs: 0})
+    ]);
     if (retired) return;
+    catalog = discovered;
+    modelDirectory.textContent = `Model storage: ${catalog.directory}`;
+    const previousDownload = availableModel.value;
+    availableModel.replaceChildren(...catalog.catalog.map(model => new Option(model.name, model.id)));
+    if (catalog.catalog.some(model => model.id === previousDownload)) availableModel.value = previousDownload;
+    modelRecords.clear();
+    for (const record of catalog.installed.models) {
+        if (!record.complete) continue;
+        // Speech companions are discovered by their separate role catalog.
+        if (catalog.installedSpeech.models.some(speechModel => speechModel.directory === record.directory
+            && speechModel.members.some(member => member.path === record.entryPath))) continue;
+        modelRecords.set(`${record.directory}/${record.entryPath}`, record);
+    }
+    inspect('Installed model discovery', discovered);
     speechState = speech;
     showModels(models.runtimes?.find(record => record.id === 'llama.cpp'));
     if (!ai) await configureSelection('');
-    if (!selectedModel) status.textContent = 'Speech is ready. Talk or Speak draft works without a language model; choose an installed model to enable Reply.';
+    if (!selectedModel) status.textContent = 'Choose an installed language model or download one. Download / load speech prepares the voice and transcription; it does not open the microphone.';
+}
+
+function progressRow(label) {
+    const row = document.createElement('p');
+    const text = document.createElement('span');
+    const progress = document.createElement('progress');
+    progress.setAttribute('aria-label', label);
+    row.append(text, progress);
+    downloadStatus.append(row);
+    return function showProgress(value) {
+        inspect(label, value);
+        const count = Number.isFinite(value.completed) && Number.isFinite(value.total) && value.total > 0
+            ? ` · ${value.completed} of ${value.total} files` : '';
+        text.textContent = `${label} · ${value.phase}${value.path ? ` · ${value.path}` : ''}${count}`;
+        progress.hidden = value.phase === 'ready' || value.phase === 'complete';
+        if (count) { progress.max = value.total; progress.value = value.completed; }
+        else progress.removeAttribute('value');
+    };
+}
+
+async function prepareSelected(operation) {
+    if (preparation || retired) return;
+    const current = {controller: new AbortController()};
+    preparation = current;
+    downloadStatus.replaceChildren();
+    controls();
+    try {
+        current.task = operation(current.controller.signal);
+        await current.task;
+    }
+    catch (error) {
+        if (current.controller.signal.aborted && error === current.controller.signal.reason) {
+            status.textContent = 'Preparation cancelled. Completed models remain installed.';
+        } else throw error;
+    } finally {
+        if (preparation === current) {
+            preparation = null;
+            // Keep the last reported work visible, without implying work is still active.
+            for (const progress of downloadStatus.querySelectorAll('progress')) progress.hidden = true;
+        }
+        controls();
+    }
+}
+
+async function downloadLanguageModel(model, signal) {
+    const projection = await downloadCoreModelAssets({workingDirectory: catalog.llmDirectory,
+        members: model.members, signal, onProgress: progressRow(model.name)});
+    await projection.release();
+    await refreshModels();
+    signal.throwIfAborted();
+    const match = [...modelRecords].find(([, record]) => record.directory === projection.directory && record.entryPath === model.entryPath);
+    if (match) {
+        modelSelect.value = match[0];
+        await configureSelection(match[0], signal);
+        status.textContent = 'Model downloaded. Reply loads the selected model; no conversation has started.';
+    } else {
+        const record = catalog.installed.models.find(item => item.directory === projection.directory);
+        status.textContent = record?.missingMembers.length
+            ? `Files downloaded. The model still needs: ${record.missingMembers.join(', ')}.`
+            : 'Files downloaded. No complete language model was discovered in this selection.';
+    }
+}
+
+async function prepareSpeech(signal) {
+    const current = await Arcane.speech.status();
+    const startedRoles = [];
+    const outcomes = await Promise.allSettled(['stt', 'tts'].map(async function loadSpeechRole(role) {
+        const model = catalog.speech[role];
+        const onProgress = progressRow(model.name);
+        if (current.roles[role].loaded) { onProgress({phase: 'ready'}); return; }
+        let projection;
+        try {
+            if (!catalog.configuredSpeech[role]) {
+                const installed = catalog.installedSpeech.models.find(record => record.catalogId === model.modelId && record.complete);
+                projection = installed
+                    ? await openExistingCoreModelAssets({directory: installed.directory, members: installed.members, signal})
+                    : await downloadCoreModelAssets({workingDirectory: catalog.speechDirectory,
+                        members: model.members, archives: model.archives, signal, onProgress});
+            }
+            onProgress({phase: 'loading'});
+            startedRoles.push(role);
+            await Arcane.speech.load({role, ...(projection ? {
+                assetProjectionId: projection.id, resourcePaths: model.resourcePaths
+            } : {})}, {signal});
+            signal.throwIfAborted();
+            onProgress({phase: 'ready'});
+        } finally { await projection?.release(); }
+    }));
+    const failures = outcomes.filter(result => result.status === 'rejected').map(result => result.reason);
+    if (signal.aborted) {
+        inspect('Cancelled speech preparation', failures);
+        // Cancelling an RPC wait alone does not retire the shared activation.
+        const cleanup = await Promise.allSettled(startedRoles.map(role => Arcane.speech.unload({role})));
+        const cleanupFailures = cleanup.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (cleanupFailures.length) throw new AggregateError([signal.reason, ...cleanupFailures], 'Speech cancellation cleanup failed.');
+        throw signal.reason;
+    }
+    if (failures.length) throw failures.every(error => error === signal.reason) ? signal.reason
+        : new AggregateError(failures, 'Speech preparation did not finish.');
+    let muteTask;
+    function cancelActivation() {
+        muteTask ??= ai.setSpeechMuted(true);
+        muteTask.catch(function retainMuteFailure() {}); // Joined below.
+    }
+    signal.addEventListener('abort', cancelActivation, {once: true});
+    try {
+        signal.throwIfAborted();
+        const readiness = await Promise.allSettled([runtime.load('stt', {signal}), ai.setSpeechMuted(false)]);
+        if (signal.aborted) inspect('Cancelled speech readiness outcomes', readiness);
+        signal.throwIfAborted();
+        const readinessFailures = readiness.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (readinessFailures.length) throw new AggregateError(readinessFailures, 'Speech readiness failed.');
+        if (readiness[1].value !== true) throw new Error('The selected speech output did not activate.');
+        speechState = await Arcane.speech.status();
+        signal.throwIfAborted();
+        status.textContent = 'Speech ready. Talk opens the microphone; Speak draft reads the text you choose.';
+    } catch (error) {
+        if (!signal.aborted) throw error;
+        cancelActivation();
+        inspect('Cancelled speech readiness', error);
+        const cleanup = await Promise.allSettled([muteTask, ...startedRoles.map(role => Arcane.speech.unload({role}))]);
+        const cleanupFailures = cleanup.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (cleanupFailures.length) throw new AggregateError([error, ...cleanupFailures], 'Speech activation cancellation cleanup failed.');
+        throw signal.reason;
+    } finally { signal.removeEventListener('abort', cancelActivation); }
 }
 
 function addMessage(role, content) {
@@ -100,19 +272,23 @@ function addMessage(role, content) {
     return text;
 }
 
-async function configureSelection(modelId) {
+async function configureSelection(modelId, signal) {
     const revision = ++selectionRevision;
     configuring = true;
     status.textContent = 'Preparing the selected speech roles…';
     controls();
     try {
         await stopConversation();
+        signal?.throwIfAborted();
         const speech = await Arcane.speech.status();
+        signal?.throwIfAborted();
         if (retired) return;
         if (!speech.roles.stt.supportsStreaming || !speech.roles.tts.supportsStreaming) {
             throw new Error('This example requires the selected streaming STT and TTS engines.');
         }
         speechState = speech;
+        if (modelId) await getInstalledCoreClient().invoke('localai.prepare', {}, {timeoutMs: 0, signal});
+        signal?.throwIfAborted();
         const llm = modelId ? {providerId: provider.id, modelId, localOnly: true} : null;
         const stt = {providerId: 'LOCAL_SPEACH', modelId: speech.roles.stt.modelId, localOnly: true};
         const tts = {providerId: 'LOCAL_SPEACH', modelId: speech.roles.tts.modelId, localOnly: true};
@@ -125,7 +301,7 @@ async function configureSelection(modelId) {
             ai = new AI(modelId ? provider.id : null, stt.providerId, tts.providerId, modelId || null, tts.modelId, stt.modelId);
             globalThis.ai = ai;
             ai.ready = true;
-            ai.configureProviders(selections, {startLanguageModel: false});
+            ai.configureProviders(selections, {startLanguageModel: false, signal});
             session = new ConfiguredAIChatSession({
                 request: {localOnly: true, tools: [], toolChoice: 'auto'},
                 chat: function streamSelectedLocalModel(request) {
@@ -143,14 +319,13 @@ async function configureSelection(modelId) {
                 }
             });
         } else {
-            await ai.transitionProviders(selections, {startLanguageModel: false});
+            await ai.transitionProviders(selections, {startLanguageModel: false, signal});
         }
+        signal?.throwIfAborted();
         selectedModel = modelId;
-        // Public unmute loads TTS and aligns AI speech state; Talk alone opens capture.
-        await Promise.all([runtime.load('stt'), ai.setSpeechMuted(false)]);
         if (revision === selectionRevision && !retired) status.textContent = modelId
-            ? 'Ready. Talk opens the microphone; Reply starts the selected local model when needed.'
-            : 'Speech is ready. No language model is selected; Talk and Speak draft remain available.';
+            ? 'Model selected. Download / load speech prepares conversation; Reply loads the selected language model.'
+            : 'Choose a language model, or load speech to try Talk and Speak draft.';
     } finally {
         if (revision === selectionRevision) configuring = false;
         controls();
@@ -353,9 +528,34 @@ const stopSpeech = globalThis.Arcane?.events?.on('speech.state', function speech
     speechState = state;
     controls();
 });
+const stopPreparation = globalThis.Arcane?.events?.on('localai.preparation', function runtimePreparation(event) {
+    inspect('Local runtime preparation', event);
+    status.textContent = `Preparing the selected local runtime · ${event.phase ?? event.type ?? 'working'}`;
+});
 
-modelSelect.addEventListener('change', function chooseModel() { configureSelection(modelSelect.value).catch(report); });
+modelSelect.addEventListener('change', function chooseModel() {
+    prepareSelected(signal => configureSelection(modelSelect.value, signal)).catch(report);
+});
 refreshButton.addEventListener('click', function refreshCatalog() { refreshModels().catch(report); });
+availableModel.addEventListener('change', controls);
+downloadModelButton.addEventListener('click', function downloadCatalogModel() {
+    const model = catalog.catalog.find(record => record.id === availableModel.value);
+    prepareSelected(signal => downloadLanguageModel(model, signal)).catch(report);
+});
+downloadShardsButton.addEventListener('click', function downloadSelectedFiles() {
+    prepareSelected(async function acquireShardSet(signal) {
+        const members = modelURLs.value.split(/\r?\n/).filter(line => line.trim() !== '').map(function sourceFile(line) {
+            const url = new URL(line.trim());
+            return {path: decodeURIComponent(url.pathname.split('/').pop()), url: url.href};
+        });
+        if (!members.length) throw new Error('Supply the direct URLs for the complete model.');
+        const first = members.find(member => /-00001-of-\d+\.gguf$/i.test(member.path)) ?? members[0];
+        await downloadLanguageModel({name: first.path, entryPath: first.path,
+            members: [first, ...members.filter(member => member !== first)]}, signal);
+    }).catch(report);
+});
+loadSpeechButton.addEventListener('click', function loadSelectedSpeech() { prepareSelected(prepareSpeech).catch(report); });
+cancelDownloadButton.addEventListener('click', function cancelPreparation() { preparation?.controller.abort(); });
 talkButton.addEventListener('click', function beginConversation() { talk().catch(report); });
 stopButton.addEventListener('click', function endConversation() { stopConversation().catch(report); });
 replyButton.addEventListener('click', function submitTurn() { reply().catch(report); });
@@ -366,8 +566,14 @@ window.addEventListener('pagehide', function closePage() {
     stopRuntime();
     stopModels?.();
     stopSpeech?.();
+    stopPreparation?.();
+    const currentPreparation = preparation;
+    currentPreparation?.controller.abort();
     (async function releasePageOwners() {
         const failures = [];
+        try { await currentPreparation?.task; } catch (error) {
+            if (error !== currentPreparation?.controller.signal.reason) failures.push(error);
+        }
         try { await stopConversation(); } catch (error) { failures.push(error); }
         try { await runtime.disposeAll(); } catch (error) { failures.push(error); }
         if (failures.length) throw new AggregateError(failures, 'The page could not finish releasing its owners.');

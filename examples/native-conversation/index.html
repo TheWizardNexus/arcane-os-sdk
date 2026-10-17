@@ -388,6 +388,23 @@
         <label for="model">Installed local model</label>
         <select id="model"><option value="">Choose a model…</option></select>
         <button id="refresh" type="button">Refresh models</button>
+    </div>
+    <div class="controls model-download">
+        <label for="available-model">Download a language model</label>
+        <select id="available-model"></select>
+        <button id="download-model" type="button" disabled>Download model</button>
+        <button id="load-speech" type="button" disabled>Download / load speech</button>
+        <button id="cancel-download" type="button" disabled>Cancel preparation</button>
+    </div>
+    <p id="model-directory"></p>
+    <div id="download-status" role="status"></div>
+    <details>
+        <summary>Download another GGUF model or shard set</summary>
+        <label for="model-urls">Direct model URLs, one per file or shard</label>
+        <textarea id="model-urls" placeholder="https://…/model-00001-of-00002.gguf&#10;https://…/model-00002-of-00002.gguf"></textarea>
+        <button id="download-shards" type="button" disabled>Download these files</button>
+    </details>
+    <div class="controls">
         <button id="talk" type="button" disabled>Talk</button>
         <button id="stop" type="button" disabled>Stop</button>
         <button id="interrupt" type="button" disabled>Stop this speech</button>

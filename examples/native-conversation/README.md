@@ -1,7 +1,8 @@
 # Native conversation
 
-A small SDK-built native player: select an installed local llama.cpp model,
-press **Talk**, speak, then press **Reply to this turn**. Microphone capture
+A small SDK-built native player: choose an installed local llama.cpp model or
+download a catalog model, press **Download / load speech**, then **Talk**,
+speak, and press **Reply to this turn**. Microphone capture
 continues during local model interpretation and streamed Magpie playback.
 Speech activity stops only the current utterance. **Stop this speech** does the
 same explicitly; **Stop** cancels the active response, drains capture, and
@@ -12,10 +13,43 @@ segments in the editable draft; **Speak draft** reads that exact draft through
 the selected Magpie voice. Reply stays unavailable until an installed model is
 explicitly selected. No model or endpoint is invented.
 
-Startup prepares STT and enables the selected TTS route through
-`AI.setSpeechMuted(false)`. This loads speech models without opening the
-microphone or producing an utterance. Talk opens capture; Speak draft or a
-completed explicit Reply starts playback.
+Startup discovers files and displays available download choices. It does not
+download or load a model. The speech button acquires missing Nemotron ASR,
+diarization, Magpie, NanoCodec and matching tokenizer files through the SDK,
+then loads the two speech roles. Existing complete files and explicit launch
+selections are reused. Talk opens capture; Speak draft or a completed explicit
+Reply starts playback.
+
+## Persistent models and downloads
+
+The SDK launch context owns the default `modelsDirectory`:
+
+- Windows: `%LOCALAPPDATA%/Arcane/native-conversation/Models`.
+- macOS: `~/Library/Application Support/Arcane/native-conversation/Models`.
+- Linux: `$XDG_DATA_HOME/Arcane/native-conversation/Models`, or
+  `~/.local/share/Arcane/native-conversation/Models` when XDG is unset.
+- Android: `Models` inside the app-private `stateRoot` supplied by its host.
+
+The example separates `LLM` and `Speech` within that directory. A launch-context
+`modelsDirectory` overrides the location. The app's own `models/` directory is
+also discovered; the model service can receive additional `directories` through
+its service options. Existing files are retained where they are, without copies.
+Models and profiles remain outside the replaceable built app.
+
+The small app-owned catalog offers IBM Granite GGUF downloads. The additional
+URL input accepts a complete model or a GGUF shard set, one direct URL per
+member. The SDK discovers `name-00001-of-000NN.gguf` sets as one model, retains
+every shard and loads the first shard through llama.cpp. Incomplete discovered
+sets remain in developer inspection with their missing filenames; they are not
+offered as usable models. Downloads show the active file and completed files,
+and can be cancelled. A transfer with no file completion yet remains visibly
+in progress rather than inventing a percentage.
+
+`downloadCoreModelAssets()` owns acquisition; `openExistingCoreModelAssets()`
+retains a complete installed set while the native engine uses it. The language
+model provider prepares the chosen files only when loaded. Downloading does not
+open the microphone or start inference. The native speech catalog and helpers
+belong to `arcane-os/local-ai/nemotron`, not to an example downloader.
 
 The editable draft assembles complete ASR-final segments as separate lines.
 Reply first requests an endpoint and waits for those update callbacks, then
@@ -69,7 +103,10 @@ const result = await buildApplication({
 
 `exampleRoot`, `hostDirectory`, and `outputRoot` are the owner's actual selected
 absolute locations. Use this example's ignored `build/windows-x64` directory for
-its generated output. Packaging selects `native/speech.mjs` and
+its generated output. Successful rebuilds replace the one
+`build/windows-x64/native-conversation/` output. The previous complete output
+stays available until replacement succeeds; model storage and profiles are
+preserved. Packaging selects `native/models.mjs`, `native/speech.mjs` and
 `native/local-ai.mjs` through `native.services`, and includes them unchanged
 through `package.nativeResources`. The SDK template supplies `img/icon.png`
 under the SDK's license. No custom builder or launcher is needed.
@@ -78,7 +115,7 @@ Launch the resulting manifest-selected executable with
 `--arcane-launch-config <selected-launch.json>`. Keep machine-specific trial
 configuration inside the ignored `.arcane/` directory, outside both the browser
 selection and native resources. The generated Core reads this complete object
-and supplies it to the two service factories:
+and supplies it to the service factories:
 
 ```json
 {
@@ -127,17 +164,24 @@ CUDA ordinals from display enumeration. Magpie uses Aria at natural rate, with
 the matching tokenizer's speaker map. The example uses the engine's selected
 language and does not infer language or meaning from transcript keywords.
 
+Without supplied speech runtime selections, the example explicitly selects CPU
+and uses the SDK's public NeMo installer and helper builders on the speech
+button. This requires the host's CMake and C++ toolchain; the upstream runtime
+archive does not contain the first-party Arcane helper executables. A configured
+GPU runtime keeps its supplied device selection; failure never silently changes
+to CPU. Installed runtime/helper paths above avoid rebuilding those helpers.
+
 For a separately owned running llama.cpp listener, select its actual URL and
 use an empty launch-context `runtimes` array. Otherwise the shared local-AI
-service owns the explicitly supplied server executable. Its model directory
-exposes the actual installed catalog; the example never chooses a model for the
-user. Keep the complete installed runtime record when its selected backend
-requires additional fields. There is no `native.localAI` bundle selection,
-installer hook, dependency acquisition, model download, or redistributed native
-runtime/model payload in this example.
+service owns the supplied executable. When no runtime record is supplied, the
+explicit language-model selection calls `localai.prepare` and the SDK acquires
+its selected llama.cpp runtime. Keep the complete installed runtime record when
+its selected backend requires additional fields. Runtime and model downloads use
+their upstream distributions; the app does not redistribute them. Preparation
+progress and complete failures remain observable through the SDK event owner.
 
 For a speech-only trial, set `"localAI": {"runtimes": []}` and `"runtimes": []`
-in the launch context. The model catalog remains empty, with no selected LLM.
+in the launch context. There is then no configured LLM runtime.
 The speech service remains available independently. Conversational inference
 acceptance then awaits an actual installed runtime and model selection.
 
