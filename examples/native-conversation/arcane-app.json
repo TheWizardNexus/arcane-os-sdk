@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "id": "native-conversation",
+  "displayName": "Arcane Native Conversation",
+  "description": "Continuous local speech and an explicitly selected local chat model.",
+  "version": "0.1.0",
+  "publisher": {"id": "the-wizard-nexus", "name": "The Wizard Nexus"},
+  "package": {
+    "entry": "index.html",
+    "strategy": "static",
+    "include": ["index.html", "App.js", "img/icon.png", "modules"],
+    "exclude": [],
+    "shared": ["browser-runtime"],
+    "nativeResources": {"include": ["native", "package.json"]}
+  },
+  "native": {
+    "type": "app",
+    "icon": "img/icon.png",
+    "order": 100,
+    "bundledApps": [],
+    "services": [{"module": "native/speech.mjs"}, {"module": "native/local-ai.mjs"}],
+    "window": {"width": 1000, "height": 800, "resizable": true}
+  },
+  "requirements": {"arcaneProtocol": "arcane/1", "minimumCoreVersion": "0.8.12", "features": []},
+  "targets": ["macos-arm64", "macos-x64", "portable", "windows-x64"]
+}

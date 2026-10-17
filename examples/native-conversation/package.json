@@ -1,0 +1,12 @@
+{
+  "name": "arcane-native-conversation-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import-map": "arcane import-map",
+    "build": "arcane build --target windows-x64",
+    "run": "arcane run --target windows-x64"
+  },
+  "dependencies": {"arcane-os": "latest"},
+  "engines": {"node": ">=22.23.2"}
+}
