@@ -1368,6 +1368,9 @@ function validateProvider(provider) {
     }
     if (provider.role === 'stt' && is.function(provider.createCapture)) {
         record.createCapture = provider.createCapture.bind(provider);
+        if (is.function(provider.supportsCapture)) {
+            record.supportsCapture = provider.supportsCapture.bind(provider);
+        }
     }
     const admitted = completeValue(record);
     PROVIDER_RECORDS.set(provider, admitted);
@@ -3360,14 +3363,14 @@ export class AIProviderRuntime {
         return this.#disposeAllPromise;
     }
 
-    request(role, options = {}, {speechInputPrepared = false, observeToolText = null, onRetry = null} = {}) {
+    request(role, options = {}, {speechInputPrepared = false, observeToolText = null, onRetry = null, speechStream = null} = {}) {
         if (SPEECH_ROLES.includes(role)) {
             arcaneLogging.debug('[Arcane speech runtime] request', role, options);
         }
-        return this.#requestRole(role, options, false, speechInputPrepared, observeToolText, onRetry);
+        return this.#requestRole(role, options, false, speechInputPrepared, observeToolText, onRetry, speechStream);
     }
 
-    #requestRole(role, options, queued, speechInputPrepared = false, observeToolText = null, onRetry = null) {
+    #requestRole(role, options, queued, speechInputPrepared = false, observeToolText = null, onRetry = null, speechStream = null) {
         this.#assertOpen();
         this.#assertNotConfiguring();
         assertRole(role);
@@ -3503,7 +3506,7 @@ export class AIProviderRuntime {
         }
         if ((!queued && slot.requestQueue.length)
             || slot.activeRequests.size >= maxConcurrentRequests) {
-            return this.#enqueueRoleRequest(slot, options, observeToolText, onRetry);
+            return this.#enqueueRoleRequest(slot, options, observeToolText, onRetry, speechStream);
         }
         if (!slot.ready
             || providerStatus.state !== 'ready'
@@ -4064,7 +4067,7 @@ export class AIProviderRuntime {
                     arcaneLogging.debug('[Arcane speech runtime] provider.request', {generation, requestSequence, operationId}, providerRequest);
                 }
                 const result = role === 'tts'
-                    ? await provider.request(providerRequest, {speechInputPrepared: true})
+                    ? await provider.request(providerRequest, {speechInputPrepared: true, speechStream})
                     : role === 'llm'
                         ? await provider.request(
                             providerRequest,
@@ -4088,9 +4091,14 @@ export class AIProviderRuntime {
                     )
                     : result;
             } catch (error) {
-                const normalized = isAbort(error, controller.signal)
-                    ? normalizedAbort(error)
-                    : error;
+                // Streaming speech joins its native cancellation before release.
+                // An aborted signal alone must not conceal a cleanup failure.
+                const speechCancelled = speechStream && !error?.errors
+                    && (error === controller.signal.reason || error?.name === 'AbortError'
+                        || error?.code === 'ARCANE_REQUEST_ABORTED');
+                const normalized = speechStream
+                    ? speechCancelled ? normalizedAbort(controller.signal.reason ?? error) : error
+                    : isAbort(error, controller.signal) ? normalizedAbort(error) : error;
                 if (SPEECH_ROLES.includes(role)) {
                     arcaneLogging.debug('[Arcane speech runtime] provider.request.error', {role, generation, requestSequence, operationId}, error);
                 }
@@ -4134,7 +4142,8 @@ export class AIProviderRuntime {
         const provider = providerId === null
             ? this.#providerFor(slot)
             : this.#providers.get(providerKey('stt', providerId));
-        return is.function(provider?.createCapture);
+        return is.function(provider?.createCapture)
+            && (!is.function(provider.supportsCapture) || provider.supportsCapture());
     }
 
     createTranscriptionCapture(options = {}) {
@@ -4147,6 +4156,7 @@ export class AIProviderRuntime {
         const runtime = this;
         const generation = slot.generation;
         const capture = provider.createCapture(options);
+        if (!capture) return null;
         const controller = new AbortController();
         let requestRecord = null;
         let detachSignal = null;
@@ -4185,7 +4195,7 @@ export class AIProviderRuntime {
         // permission retains the originating user gesture. It is never queued.
         return {
             done,
-            start({signal} = {}) {
+            start({signal, ...captureOptions} = {}) {
                 if (started || closed) return Promise.resolve(false);
                 try {
                     runtime.#assertOpen();
@@ -4217,7 +4227,7 @@ export class AIProviderRuntime {
                     };
                     slot.activeRequests.set(requestSequence, requestRecord);
                     runtime.#publishRoleRequestState(slot);
-                    const starting = capture.start({signal: controller.signal});
+                    const starting = capture.start({...captureOptions, signal: controller.signal});
                     return Promise.resolve(starting).catch(
                         function releaseFailedTranscriptionCaptureStart(error) {
                             capture.cancel();
@@ -4230,16 +4240,22 @@ export class AIProviderRuntime {
                 }
             },
             stop() {
-                capture.stop();
-                return done;
+                return Promise.resolve(capture.stop()).then(function captureStopped() { return done; });
             },
+            ...(is.function(capture.forceEndpoint) ? {
+                forceEndpoint() {
+                    return capture.forceEndpoint();
+                }
+            } : {}),
             cancel() {
                 controller.abort();
                 capture.cancel();
+                return done;
             },
             destroy() {
                 controller.abort();
                 capture.destroy();
+                return done;
             }
         };
     }
@@ -4432,7 +4448,7 @@ export class AIProviderRuntime {
         );
     }
 
-    #enqueueRoleRequest(slot, options, observeToolText = null, onRetry = null) {
+    #enqueueRoleRequest(slot, options, observeToolText = null, onRetry = null, speechStream = null) {
         if (SPEECH_ROLES.includes(slot.role)) {
             arcaneLogging.debug('[Arcane speech runtime] queue.enqueue', {
                 role: slot.role,
@@ -4448,6 +4464,7 @@ export class AIProviderRuntime {
                 options,
                 observeToolText,
                 onRetry,
+                speechStream,
                 resolve,
                 reject,
                 detachSignal: null
@@ -4520,7 +4537,7 @@ export class AIProviderRuntime {
             let operation;
             try {
                 operation = runtime.#requestRole(
-                    slot.role, entry.options, true, false, entry.observeToolText, entry.onRetry
+                    slot.role, entry.options, true, false, entry.observeToolText, entry.onRetry, entry.speechStream
                 );
             } catch (error) {
                 if (SPEECH_ROLES.includes(slot.role)) {

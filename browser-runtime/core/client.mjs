@@ -569,6 +569,199 @@ export function createCoreClient({
 export function createCoreFacade(client){
     const {invoke,events,uuid}=client;
     const long={timeoutMs:LONG_OPERATION_TIMEOUT};
+    function speechStreamEvents(streamId,options){
+        const controller=new AbortController();
+        const signal=options.signal?AbortSignal.any([options.signal,controller.signal]):controller.signal;
+        const subscriptions=[];
+        let delivery=Promise.resolve();
+        let callbackFailure;
+        function listen(name,callback){
+            if(callback===undefined)return;
+            if(typeof callback!=='function')throw new TypeError(`${name} observer must be a function.`);
+            subscriptions.push(events.on(name,function receiveSpeechStreamEvent(event){
+                if(event?.streamId!==streamId||signal.aborted)return;
+                delivery=delivery.then(function deliverOrderedSpeechEvent(){
+                    if(!signal.aborted)return callback(event);
+                });
+                delivery.catch(function cancelFailedSpeechObserver(error){
+                    callbackFailure??=error;
+                    controller.abort(error);
+                });
+            }));
+        }
+        function dispose(){
+            for(const unsubscribe of subscriptions.splice(0))unsubscribe();
+        }
+        async function delivered(){
+            await delivery;
+            signal.throwIfAborted();
+        }
+        async function settle(task,{preserveTaskFailure=false}={}){
+            let result;
+            let failure;
+            let failed=false;
+            let deliveryFailure;
+            let deliveryFailed=false;
+            try{
+                try{result=await task;}catch(error){failed=true;failure=error;}
+                try{await delivery;}catch(error){deliveryFailed=true;deliveryFailure=callbackFailure??error;}
+                if(preserveTaskFailure&&failed&&deliveryFailed&&failure!==deliveryFailure){
+                    throw new AggregateError([deliveryFailure,failure],'Speech callback and native cleanup failed.');
+                }
+                if(failed||deliveryFailed)throw callbackFailure??deliveryFailure??failure;
+                signal.throwIfAborted();
+                return result;
+            }finally{dispose();}
+        }
+        return {controller,signal,listen,settle,dispose,delivered};
+    }
+    function encodeSpeechSamples(samples){
+        if(!(samples instanceof Float32Array))throw new TypeError('Speech stream push requires Float32Array PCM.');
+        const encoded=new Uint8Array(samples.length*4);
+        const view=new DataView(encoded.buffer);
+        const bits=new Uint32Array(samples.buffer,samples.byteOffset,samples.length);
+        for(let index=0;index<bits.length;index+=1)view.setUint32(index*4,bits[index],true);
+        let binary='';
+        for(const value of encoded)binary+=String.fromCharCode(value);
+        return {encoding:'f32le',data:globalThis.btoa(binary)};
+    }
+    function decodeSpeechAudio(audio){
+        if(audio?.pcm?.encoding!=='base64'||typeof audio.pcm.data!=='string'){
+            throw new TypeError('Streaming speech audio requires base64 PCM transport.');
+        }
+        const binary=globalThis.atob(audio.pcm.data);
+        const pcm=new Uint8Array(binary.length);
+        for(let index=0;index<binary.length;index+=1)pcm[index]=binary.charCodeAt(index);
+        return {...audio,pcm};
+    }
+    function openSpeechStream(request={},options={}){
+        const streamId=uuid();
+        const owned=speechStreamEvents(streamId,options);
+        let resolveReady;
+        let rejectReady;
+        let opened=false;
+        let ending=false;
+        let snapshot=null;
+        let controls=Promise.resolve();
+        let finishing=null;
+        let cancelling=null;
+        const ready=new Promise(function waitForSpeechStream(resolve,reject){
+            resolveReady=resolve;
+            rejectReady=reject;
+        });
+        ready.catch(function observeSpeechStreamReadinessFailure(){});
+        try{
+            owned.listen('speech.opened',function speechStreamOpened(event){
+                opened=true;
+                resolveReady(event);
+            });
+            owned.listen('speech.transcription',function transcriptionUpdated(event){
+                snapshot=event.result;
+                return options.onUpdate?.(event.result);
+            });
+            if(options.onProgress!==undefined){
+                owned.listen('speech.progress',function speechStreamProgress(event){return options.onProgress(event);});
+            }
+        }catch(error){owned.dispose();throw error;}
+        const completion=owned.settle(invoke('speech.open',{streamId,options:request},{
+            timeoutMs:0,signal:owned.signal,onRequest:options.onRequest
+        })).then(function speechStreamCompleted(result){
+            if(!opened)throw new CoreError({code:'SPEECH_STREAM_NOT_OPENED',message:'The speech stream ended before readiness.'});
+            return result;
+        }).catch(function speechStreamFailed(error){
+            rejectReady(error);
+            throw error;
+        }).finally(function releaseSpeechStream(){ending=true;});
+        completion.catch(function observeOwnedSpeechStreamFailure(){});
+        function control(method,parameters={}){
+            const task=controls.then(async function sendOrderedSpeechControl(){
+                await ready;
+                owned.signal.throwIfAborted();
+                return invoke(method,{streamId,...parameters},{timeoutMs:0,signal:owned.signal});
+            });
+            controls=task;
+            task.catch(function cancelFailedSpeechControl(error){owned.controller.abort(error);});
+            return task;
+        }
+        return {
+            streamId,ready,completion,
+            current:function currentSpeechTranscript(){return snapshot;},
+            push:function pushSpeechSamples(samples){
+                if(ending)return Promise.reject(new CoreError({code:'SPEECH_STREAM_ENDING',message:'The speech stream is finishing.'}));
+                return control('speech.push',{audio:encodeSpeechSamples(samples)});
+            },
+            forceEndpoint:function endpointSpeechStream(){
+                if(ending)return Promise.reject(new CoreError({code:'SPEECH_STREAM_ENDING',message:'The speech stream is finishing.'}));
+                return control('speech.endpoint').then(async function deliverEndpointSnapshots(result){
+                    await owned.delivered();
+                    return result;
+                });
+            },
+            finish:function finishSpeechStream(){
+                if(!ending){
+                    ending=true;
+                    finishing=control('speech.finish').then(function finishSpeechDelivery(){return completion;});
+                    finishing.catch(function observeSpeechFinishFailure(){});
+                }
+                return finishing??completion;
+            },
+            cancel:function cancelSpeechStream(reason){
+                if(cancelling)return cancelling;
+                ending=true;
+                const stopping=invoke('speech.cancel',{streamId},{timeoutMs:0});
+                owned.controller.abort(reason);
+                // A transcript callback may await cancellation. Native cleanup
+                // must not wait for that same callback through completion.
+                cancelling=stopping;
+                return cancelling;
+            }
+        };
+    }
+    function synthesizeSpeechStream(request={},options={}){
+        if(typeof options.onAudio!=='function')throw new TypeError('Streaming speech synthesis requires an onAudio consumer.');
+        const streamId=uuid();
+        const owned=speechStreamEvents(streamId,options);
+        try{
+            owned.listen('speech.audio',async function synthesisAudio(event){
+                await options.onAudio(decodeSpeechAudio(event.audio));
+                owned.signal.throwIfAborted();
+                await invoke('speech.audioConsumed',{streamId,sequence:event.sequence},{timeoutMs:0,signal:owned.signal});
+            });
+            if(options.onProgress!==undefined){
+                owned.listen('speech.progress',function synthesisProgress(event){return options.onProgress(event);});
+            }
+        }catch(error){owned.dispose();throw error;}
+        if(owned.signal.aborted)return owned.settle(Promise.reject(owned.signal.reason));
+        // Keep the response pending until the native operation settles. Generic
+        // invoke cancellation settles locally before native cleanup can finish.
+        const operation=invoke('speech.synthesizeStream',{streamId,request},{
+            timeoutMs:0,onRequest:options.onRequest
+        });
+        let cancellation=null;
+        function cancelSynthesis(){
+            if(cancellation)return;
+            cancellation=invoke('speech.cancelSynthesis',{streamId},{timeoutMs:0});
+            cancellation.catch(function observeSynthesisCleanupFailure(){});
+        }
+        owned.signal.addEventListener('abort',cancelSynthesis,{once:true});
+        if(owned.signal.aborted)cancelSynthesis();
+        const joined=(async function joinSynthesisCleanup(){
+            let result;
+            const failures=[];
+            try{result=await operation;}catch(error){
+                if(!owned.signal.aborted||error?.name!=='AbortError')failures.push(error);
+            }
+            if(cancellation){
+                try{await cancellation;}catch(error){failures.push(error);}
+            }
+            if(failures.length===1)throw failures[0];
+            if(failures.length)throw new AggregateError(failures,'Speech synthesis and cleanup failed.');
+            return result;
+        })();
+        return owned.settle(joined,{preserveTaskFailure:true}).finally(function releaseSynthesisCancellation(){
+            owned.signal.removeEventListener('abort',cancelSynthesis);
+        });
+    }
     function ollamaInvoke(operation,request={},options={}){
         const onChunk=typeof options==='function'?options:options?.onChunk;
         const timeoutMs=options?.timeoutMs??(['pull','push','create'].includes(operation)?LONG_OPERATION_TIMEOUT:10*60*1000);
@@ -598,6 +791,8 @@ export function createCoreFacade(client){
             remove:name=>invoke('environment.delete',{name})},
         mail:{send:request=>invoke('mail.send',request??{},{timeoutMs:450000})},
         speech:{status:()=>invoke('speech.status',{},{timeoutMs:10000}),
+            openStream:openSpeechStream,
+            synthesizeStream:synthesizeSpeechStream,
             load:function loadSpeech(request,options){return invoke('speech.load',request??{},{timeoutMs:0,signal:options?.signal,onRequest:options?.onRequest});},
             unload:function unloadSpeech(request,options){return invoke('speech.unload',request??{},{timeoutMs:0,signal:options?.signal,onRequest:options?.onRequest});},
             synthesize:(request,options)=>invoke('speech.synthesize',request??{},{timeoutMs:180000,signal:options?.signal}),

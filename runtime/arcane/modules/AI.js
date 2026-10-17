@@ -28,6 +28,8 @@ import {
 import {MarkdownSpeech,stripSpeechFormatting} from 'arcane-os/speech-text';
 import {prepareSpeech, readPreparedSpeech} from './PreparedSpeech.js';
 import {createToolTextObserver} from 'arcane-os/ai/tool-text-stream';
+import createNativeSpeechCapture from './NativeSpeechCapture.js';
+import prepareNativeSpeechPlayback from './NativeSpeechPlayback.js';
 
 const completeValue=(value)=>value;
 
@@ -2008,13 +2010,15 @@ class AI {
                 if(runtime.#builtInSpeechService(role)!==providerId||!model){
                     return completeValue([]);
                 }
-                const defaultVoice=runtime.#builtInSpeechDefaultVoice(
+                const defaultVoice=nativeWatch?.snapshot?.roles?.[role]?.defaultVoice??runtime.#builtInSpeechDefaultVoice(
                     role,
                     providerId
                 );
                 return completeValue([
                     completeValue({
                         id:model,
+                        ...(nativeWatch?.snapshot?.roles?.[role]?.speech
+                            ?{speech:nativeWatch.snapshot.roles[role].speech}:{}),
                         ...(defaultVoice?{defaultVoice}:{})
                     })
                 ]);
@@ -2026,6 +2030,39 @@ class AI {
                 return runtime.#builtInSpeechInspection(role,providerId,selection);
             },
             status:statusBuiltInSpeechProvider,
+            ...(role==='stt'?{
+                supportsCapture:function supportsNativeCapture(){
+                    return nativeWatch?.snapshot?.roles?.stt?.supportsStreaming===true;
+                },
+                createCapture:function createBuiltInNativeCapture(options={}){
+                    if(nativeWatch?.snapshot?.roles?.stt?.supportsStreaming!==true)return null;
+                    const capture=createNativeSpeechCapture({
+                        ...options,
+                        speech:nativeWatch.speech,
+                        model:nativeWatch.modelId
+                    });
+                    const operation={watch:nativeWatch,requestId:null,signal:null};
+                    const done=capture.done.finally(function releaseNativeCapture(){
+                        if(nativeRequest===operation)releaseBuiltInSpeechRequest();
+                    });
+                    done.catch(function observeNativeCaptureCompletion(error){
+                        if(!isAIRequestAbort(error))arcaneLogging.error('Native transcription capture failed.',error);
+                    });
+                    return {
+                        ...capture,
+                        done,
+                        start:function startBuiltInNativeCapture(options={}){
+                            if(!nativeSpeechReady()||busy){
+                                throw aiProviderError('The native transcription model is not ready.','ARCANE_AI_ROLE_NOT_READY');
+                            }
+                            busy=true;
+                            operation.signal=options.signal;
+                            nativeRequest=operation;
+                            return capture.start(options);
+                        }
+                    };
+                }
+            }:{}),
             load:async function loadBuiltInSpeechProvider(context={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
@@ -2086,7 +2123,7 @@ class AI {
                     throw error;
                 }
             },
-            request:function requestBuiltInSpeechProvider(context={}){
+            request:function requestBuiltInSpeechProvider(context={}, {speechStream=null}={}){
                 if(context.signal?.aborted){
                     throw normalizeAIRequestAbort(context.signal.reason);
                 }
@@ -2126,7 +2163,8 @@ class AI {
                     )
                     :runtime.#requestBuiltInSpeechSynthesis(
                         context.payload,
-                        context.signal
+                        context.signal,
+                        speechStream
                     );
                 return Promise.resolve(request).finally(releaseBuiltInSpeechRequest);
             },
@@ -2548,6 +2586,7 @@ class AI {
 
     audioMessageChunks='';
     #markdownSpeech=new MarkdownSpeech();
+    #streamSpeechOptions=null;
     sourceNodes=[];
     isSpeaking=false;
     audioContext=null;
@@ -4684,7 +4723,7 @@ class AI {
         return response.text();
     }
 
-    async #requestBuiltInSpeechSynthesis(payload={},signal=null){
+    async #requestBuiltInSpeechSynthesis(payload={},signal=null,speechStream=null){
         const input=is.string(payload?.input)?payload.input:'';
         if(!input){
             throw new TypeError('Speech synthesis requires nonempty input.');
@@ -4703,9 +4742,15 @@ class AI {
         const speed=is.finite(payload.speed)?payload.speed:this.voiceSpeed;
         const nativeSpeech=this.#nativeSpeech(this.ttsService,'tts');
         if(nativeSpeech){
+            if(speechStream){
+                return nativeSpeech.synthesizeStream({
+                    ...payload,model,voice,input,speed
+                },{...speechStream,signal});
+            }
             let response;
             try{
                 response=await nativeSpeech.synthesize({
+                    ...payload,
                     model,
                     voice,
                     input,
@@ -6871,12 +6916,24 @@ class AI {
             if(end){
                 this.audioMessageChunks='';
                 this.#markdownSpeech.reset();
+                this.#streamSpeechOptions=null;
             }
             this.#traceSpeech('streamTTS.result',{callId,result:false,reason:'muted'});
             return Promise.resolve(false);
         }
 
-        const {voice,speed,waitForPlayback=false}=options;
+        // A final flush belongs to the same utterance selection. An explicit
+        // language change drains the previous text before accepting new text.
+        let preceding=null;
+        if(this.#streamSpeechOptions&&Object.hasOwn(options,'languageCode')
+            &&options.languageCode!==this.#streamSpeechOptions.languageCode){
+            preceding=this.streamTTS('',true,this.#streamSpeechOptions);
+        }
+        const selectedOptions={...this.#streamSpeechOptions,...options};
+        this.#streamSpeechOptions={
+            voice:selectedOptions.voice,speed:selectedOptions.speed,languageCode:selectedOptions.languageCode
+        };
+        const {voice,speed,languageCode,waitForPlayback=false}=selectedOptions;
         const pauseAfterMs=Number(options.pauseAfterMs??0);
         if(!is.finite(pauseAfterMs)||pauseAfterMs<0){
             throw new RangeError('Speech pauses must be a nonnegative number of milliseconds.');
@@ -6885,6 +6942,7 @@ class AI {
         const speechText=this.#markdownSpeech.append(String(text||''),end);
         this.audioMessageChunks+=speechText;
         const outputs=this.#extractSpeechSegments(end);
+        if(end)this.#streamSpeechOptions=null;
         this.#traceSpeech('streamTTS.segments',{
             callId,segments:outputs,remainder:this.audioMessageChunks,
             segmentation:this.ttsSegmentation,speechText
@@ -6892,7 +6950,7 @@ class AI {
 
         if(!outputs.length){
             this.#traceSpeech('streamTTS.result',{callId,result:true,reason:'buffered'});
-            return Promise.resolve(true);
+            return preceding??Promise.resolve(true);
         }
 
         try{
@@ -6909,7 +6967,7 @@ class AI {
         }
 
         const generation=this.speechGeneration;
-        const jobs=[];
+        const jobs=preceding?[preceding]:[];
         const runtime=this;
 
         for(const [index,output] of outputs.entries()){
@@ -6917,6 +6975,7 @@ class AI {
                 diagnosticCallId:callId,
                 voice,
                 speed,
+                languageCode,
                 waitForPlayback,
                 pauseAfterMs:index===outputs.length-1?pauseAfterMs:0
             }));
@@ -6938,6 +6997,7 @@ class AI {
             for(const playback of this.#preparedSpeechPlaybacks) playback.stop();
             this.audioMessageChunks='';
             this.#markdownSpeech.reset();
+            this.#streamSpeechOptions=null;
             return;
         }
         this.finishTTS();
@@ -7111,6 +7171,7 @@ class AI {
             text,
             voice:options.voice,
             speed:options.speed,
+            languageCode:options.languageCode,
             pauseAfterMs:options.pauseAfterMs??0,
             resolvePlayback:null
         };
@@ -7206,6 +7267,7 @@ class AI {
         const payload={
             model:selection?.modelId||this.modelTTS,
             input:job.text,
+            ...(job.languageCode!==undefined?{languageCode:job.languageCode}:{}),
             ...(job.voice!==undefined||voice?{voice}:{}),
             ...(!native?{responseFormat:selection
                 ?this.#providerSpeechResponseFormat()
@@ -7570,6 +7632,34 @@ class AI {
 
     async prepareTTSPlayback(payload={},signal=null,preparation={}){
         const model=this.#providerSpeechModel();
+        if(model?.speech?.streaming===true){
+            this.#assertServiceConfigured(this.ttsService,'tts');
+            if(signal?.aborted)throw normalizeAIRequestAbort(signal.reason);
+            const runtime=this;
+            const selection=this.#providerRuntime.selection('tts');
+            return prepareNativeSpeechPlayback({
+                request:{
+                    ...payload,
+                    model:payload.model??selection.modelId,
+                    voice:payload.voice??this.#providerSpeechVoice(),
+                    speed:payload.speed??this.voiceSpeed
+                },
+                signal,
+                getAudioContext:function getOwnedSpeechOutput(){
+                    return runtime.#getSpeechAudioContext();
+                },
+                speech:{
+                    synthesizeStream:function requestNativeSpeechStream(request,options){
+                        return runtime.#providerRuntime.request('tts',{
+                            operation:'synthesize',payload:request,localOnly:false,signal:options.signal
+                        },{
+                            ...preparation,
+                            speechStream:{onAudio:options.onAudio,onProgress:options.onProgress,onRequest:options.onRequest}
+                        });
+                    }
+                }
+            });
+        }
         if(model?.speech?.playback!=='native'){
             return this.fetchTTS(payload,signal,preparation);
         }
@@ -7618,6 +7708,7 @@ class AI {
                 'input',
                 'textFormat',
                 'responseFormat',
+                'languageCode',
                 'speed'
             ]);
             for(const key of Reflect.ownKeys(descriptors)){
@@ -7625,7 +7716,7 @@ class AI {
                     ||!acceptedKeys.has(key)
                     ||!Object.hasOwn(descriptors[key],'value')){
                     const error=new TypeError(
-                        'AI.fetchTTS accepts only model, voice, input, textFormat, responseFormat, and speed data properties.'
+                        'AI.fetchTTS accepts only model, voice, input, textFormat, responseFormat, languageCode, and speed data properties.'
                     );
                     error.code='ARCANE_AI_TTS_REQUEST_INVALID';
                     throw error;
@@ -7732,15 +7823,19 @@ class AI {
                 throw error;
             }
 
+            const speechRequest={
+                model,voice,input,responseFormat,speed,
+                ...(descriptors.languageCode?{languageCode:descriptors.languageCode.value}:{})
+            };
             if(selection){
                 this.#traceSpeech('fetchTTS.dispatch',{
-                    callId,selection,payload:{model,voice,input,responseFormat,speed}
+                    callId,selection,payload:speechRequest
                 });
                 const response=await this.#providerRuntime.request(
                     'tts',
                     {
                         operation:'synthesize',
-                        payload:{model,voice,input,responseFormat,speed},
+                        payload:speechRequest,
                         localOnly:false,
                         signal
                     },
@@ -7755,10 +7850,10 @@ class AI {
             }
 
             this.#traceSpeech('fetchTTS.dispatch',{
-                callId,service:this.ttsService,payload:{model,voice,input,responseFormat,speed}
+                callId,service:this.ttsService,payload:speechRequest
             });
             const audio=await this.#requestBuiltInSpeechSynthesis(
-                {model,voice,input,responseFormat,speed},
+                speechRequest,
                 signal
             );
             this.#traceSpeech('fetchTTS.result',{callId,audio});
@@ -7859,6 +7954,7 @@ class AI {
         this.speechScheduleTime=0;
         this.audioMessageChunks='';
         this.#markdownSpeech.reset();
+        this.#streamSpeechOptions=null;
         this.#clearSpeechUnlock();
 
         for(const job of this.speechJobs){

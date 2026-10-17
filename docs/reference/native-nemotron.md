@@ -191,9 +191,14 @@ does not decode WAV, MP3 or other encoded recording formats.
 
 ## Evidence boundary
 
-The adapter, transport and platform paths have been source-reviewed. This
-initial implementation has not been compiled or executed on Windows, Linux or
-macOS, and has no measured latency, GPU-inference, microphone, diarization or
-multi-utterance acceptance result. Header and upstream documentation review is
-distinct from a built native application's observed behavior. Android requires
-the necessary host integration and a matching native runtime.
+The adapter, transport and platform paths have been source-reviewed. On October
+17, 2026, the selected Windows x64 helper configured, compiled and installed
+successfully against installed NeMo-Speech.cpp 0.2.0 using CMake 4.4.3, Visual
+Studio 2022, MSVC 19.44.35217 and Windows SDK 10.0.26100. Each operation exited 0;
+complete diagnostics remain in the SDK's ignored selected-output directory. The
+helper was not launched, and there is no measured latency, GPU-inference,
+microphone, diarization, audio playback or multi-utterance acceptance result for
+this adapter. Linux and macOS compilation and execution remain unverified.
+Compilation, header review and upstream documentation remain distinct from a
+built native application's observed behavior. Android requires the necessary
+host integration and a matching native runtime.

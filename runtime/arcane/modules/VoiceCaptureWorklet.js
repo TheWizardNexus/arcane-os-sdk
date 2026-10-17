@@ -18,10 +18,21 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
     #buffer = null;
     #view = null;
     #stopped = false;
+    #pcmMode = false;
+    #pcmBuffer = null;
+    #pcmOffset = 0;
+    #pcmFrames = 0;
+    #observedActivity = false;
+    #observedFrames = 0;
 
     constructor(options) {
         super();
         const configuration = options.processorOptions;
+        this.#pcmMode = configuration.mode === 'pcm';
+        if (this.#pcmMode) {
+            this.#pcmFrames = Math.max(1, Math.round(configuration.pcmChunkMs * sampleRate / 1000));
+            this.#pcmBuffer = new Float32Array(this.#pcmFrames);
+        }
         this.#preRoll = new Float32Array(
             Math.round(configuration.preRollMs * sampleRate / 1000)
         );
@@ -35,11 +46,23 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
     }
 
     #receiveControl(event) {
-        if (this.#stopped || event.data.type !== 'stop') return;
+        if (this.#stopped) return;
+        if (event.data.type === 'flush') {
+            try {
+                this.#flushAnalysis();
+                if (this.#pcmMode) this.#emitPCM();
+                this.port.postMessage({type: 'flushed', id: event.data.id});
+            } catch (error) {
+                this.#fail(error);
+            }
+            return;
+        }
+        if (event.data.type !== 'stop') return;
         this.#stopped = true;
         try {
             this.#flushAnalysis();
-            this.#emit('stop');
+            if (this.#pcmMode) this.#emitPCM();
+            else this.#emit('stop');
             this.#release();
             this.port.postMessage(
                 {type: 'stopped'}
@@ -74,6 +97,25 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
     #flushAnalysis() {
         if (!this.#analysisCount) return;
         const activity = Math.sqrt(this.#analysisEnergy / this.#analysisCount) > this.#activityThreshold;
+        if (this.#pcmMode) {
+            if (activity !== this.#observedActivity) {
+                this.#observedActivity = activity;
+                this.port.postMessage({
+                    type: 'activity',
+                    active: activity,
+                    audioTime: this.#observedFrames / sampleRate
+                });
+            }
+            for (let index = 0; index < this.#analysisCount; index += 1) {
+                this.#pcmBuffer[this.#pcmOffset] = this.#analysisSamples[index];
+                this.#pcmOffset += 1;
+                if (this.#pcmOffset === this.#pcmFrames) this.#emitPCM();
+            }
+            this.#observedFrames += this.#analysisCount;
+            this.#analysisCount = 0;
+            this.#analysisEnergy = 0;
+            return;
+        }
         // Classification selects boundaries only. Every original sample still
         // enters capture in order, including a partial final analysis window.
         for (let index = 0; index < this.#analysisCount; index += 1) {
@@ -121,6 +163,22 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
         this.#preRoll[this.#preRollOffset] = sample;
         this.#preRollOffset = (this.#preRollOffset + 1) % this.#preRoll.length;
         this.#preRollLength = Math.min(this.#preRollLength + 1, this.#preRoll.length);
+    }
+
+    #emitPCM() {
+        if (!this.#pcmOffset) return;
+        const samples = this.#pcmOffset === this.#pcmFrames
+            ? this.#pcmBuffer
+            : this.#pcmBuffer.slice(0, this.#pcmOffset);
+        this.#sequence += 1;
+        this.port.postMessage({
+            type: 'pcm',
+            audio: samples.buffer,
+            sampleRate,
+            sequence: this.#sequence
+        }, [samples.buffer]);
+        this.#pcmBuffer = new Float32Array(this.#pcmFrames);
+        this.#pcmOffset = 0;
     }
 
     #beginSegment() {
@@ -206,6 +264,8 @@ class ArcaneVoiceCaptureProcessor extends AudioWorkletProcessor {
     }
 
     #release() {
+        this.#pcmBuffer = null;
+        this.#pcmOffset = 0;
         this.#buffer = null;
         this.#view = null;
         this.#preRoll = new Float32Array(0);

@@ -7,7 +7,8 @@ from `arcane-os/core/speech`.
 The host supplies an STT engine, a TTS engine, or both. Construction performs no
 installation, model download, model loading, or inference. Core registration
 exposes `speech.status`, `speech.load`, `speech.unload`, `speech.transcribe`,
-and `speech.synthesize`; an operation whose engine was omitted rejects with
+and `speech.synthesize`, plus the optional streaming operations described below;
+an ordinary operation whose engine was omitted rejects with
 `SPEECH_ENGINE_UNAVAILABLE`.
 The optional `signal` controls the service lifetime.
 
@@ -60,6 +61,12 @@ model readiness. Existing readiness consumers additionally recognize
 the engine IDs `whisper.cpp` and `kokoro-onnx`; another engine ID requires the
 corresponding consumer integration.
 
+Each role also reports `supportsStreaming`: STT requires the configured
+engine's `openStream()` method, and TTS requires its `synthesizeStream()` method.
+This capability is independent of `loaded` and `available`; a facade method
+alone does not establish support in the selected engine. Complete engine state,
+including `defaultVoice` and `voices` when supplied, remains present.
+
 ## Explicit role activation
 
 `speech.load({role, ...selection})` and `speech.unload({role, ...selection})`
@@ -100,6 +107,127 @@ cancelled requests publish no later progress.
 Role load/unload acknowledgements additionally carry `operation: 'load'` or
 `'unload'` in that progress record.
 
+## Continuous transcription and streaming synthesis
+
+`Arcane.speech.openStream(request, {signal, onUpdate, onProgress, onRequest})`
+returns an owned handle immediately:
+
+```js
+const recognition = Arcane.speech.openStream({sampleRate: 16000}, {
+  signal,
+  onUpdate: function retainNativeSnapshot(result) {
+    // Keep the complete snapshot. The application decides when to take a turn.
+    showRecognition(result);
+  }
+});
+await recognition.ready;
+await recognition.push(pcm); // Float32Array, supplied in capture order.
+await recognition.forceEndpoint(); // Finalizes recognition, keeps the stream.
+const complete = await recognition.finish(); // Drains and closes this stream.
+```
+
+The handle exposes `streamId`, `ready`, `completion`, `current()`,
+`push(Float32Array)`, `forceEndpoint()`, `finish()`, and `cancel(reason)`.
+`ready` resolves with the native-open acknowledgement; `completion` resolves
+with the engine's complete terminal result or rejects with its actual failure.
+`current()` returns the latest delivered complete snapshot. Pushes and endpoint
+controls are ordered, and each returned promise lets the producer apply
+backpressure without dropping captured samples. `forceEndpoint()` waits for
+ordered update callbacks preceding its control response, so an external Reply
+control can consume those final segments. `finish()` follows every accepted
+push and waits for final callback delivery. An update callback must not await
+its own `forceEndpoint()`, `finish()`, or `completion` delivery join; invoke these
+controls outside the callback. `cancel()` targets this
+stream, suppresses later callbacks immediately, and awaits its explicit native
+cleanup control; it leaves the other speech role alone. Aborting the caller's
+signal uses ordinary Core request cancellation and can settle the browser's
+request before native cleanup finishes.
+Creation opens no microphone: the selected capture owner supplies PCM.
+
+Updates are the engine's unchanged snapshots, including provisional/final
+status, words, timestamps, and speaker scope when supplied. A provisional
+snapshot replaces the preceding provisional snapshot; it is not appended text.
+An ASR final or silence boundary is recognition output, not a completed human
+turn, an instruction, or approval. `forceEndpoint()` preserves the native
+stream's speaker scope according to its engine contract. The application owns
+conversational meaning, turn completion, tool selection, and whether to issue
+an LLM request. The SDK starts no chat request from an update.
+
+The underlying `speech.open` request remains pending for the entire stream,
+with no fixed request timeout. `speech.opened` and `speech.transcription`
+events use that request's scoped emitter, carrying `{streamId, ...metadata}`
+and `{streamId, result}` respectively. They reach only the owning connection.
+`speech.push`, `speech.endpoint`, `speech.finish`, and `speech.cancel` address
+the same stream. Client close, document retirement, transport disconnect, or
+the request signal cancels the native stream through normal Core request
+ownership. This stream is not accepted service-lifetime background work.
+
+`Arcane.speech.synthesizeStream(request, {signal, onAudio, onProgress,
+onRequest})` returns a promise for the complete native terminal metadata.
+The complete synthesis payload reaches the selected engine unchanged.
+The required `onAudio(audio)` consumer receives every ordered native PCM contribution, preserving
+its metadata; `audio.pcm` is a `Uint8Array`, interpreted using the supplied
+`format`, `channels`, and `sampleRate`. Magpie supplies signed little-endian
+16-bit mono PCM. The facade does not play audio, infer audible completion, or
+add a voice, language, speed, or output limit. The selected playback owner
+consumes this stream and owns its actual playback completion and interruption.
+Give each utterance its own signal to stop precisely that utterance without
+stopping microphone capture or unrelated synthesis.
+
+The synthesis request has no fixed timeout. Its request-scoped `speech.audio`
+events contain `{streamId, sequence, audio}`; `speech.progress` also carries the
+stream correlation. The facade serializes asynchronous callbacks and sends
+`speech.audioConsumed` for that exact stream and sequence only after `onAudio`
+completes. The native producer awaits this acknowledgement before contributing
+the next PCM chunk; the event parser remains free to handle control messages.
+Sequence and acknowledgement metadata stay outside the audio payload.
+
+Aborting the utterance signal suppresses later callback delivery and sends
+`speech.cancelSynthesis`. That scoped control releases pending audio
+acknowledgements and joins the native synthesis task. The facade keeps the
+original response pending and joins this cleanup control before settling;
+ordinary cancellation rejects with the caller's reason. Callback failure
+cancels the same owned operation and retains its complete failure together with
+any native cleanup failure. Successful completion waits for all callback
+delivery. A callback may abort its caller-owned signal, while its own completion
+must not await the same synthesis promise. A transport failure remains an error,
+not evidence of completed native cleanup. Playback completion remains with the
+selected playback owner, independently of synthesis completion.
+
+The Core transport uses base64 only for PCM framing: STT transfers exact
+Float32 bit patterns as little-endian samples, and TTS transfers the engine's
+complete PCM before decoding it back to the original sample representation.
+Routing and callbacks stay outside transcript and synthesis payloads.
+Existing file transcription, complete-audio synthesis, model loading, and
+unloading methods keep their original contracts. A selected engine without the
+requested streaming method reports `SPEECH_OPERATION_UNAVAILABLE`; the SDK
+selects no replacement engine or capture path.
+
+### Shared AI capture and playback
+
+The built-in native AI adapter advertises continuous capture only when the
+selected STT engine reports streaming support. `ai.createTranscriptionCapture`
+uses the shared microphone owner, forwards the caller's media constraints and
+actual sample rate, and preserves every ordered PCM sample. Its `onUpdate`,
+`onInterim`, and `onSegment` callbacks receive the complete recognition record
+and a second `{requestStop}` argument. A callback can call `requestStop()` and
+return; the external owner joins `capture.stop()` or `capture.done`. Do not
+await those joins or `forceEndpoint()` from their own recognition callback.
+Stop drains accepted audio and final recognition; cancel joins microphone and
+native cleanup without inventing a completed transcript. Neither action sends
+a chat turn automatically.
+
+For a selected streaming TTS engine, `ai.prepareTTSPlayback()` returns an inert
+playback descriptor. Its `play()` consumes native PCM through the existing AI
+provider lane and shared audio output. Playback stop affects only that utterance;
+the control's `released` promise joins native cleanup. Existing full-audio
+`fetchTTS()` remains available. `streamTTS(text, end, {languageCode})`,
+`prepareTTSPlayback({input, languageCode, ...})`, and
+`fetchTTS({input, languageCode, ...})` carry the caller's per-utterance language
+to the native engine separately from the unchanged text. The SDK does not infer
+language or create conversation replies. See the
+[Nemotron](native-nemotron.md) and [Magpie](native-magpie.md) engine contracts.
+
 ## Engine interface
 
 Each supplied engine implements:
@@ -115,6 +243,13 @@ Each supplied engine implements:
 - `transcribe(request, {signal, onProgress, requestId})` for STT, or
   `synthesize(request, {signal, onProgress, requestId})` for TTS. `requestId` is
   the actual Core request's control metadata, separate from the unchanged payload.
+- Optional `openStream({...options, signal, onUpdate})` for continuous STT,
+  returning `{push, forceEndpoint, finish, cancel, completion, current}`.
+  Its cancellation must settle `completion` without requiring service shutdown.
+- Optional `synthesizeStream(request, {signal, onProgress, onAudio, requestId})`
+  for streaming TTS. Each `onAudio` value contains the complete `pcm` Buffer
+  and its format metadata; the engine awaits each callback before producing the
+  next contribution and joins native cleanup before settling cancellation.
 - `close()`, cancelling and joining its native work and releasing its resources.
 
 The service forwards each complete transcription/synthesis request and result
