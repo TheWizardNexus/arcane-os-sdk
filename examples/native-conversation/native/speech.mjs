@@ -6,7 +6,12 @@ import {createMagpieRuntime} from 'arcane-os/local-ai/magpie';
 export default function createConversationSpeech(options, launchContext) {
     const selection = launchContext.speech ?? options;
     return createSpeechService({
-        stt: createNemotronRuntime(selection.stt),
-        tts: createMagpieRuntime(selection.tts)
+        stt: createNemotronRuntime({...selection.stt, onEvent: reportNativeEvent}),
+        tts: createMagpieRuntime({...selection.tts, onEvent: reportNativeEvent})
     });
+}
+
+function reportNativeEvent(event) {
+    // Native startup diagnostics belong in the host log, not the conversation.
+    console.error('Native speech:', JSON.stringify(event));
 }
