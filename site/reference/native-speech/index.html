@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.96.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.97.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#selected-nemo-model-acquisition">Selected NeMo model acquisition</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal, autoLoad = true} = {})</code> composes independently selected
@@ -357,11 +357,24 @@ before downloading. <code>openExisting()</code> borrows its original files and n
 deletes them. Incomplete selections stay visible through the owner&#39;s discovery
 results and are not mistaken for a complete model. When no complete match is
 available, the existing acquisition path prepares the complete selected set;
-its completed downloads remain reusable. Explicit <code>refresh: true</code> requests a
-fresh acquisition. The host chooses the roots: its portable native launch
-context supplies <code>modelsDirectory</code> under the resolved per-user <code>stateRoot</code> by
-default, while explicit directory overrides remain supported. An application
-may include its own <code>models</code> directory among the discovery roots.</p>
+its completed members and closed partial files remain available after an
+interruption or cancellation. Explicit retry reuses those members and resumes
+ordinary HTTP transfers when the source accepts their conditional range;
+otherwise only that member restarts with an explicit progress event. TAR
+segments replay while completed tokenizer companions remain reusable.
+Matching cross-process selections wait for the actual transfer owner, then
+reuse or resume its recorded attempt; unrelated downloads remain concurrent.
+See <a href="../model-assets/#native-ownership">native acquisition and recovery</a> for the
+shared owner&#39;s complete contract. Explicit <code>refresh: true</code> requests a
+fresh acquisition. The host chooses the roots: on Windows, Linux and macOS its
+portable native launch-context resolver defaults <code>modelsDirectory</code> to the
+operating-system user&#39;s shared <code>Arcane/Models</code> directory, independently of
+app-private state and workspace. Explicit directory overrides remain unchanged;
+other adapted hosts supply their shared directory explicitly or retain the
+resolver&#39;s app-state fallback. This location applies to services using that
+resolver value, not every provider store. Resolution moves no existing files.
+An application may include its own <code>models</code> directory and prior app-local
+model locations among the discovery roots, borrowing those originals in place.</p>
 <p>The result is <code>{assetProjectionId, directory, members, resourcePaths, release}</code>.
 <code>release()</code> is idempotent and releases preparation ownership. Each engine
 retains the projection synchronously when <code>load()</code> accepts it, so the caller
@@ -374,8 +387,17 @@ changing an active selection; its retained files are released only after
 native work and helper exit have joined. Load failures also join asset cleanup,
 and cleanup failures remain observable.</p>
 <p><code>onProgress</code> receives ordered, awaited shared-owner phase and file-completion
-events, including reuse and ready for installed selections. Signal cancellation
-stops that preparation&#39;s work; an abort after projection creation releases it
+events. Native acquisition includes <code>state</code>, plain <code>message</code>, file counts and
+optional member, reason, recovery, error or other-owner activity. Its five-second
+heartbeat and fifteen-second no-source-activity <code>stalled</code> state describe actual
+transfer observations, not an inferred outage or percentage. <code>interrupted</code>,
+<code>cancelled</code>, <code>failed</code> and <code>ready</code> are distinct terminal states. Direct
+installed-directory reuse retains the existing <code>reuse</code>/<code>ready</code> records with
+<code>completed</code>, <code>total</code> and <code>unit:&#39;files&#39;</code>.</p>
+<p>Signal cancellation stops that caller&#39;s preparation interest; another interested
+caller may continue the shared acquisition. The final cancellation joins I/O
+and retains resumable data; cancelled subscribers keep their existing callback
+boundary. An abort after projection creation releases preparation ownership
 before rejecting. Engine load cancellation remains separate: cancelling the
 caller&#39;s wait does not cancel a shared activation; explicit engine unload/close
 owns that cancellation.</p>
@@ -607,6 +629,6 @@ retain their existing lifecycle contracts.</p>
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#selected-nemo-model-acquisition">Selected NeMo model acquisition</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.96.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.97.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
