@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.96.0
+
+- Publish successful portable, Windows and macOS native builds to one stable
+  app-specific output directory. Assemble separately and retain the previous
+  output through promotion, callback acceptance and recoverable rollback;
+  keep model caches and user profiles outside replacement.
+- Add persistent native model acquisition and installed-model discovery through
+  the shared Core model-assets owner. Preserve complete split GGUF sets and
+  companion files, stream selected TAR members, report file-based progress,
+  and join cancellation and cleanup while retaining completed originals.
+- Expose upstream Nemotron/diarization and Magpie/NanoCodec model selections
+  through the existing native speech API. Nemotron retains selected resource
+  projections until its owned helper closes; no model or runtime redistribution
+  is added.
+- Add explicit native language-model startup and an app-scoped Models directory.
+  Preserve existing automatic startup defaults and ordinary speech APIs.
+  Package delivery remains distinct from native inference or app acceptance.
+
 ## 0.95.0
 
 - Add retained native Nemotron streaming recognition and optional diarization,
