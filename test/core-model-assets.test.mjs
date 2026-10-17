@@ -902,6 +902,138 @@ test('archive preparation extracts complete selected companions from ordered ups
     assert.equal(calls.length, 3);
 });
 
+test('later selected TAR occurrences replace earlier content within and across ranges', async function repeatedTarEntries(t) {
+    const earlier = '  Earlier configuration.\r\nvoice: Jason  ';
+    const latest = '  Complete later configuration.\r\nvoice: Aria\n月  ';
+    const speakers = ' {"Aria":0,"Jason":1} \n';
+    const first = tarMember('./model_config.yaml', earlier);
+    const second = Buffer.concat([tarMember('model_config.yaml', latest), tarMember('speakers.json', speakers)]);
+    for (const ranged of [false, true]) {
+        await t.test(ranged ? 'ordered ranges' : 'one response', async function selectedOccurrences(child) {
+            const ranges = ranged ? [{start: 0, end: first.length - 1}, {start: 8192, end: 8192 + second.length - 1}] : undefined;
+            const requests = [];
+            const {service} = await fixture(child, async function archiveResponse(url, options) {
+                requests.push(options.headers?.Range);
+                if (!ranges) return new Response(Buffer.concat([first, second]));
+                const index = ranges.findIndex(function selectedRange(range) { return options.headers.Range === `bytes=${range.start}-${range.end}`; });
+                assert.notEqual(index, -1);
+                const range = ranges[index];
+                return new Response(index === 0 ? first : second, {status: 206,
+                    headers: {'Content-Range': `bytes ${range.start}-${range.end}/16384`}});
+            });
+            const projection = await service.prepare({id: 'repeated-tar', workingDirectory: 'models',
+                archives: [{url: 'https://models.invalid/repeated.tar', format: 'tar', ranges, members: [
+                    {path: 'tokenizer/model_config.yaml', member: 'model_config.yaml'},
+                    {path: 'tokenizer/speakers.json', member: 'speakers.json'}
+                ]}]});
+            assert.equal(await readFile(projection.members[0].nativePath, 'utf8'), latest);
+            assert.equal(await readFile(projection.members[1].nativePath, 'utf8'), speakers);
+            assert.deepEqual(requests, ranges ? ranges.map(function requestedRange(range) { return `bytes=${range.start}-${range.end}`; }) : [undefined]);
+            const state = JSON.parse(await readFile(path.join(path.dirname(projection.directory), 'transfer.json'), 'utf8'));
+            assert.deepEqual(state.completedArchiveMembers, [0, 1]);
+        });
+    }
+});
+
+test('an interrupted later TAR occurrence preserves its earlier complete file and retries through the last occurrence', async function interruptedTarReplacement(t) {
+    const earlier = '  Earlier complete configuration.\r\nvoice: Jason  ';
+    const latest = '  Complete later configuration.\r\nvoice: Aria\n月  ';
+    const prefix = Buffer.from('  Complete later');
+    const first = tarMember('model_config.yaml', earlier);
+    const second = tarMember('model_config.yaml', latest);
+    let requests = 0;
+    const {root, service, createService} = await fixture(t, async function interruptedArchive() {
+        requests++;
+        return new Response(requests === 1
+            ? Buffer.concat([first, second.subarray(0, 512), prefix])
+            : Buffer.concat([first, second]));
+    });
+    const selection = {workingDirectory: 'models', archives: [{url: 'https://models.invalid/repeated.tar', format: 'tar',
+        members: [{path: 'tokenizer/model_config.yaml', member: 'model_config.yaml'}]}]};
+    await assert.rejects(service.prepare({id: 'interrupted-later-entry', ...selection}), {code: 'MODEL_ASSET_ARCHIVE_INCOMPLETE'});
+    const attempt = path.join(root, 'models/model-assets', (await acquisitions(root, 'models'))[0]);
+    assert.equal(await readFile(path.join(attempt, 'files/tokenizer/model_config.yaml'), 'utf8'), earlier);
+    assert.deepEqual(await readFile(path.join(attempt, 'parts/0.part')), prefix);
+    assert.deepEqual(JSON.parse(await readFile(path.join(attempt, 'transfer.json'), 'utf8')).completedArchiveMembers, []);
+    await assert.rejects(readFile(path.join(attempt, 'acquisition.json')), {code: 'ENOENT'});
+    const restarted = createService();
+    const projection = await restarted.prepare({id: 'replayed-later-entry', ...selection});
+    assert.equal(projection.directory, path.join(attempt, 'files'));
+    assert.equal(await readFile(projection.members[0].nativePath, 'utf8'), latest);
+    assert.equal(requests, 2);
+    assert.deepEqual(await readdir(path.join(attempt, 'parts')), []);
+    assert.deepEqual(JSON.parse(await readFile(path.join(attempt, 'transfer.json'), 'utf8')).completedArchiveMembers, [0]);
+});
+
+test('a completed archive pass is reused after its ordinary sibling fails', async function reuseConfirmedArchive(t) {
+    const archiveURL = 'https://models.invalid/companions.tar';
+    const modelURL = 'https://models.invalid/model.gguf';
+    const config = '  Complete retained configuration.\r\nvoice: Aria\n月  ';
+    const model = '  Complete recovered model.\n🦑  ';
+    const requests = [];
+    let ordinaryRequests = 0;
+    const {root, service, createService} = await fixture(t, async function selectedResponse(url) {
+        requests.push(url);
+        assert.equal(url, modelURL);
+        ordinaryRequests++;
+        if (ordinaryRequests !== 1) return new Response(model);
+        return new Response('Complete synthetic model failure.', {status: 503});
+    });
+    const selection = {workingDirectory: 'models', members: [{path: 'model.gguf', url: modelURL}],
+        archives: [{url: archiveURL, format: 'tar', members: [{path: 'tokenizer/model_config.yaml', member: 'model_config.yaml'}]}]};
+    const attempt = path.join(root, 'models/model-assets/acquisition-confirmed-archive');
+    await mkdir(path.join(attempt, 'files/tokenizer'), {recursive: true});
+    await mkdir(path.join(attempt, 'parts'));
+    await writeFile(path.join(attempt, 'files/tokenizer/model_config.yaml'), config);
+    await writeFile(path.join(attempt, 'transfer.json'), JSON.stringify({
+        members: [...selection.members, {path: 'tokenizer/model_config.yaml', url: archiveURL, archiveMember: 'model_config.yaml'}],
+        order: 1, refresh: false, completedMembers: [1], completedArchiveMembers: [1], transports: {}
+    }));
+    await assert.rejects(service.prepare({id: 'failed-ordinary-sibling', ...selection}), {code: 'MODEL_ASSET_DOWNLOAD_FAILED', status: 503});
+    assert.deepEqual(JSON.parse(await readFile(path.join(attempt, 'transfer.json'), 'utf8')).completedArchiveMembers, [1]);
+    assert.equal(await readFile(path.join(attempt, 'files/tokenizer/model_config.yaml'), 'utf8'), config);
+    const restarted = createService();
+    const projection = await restarted.prepare({id: 'retry-ordinary-sibling', ...selection});
+    assert.equal(projection.directory, path.join(attempt, 'files'));
+    assert.equal(await readFile(projection.members[0].nativePath, 'utf8'), model);
+    assert.equal(await readFile(projection.members[1].nativePath, 'utf8'), config);
+    assert.deepEqual(requests, [modelURL, modelURL]);
+    assert.equal(ordinaryRequests, 2);
+});
+
+test('regrouped archive selections replay every unconfirmed member despite existing extracted files', async function regroupedArchivePass(t) {
+    const url = 'https://models.invalid/regrouped.tar';
+    const config = '  Complete configuration.\r\nvoice: Aria  ';
+    const earlier = ' {"Aria":3} \n';
+    const latest = ' {"Aria":0,"Jason":1,"John":2,"Leo":3,"Sofia":4} \n';
+    const members = [{path: 'tokenizer/model_config.yaml', member: 'model_config.yaml'},
+        {path: 'tokenizer/speakers.json', member: 'speakers.json'}];
+    let requests = 0;
+    const {root, service} = await fixture(t, async function regroupedResponse() {
+        requests++;
+        return new Response(Buffer.concat([tarMember('model_config.yaml', config),
+            tarMember('speakers.json', earlier), tarMember('speakers.json', latest)]));
+    });
+    const attempt = path.join(root, 'models/model-assets/acquisition-regrouped');
+    await mkdir(path.join(attempt, 'files/tokenizer'), {recursive: true});
+    await mkdir(path.join(attempt, 'parts'));
+    await writeFile(path.join(attempt, 'files/tokenizer/model_config.yaml'), config);
+    await writeFile(path.join(attempt, 'files/tokenizer/speakers.json'), earlier);
+    // Earlier callers grouped config and speakers separately. Only the first
+    // group's complete pass was recorded; the second wrote an earlier entry.
+    await writeFile(path.join(attempt, 'transfer.json'), JSON.stringify({
+        members: members.map(function selectedMember(member) { return {path: member.path, url, archiveMember: member.member}; }),
+        order: 1, refresh: false, completedMembers: [0, 1], completedArchiveMembers: [0], transports: {}
+    }));
+    const projection = await service.prepare({id: 'regrouped-archive', workingDirectory: 'models',
+        archives: [{url, format: 'tar', members}]});
+    assert.equal(projection.directory, path.join(attempt, 'files'));
+    assert.equal(await readFile(projection.members[0].nativePath, 'utf8'), config);
+    assert.equal(await readFile(projection.members[1].nativePath, 'utf8'), latest);
+    assert.equal(requests, 1);
+    assert.deepEqual(JSON.parse(await readFile(path.join(attempt, 'transfer.json'), 'utf8')).completedArchiveMembers, [0, 1]);
+});
+
 test('archive member absence rejects preparation while retaining its incomplete selected acquisition', async function missingArchiveCompanion(t) {
     const {root, service} = await fixture(t, async function archiveResponse() { return new Response(tarMember('other.json', 'Complete unrelated member.')); });
     await assert.rejects(service.prepare({

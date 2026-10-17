@@ -503,9 +503,8 @@ async function extractTarRange(response, range, selected, found, entry, progress
             if (range?.stopBefore && (memberName === range.stopBefore || path.posix.basename(memberName) === range.stopBefore)) break;
             const memberIndexes = selected.get(memberName);
             if (memberIndexes && (type === '0' || type === '\0')) {
-                if (memberIndexes.some(function alreadyRead(index) { return found.has(index); })) {
-                    throw failure('MODEL_ASSET_ARCHIVE_FORMAT', `The selected TAR member occurs more than once: ${memberName}`);
-                }
+                // TAR extraction is ordered: a later complete occurrence replaces
+                // the earlier file only after its own stream and file close.
                 const handles = [];
                 const errors = [];
                 try {
@@ -744,6 +743,7 @@ async function acquireNativeMembers(entry) {
         state.transports ??= {};
         state.completedMembers = current?.completedMembers ?? [];
         const finished = new Set(state.completedMembers);
+        const completedArchiveMembers = new Set(state.completedArchiveMembers ?? []);
         completed = finished.size;
         await mkdir(path.join(selected.root, 'parts'), {recursive: true});
         progress('open');
@@ -786,17 +786,22 @@ async function acquireNativeMembers(entry) {
         let archiveIndex = members.findIndex(function archiveMember(member) { return member.archiveMember !== undefined; });
         for (const archive of entry.archives) {
             const selected = new Map();
+            const archiveMembers = [];
             for (const member of archive.members) {
                 const memberIndex = archiveIndex++;
-                if (finished.has(memberIndex)) continue;
+                archiveMembers.push(memberIndex);
                 const name = tarName(member.member);
                 if (!selected.has(name)) selected.set(name, []);
                 selected.get(name).push(memberIndex);
             }
             if (!selected.size) continue;
+            if (archiveMembers.every(function confirmed(index) { return finished.has(index) && completedArchiveMembers.has(index); })) continue;
+            for (const memberIndex of archiveMembers) completedArchiveMembers.delete(memberIndex);
             jobs.push(async function downloadArchiveMembers() {
                 const found = new Set();
                 try {
+                    state.completedArchiveMembers = [...completedArchiveMembers];
+                    await save();
                     for (const range of archive.ranges ?? [undefined]) {
                         signal.throwIfAborted();
                         const response = await fetchModelResponse(archive.url, signal, range);
@@ -811,6 +816,11 @@ async function acquireNativeMembers(entry) {
                         error.members = missing;
                         throw error;
                     }
+                    // A file written before a later TAR occurrence is retained
+                    // on interruption, but only a complete pass confirms reuse.
+                    for (const memberIndex of archiveMembers) completedArchiveMembers.add(memberIndex);
+                    state.completedArchiveMembers = [...completedArchiveMembers];
+                    await save();
                 } catch (error) {
                     noteFailure(error, error.code?.startsWith('MODEL_ASSET_ARCHIVE_') ? 'failed' : 'interrupted');
                     throw error;

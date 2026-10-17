@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.97.1
+
+- Extract repeated selected TAR members in order, retaining the last complete
+  occurrence instead of rejecting valid upstream model companion archives.
+- Preserve earlier extracted files through interrupted replacements and replay
+  unfinished archive selections on retry. Completed archive selections remain
+  reusable while independent model files resume their own transfers.
+
 ## 0.97.0
 
 - Share native model storage across applications for the same operating-system

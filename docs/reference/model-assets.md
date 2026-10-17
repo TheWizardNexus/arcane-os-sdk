@@ -183,6 +183,13 @@ path records select members; a leading `./` is archive path framing. Missing
 selected members reject preparation and identify the missing names. Gzip and
 other archive formats are outside this reader's contract.
 
+Repeated selected TAR names follow sequential extraction: the last complete
+occurrence replaces the earlier file only after closing its temporary output.
+An interrupted archive pass retains those files and replays its selected
+segments on retry, so an earlier occurrence is never mistaken for the final
+one. Fully completed archive selections are reused while other model files
+continue their own resumable downloads.
+
 When the upstream catalog supplies aligned TAR segments, an archive may include
 `ranges:[{start,end,stopBefore?}]`. The reader requests each inclusive HTTP range
 once and parses its TAR framing; `stopBefore` ends that segment before the
