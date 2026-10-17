@@ -3,10 +3,12 @@ import {randomUUID} from 'node:crypto';
 import {createArcaneEventSource} from '../../event-manager.mjs';
 import {createNemotronHelper, deferred, encodeNemotronAudio, nemotronError} from './helper.mjs';
 
+export {NEMO_SPEECH_MODELS, prepareNemotronModels, prepareMagpieModels} from '../nemo-models.mjs';
+
 /** Retain one selected recognizer and diarizer across explicit utterance endpoints. */
 export function createNemotronRuntime(
     {runtime, prepare, modelId = 'nemotron-3.5-asr-streaming-0.6b', modelPath,
-        diarizationModelPath, gpu, onEvent} = {}
+        diarizationModelPath, modelAssets, assetProjectionId, resourcePaths, gpu, onEvent} = {}
 ) {
     if (!runtime && typeof prepare !== 'function') {
         throw new TypeError('Nemotron requires a prepared runtime or a prepare function.');
@@ -20,6 +22,10 @@ export function createNemotronRuntime(
     let selected = modelId;
     let selectedModelPath = modelPath ?? runtime?.modelPath;
     let selectedDiarizationPath = diarizationModelPath ?? runtime?.diarizationModelPath;
+    let selectedProjectionId = assetProjectionId;
+    let selectedResourcePaths = resourcePaths;
+    let retainedAssets = null;
+    let activePaths = null;
     let selectedGpu = gpu ?? runtime?.gpu;
     let streamSequence = 0;
     let state = 'unloaded';
@@ -37,8 +43,10 @@ export function createNemotronRuntime(
         return {
             providerId: 'nemotron', modelId: selected, state,
             loaded: state === 'ready', busy: active !== null,
-            modelPath: selectedModelPath ?? null,
-            diarizationModelPath: selectedDiarizationPath ?? null,
+            modelPath: activePaths?.model ?? selectedModelPath ?? null,
+            diarizationModelPath: activePaths ? activePaths.diarization ?? null : selectedDiarizationPath ?? null,
+            assetProjectionId: selectedProjectionId ?? null,
+            resourcePaths: selectedResourcePaths ? {...selectedResourcePaths} : null,
             requestedGpu: selectedGpu ?? null,
             observedBackend: null,
             nativeVersion: helper?.current().metadata?.version ?? null,
@@ -95,6 +103,11 @@ export function createNemotronRuntime(
         const changed = (options.modelId !== undefined && options.modelId !== selected)
             || (options.modelPath !== undefined && options.modelPath !== selectedModelPath)
             || (options.diarizationModelPath !== undefined && options.diarizationModelPath !== selectedDiarizationPath)
+            || (Object.hasOwn(options, 'assetProjectionId') && options.assetProjectionId !== selectedProjectionId)
+            || (Object.hasOwn(options, 'resourcePaths') && (
+                options.resourcePaths?.model !== selectedResourcePaths?.model
+                || options.resourcePaths?.diarization !== selectedResourcePaths?.diarization
+            ))
             || (options.gpu !== undefined && options.gpu !== selectedGpu);
         if ((loading || helper || active) && changed) {
             return Promise.reject(nemotronError('NEMOTRON_MODEL_LOADED', 'Unload the current Nemotron selection before replacing it.'));
@@ -107,12 +120,22 @@ export function createNemotronRuntime(
         selected = options.modelId ?? selected;
         selectedModelPath = options.modelPath ?? selectedModelPath;
         selectedDiarizationPath = options.diarizationModelPath ?? selectedDiarizationPath;
+        if (Object.hasOwn(options, 'assetProjectionId')) selectedProjectionId = options.assetProjectionId;
+        if (Object.hasOwn(options, 'resourcePaths')) selectedResourcePaths = options.resourcePaths;
         selectedGpu = options.gpu ?? selectedGpu;
+        if (selectedProjectionId && typeof modelAssets?.retain !== 'function') {
+            return Promise.reject(nemotronError('NEMOTRON_RESOURCES_UNAVAILABLE', 'A model projection requires the existing model-assets owner.'));
+        }
+        // Retain synchronously before callers can release preparation ownership.
+        const previousAssets = retainedAssets;
+        const assets = selectedProjectionId ? {use: modelAssets.retain(selectedProjectionId), release: null} : null;
+        retainedAssets = assets;
         state = 'loading';
         error = null;
         loadController = new AbortController();
         const ownerSignal = loadController.signal;
         async function loadModel() {
+            await releaseModelAssets(previousAssets);
             ownerSignal.throwIfAborted();
             if (!runtime) {
                 runtime = await prepare(
@@ -123,10 +146,15 @@ export function createNemotronRuntime(
             selectedModelPath ??= runtime.modelPath;
             selectedDiarizationPath ??= runtime.diarizationModelPath;
             selectedGpu ??= runtime.gpu;
-            if (typeof runtime.helperExecutable !== 'string' || typeof selectedModelPath !== 'string') {
+            const paths = assets ? {
+                model: projectedModelPath(assets, 'model'),
+                diarization: selectedResourcePaths?.diarization === undefined
+                    ? undefined : projectedModelPath(assets, 'diarization')
+            } : {model: selectedModelPath, diarization: selectedDiarizationPath};
+            if (typeof runtime.helperExecutable !== 'string' || typeof paths.model !== 'string') {
                 throw nemotronError('NEMOTRON_MODEL_UNAVAILABLE', 'Select the prepared Nemotron helperExecutable and ASR modelPath.');
             }
-            if (selectedDiarizationPath !== undefined && typeof selectedDiarizationPath !== 'string') {
+            if (paths.diarization !== undefined && typeof paths.diarization !== 'string') {
                 throw new TypeError('diarizationModelPath must be the selected local model path.');
             }
             if (!Number.isInteger(selectedGpu) || selectedGpu < -1) {
@@ -134,10 +162,11 @@ export function createNemotronRuntime(
             }
             const session = createNemotronHelper(
                 {
-                    runtime, modelPath: selectedModelPath, diarizationModelPath: selectedDiarizationPath,
+                    runtime, modelPath: paths.model, diarizationModelPath: paths.diarization,
                     gpu: selectedGpu, onEvent
                 }
             );
+            activePaths = paths;
             helper = session;
             function cancelLoad() {
                 session.stop(ownerSignal.reason).catch(observeRetainedFailure);
@@ -179,7 +208,14 @@ export function createNemotronRuntime(
                 ownerSignal.removeEventListener('abort', cancelLoad);
             }
         }
-        function loadFailed(failure) {
+        async function loadFailed(failure) {
+            try {
+                await releaseModelAssets(assets);
+            } catch (cleanupFailure) {
+                failure = new AggregateError([failure, cleanupFailure], 'Nemotron model loading and asset cleanup failed.', {cause: failure});
+            }
+            if (retainedAssets === assets) retainedAssets = null;
+            activePaths = null;
             const cancelledLoad = ownerSignal.aborted && (
                 failure === ownerSignal.reason || failure?.code === 'ARCANE_CANCELLED' || failure?.name === 'AbortError'
             );
@@ -198,6 +234,21 @@ export function createNemotronRuntime(
         // A caller's wait never cancels shared model loading. Explicit unload
         // and close own that cancellation and its joined native cleanup.
         return waitFor(loading, signal);
+    }
+
+    function projectedModelPath(assets, role) {
+        const memberPath = selectedResourcePaths?.[role];
+        const member = assets.use.members.find(function selectedMember(value) { return value.path === memberPath; });
+        if (!member) {
+            throw nemotronError('NEMOTRON_RESOURCE_UNAVAILABLE', `The retained Nemotron projection has no member ${String(memberPath)} for ${role}.`);
+        }
+        return member.nativePath;
+    }
+
+    function releaseModelAssets(assets) {
+        if (!assets) return Promise.resolve();
+        assets.release ??= Promise.resolve().then(function releaseNativeModelUse() { return assets.use.release(); });
+        return assets.release;
     }
 
     function openStream({sampleRate = 16000, languageCode, model, onUpdate, signal} = {}) {
@@ -547,6 +598,11 @@ export function createNemotronRuntime(
             const session = helper;
             try { if (session) await session.stop(); } catch (failure) { failures.push(failure); }
             if (helper === session) helper = null;
+            // stop joins actual native exit even when it reports diagnostics.
+            const assets = retainedAssets;
+            try { await releaseModelAssets(assets); } catch (failure) { failures.push(failure); }
+            if (retainedAssets === assets) retainedAssets = null;
+            activePaths = null;
             if (failures.length) throw new AggregateError(failures, 'Nemotron cleanup failed.');
             error = null;
             state = 'unloaded';

@@ -42,7 +42,7 @@ function waitForLoad(task, signal) {
 }
 
 /** Hosts supply selected engines; this service owns their independent lifetimes. */
-export function createSpeechService({stt, tts, signal} = {}) {
+export function createSpeechService({stt, tts, signal, autoLoad = true} = {}) {
     const roles = {
         stt: {engine: stt, operation: 'transcribe', state: null, loading: null, changing: null, unsubscribe: null},
         tts: {engine: tts, operation: 'synthesize', state: null, loading: null, changing: null, unsubscribe: null}
@@ -177,7 +177,7 @@ export function createSpeechService({stt, tts, signal} = {}) {
             return;
         }
         // Replay can synchronously select an activation or close the service.
-        if (role.changing || closing || closed) return;
+        if (role.changing || closing || closed || autoLoad === false) return;
         const task = Promise.resolve().then(
             async function loadSpeechEngine() {
                 lifetimeSignal.throwIfAborted();

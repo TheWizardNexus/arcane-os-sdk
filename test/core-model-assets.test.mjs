@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {Buffer} from 'node:buffer';
-import {mkdir, mkdtemp, readFile, readdir, rm} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from '../src/testing.mjs';
 import {createModelAssetService} from '../src/core/services/model-assets.mjs';
+import {downloadCoreModelAssets} from '../browser-runtime/ai/core-model-assets.mjs';
 
 function deferred() {
     let resolve;
@@ -549,4 +550,299 @@ test('browser open write and complete methods retain their temporary projection 
     assert.deepEqual(service.current().projections, []);
     await assert.rejects(readdir(ready.directory), {code: 'ENOENT'});
     assert.deepEqual(await readdir(path.join(root, 'browser-working-files')), []);
+});
+
+test('native discovery groups split GGUF members and exposes missing companions without network work', async function discoverInstalledModels(t) {
+    const {root, service} = await fixture(t, function unusedNetwork() { throw new Error('Discovery must not fetch.'); });
+    const directory = path.join(root, 'installed');
+    await mkdir(directory);
+    for (const name of ['moon-00001-of-00003.gguf', 'moon-00003-of-00003.gguf', 'speech.gguf']) {
+        await writeFile(path.join(directory, name), `Complete original ${name}.`);
+    }
+    const result = await service.discover({
+        directories: ['installed', 'absent'],
+        catalog: [{id: 'speech-selection', members: [{path: 'speech.gguf'}, {path: 'tokenizer/config.json'}], entryPath: 'speech.gguf'}]
+    });
+    assert.deepEqual(result.directories, [
+        {directory, exists: true}, {directory: path.join(root, 'absent'), exists: false}
+    ]);
+    assert.equal(result.models.length, 2);
+    const split = result.models.find(function splitCandidate(model) { return model.source === 'directory'; });
+    assert.equal(split.entryPath, 'moon-00001-of-00003.gguf');
+    assert.equal(split.complete, false);
+    assert.deepEqual(split.members.map(function memberPath(member) { return member.path; }), [
+        'moon-00001-of-00003.gguf', 'moon-00002-of-00003.gguf', 'moon-00003-of-00003.gguf'
+    ]);
+    assert.deepEqual(split.missingMembers, ['moon-00002-of-00003.gguf']);
+    const speech = result.models.find(function speechCandidate(model) { return model.catalogId === 'speech-selection'; });
+    assert.equal(speech.complete, false);
+    assert.deepEqual(speech.missingMembers, ['tokenizer/config.json']);
+    await assert.rejects(service.openExisting({id: 'incomplete', directory, members: split.members}), function missingParts(error) {
+        assert.equal(error.code, 'MODEL_ASSET_MEMBERS_MISSING');
+        assert.deepEqual(error.members, split.missingMembers);
+        return true;
+    });
+    assert.equal(await readFile(path.join(directory, 'moon-00001-of-00003.gguf'), 'utf8'), 'Complete original moon-00001-of-00003.gguf.');
+});
+
+test('openExisting retains complete ordered borrowed files through engine ownership without deleting originals', async function retainInstalledMembers(t) {
+    let use;
+    const {root, service} = await fixture(t, function unusedNetwork() { throw new Error('Existing files must not fetch.'); }, async function releaseUse() { await use?.release(); });
+    const directory = path.join(root, 'installed');
+    await mkdir(directory);
+    const members = [{path: 'moon-00001-of-00002.gguf'}, {path: 'moon-00002-of-00002.gguf'}];
+    for (const member of members) await writeFile(path.join(directory, member.path), `Complete ${member.path}.`);
+    const projection = await service.openExisting({id: 'borrowed', directory, members});
+    assert.equal(projection.state, 'ready');
+    use = service.retain(projection.id);
+    await service.release(projection.id);
+    assert.equal(service.current().projections[0].uses, 1);
+    await use.release();
+    assert.deepEqual(service.current().projections, []);
+    for (const member of members) assert.equal(await readFile(path.join(directory, member.path), 'utf8'), `Complete ${member.path}.`);
+});
+
+test('discovery reads completed acquisition companions and ignores unfinished attempts', async function discoverAcquiredSets(t) {
+    const {root, service} = await fixture(t, async function fetchSelected(url) { return new Response(`Complete ${url}.`); });
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/model'}, {path: 'tokenizer/config.json', url: 'https://models.invalid/config'}];
+    const projection = await service.prepare({id: 'acquired', workingDirectory: 'models', members});
+    await service.release(projection.id);
+    const unfinished = path.join(root, 'models/model-assets/acquisition-unfinished/files');
+    await mkdir(unfinished, {recursive: true});
+    await writeFile(path.join(unfinished, 'unfinished.gguf'), 'Incomplete source.');
+    const result = await service.discover({directories: ['models'], catalog: [{id: 'complete-selection', members, entryPath: 'model.gguf'}]});
+    assert.equal(result.models.length, 1);
+    assert.equal(result.models[0].catalogId, 'complete-selection');
+    assert.equal(result.models[0].source, 'acquisition');
+    assert.equal(result.models[0].directory, projection.directory);
+    assert.equal(result.models[0].complete, true);
+    const changed = await service.discover({directories: ['models'], catalog: [{id: 'different-source', members: [
+        {...members[0], url: 'https://models.invalid/new-model'}, members[1]
+    ]}]});
+    assert.equal(changed.models[0].catalogId, undefined);
+    const pathOnly = await service.discover({directories: ['models'], catalog: [{id: 'path-only', members: members.map(function selectedPath(member) { return {path: member.path}; })}]});
+    assert.equal(pathOnly.models[0].catalogId, 'path-only');
+});
+
+function tarMember(name, content, type = '0') {
+    const original = Buffer.from(content);
+    const header = Buffer.alloc(512);
+    header.write(name, 0, 100, 'utf8');
+    header.write(`${original.length.toString(8).padStart(11, '0')}\0`, 124, 12, 'ascii');
+    header.write(type, 156, 1, 'ascii');
+    return Buffer.concat([header, original, Buffer.alloc((512 - original.length % 512) % 512)]);
+}
+
+test('archive preparation extracts complete selected companions from ordered upstream TAR segments once', async function prepareTarCompanions(t) {
+    const config = '  Complete YAML.\r\nvoice: Aria\n月  ';
+    const speakers = ' {"Aria":0,"Jason":1,"John":2,"Leo":3,"Sofia":4} \n';
+    const first = Buffer.concat([tarMember('./model_config.yaml', config), tarMember('model_weights.ckpt', 'Unselected weights.')]);
+    const second = tarMember('speakers.json', speakers);
+    const archiveURL = 'https://models.invalid/magpie.nemo';
+    const ranges = [{start: 0, end: first.length - 1, stopBefore: 'model_weights.ckpt'}, {start: 10000, end: 10000 + second.length - 1}];
+    const calls = [];
+    const {service} = await fixture(t, async function selectedTransport(url, options) {
+        calls.push({url, range: options.headers?.Range});
+        if (url !== archiveURL) return new Response('Complete model.');
+        const index = options.headers.Range === `bytes=${ranges[0].start}-${ranges[0].end}` ? 0 : 1;
+        const range = ranges[index];
+        return new Response(index === 0 ? first : second, {status: 206, headers: {'Content-Range': `bytes ${range.start}-${range.end}/20000`}});
+    });
+    const selection = {
+        workingDirectory: 'models', members: [{path: 'model.gguf', url: 'https://models.invalid/model.gguf'}],
+        archives: [{url: archiveURL, format: 'tar', ranges, members: [
+            {path: 'tokenizer/model_config.yaml', member: 'model_config.yaml'}, {path: 'tokenizer/speakers.json', member: 'speakers.json'}
+        ]}]
+    };
+    const progress = [];
+    const projection = await service.prepare({id: 'archive-model', ...selection, onProgress(event) { progress.push(event); }});
+    assert.deepEqual(projection.members.map(function memberPath(member) { return member.path; }), ['model.gguf', 'tokenizer/model_config.yaml', 'tokenizer/speakers.json']);
+    assert.equal(await readFile(projection.members[1].nativePath, 'utf8'), config);
+    assert.equal(await readFile(projection.members[2].nativePath, 'utf8'), speakers);
+    assert.deepEqual(progress.at(-1), {phase: 'ready', completed: 3, total: 3, unit: 'files'});
+    assert.equal(calls.length, 3);
+    await service.release(projection.id);
+    const reused = await service.prepare({id: 'archive-reuse', ...selection});
+    assert.equal(reused.directory, projection.directory);
+    assert.equal(calls.length, 3);
+});
+
+test('archive member absence rejects the acquisition without keeping a partial selected set', async function missingArchiveCompanion(t) {
+    const {root, service} = await fixture(t, async function archiveResponse() { return new Response(tarMember('other.json', 'Complete unrelated member.')); });
+    await assert.rejects(service.prepare({
+        id: 'missing-archive-member', workingDirectory: 'models',
+        archives: [{url: 'https://models.invalid/model.tar', format: 'tar', members: [{path: 'tokenizer/config.json', member: 'config.json'}]}]
+    }), function completeMissingError(error) {
+        assert.equal(error.code, 'MODEL_ASSET_ARCHIVE_MEMBERS_MISSING');
+        assert.deepEqual(error.members, ['config.json']);
+        return true;
+    });
+    assert.deepEqual(await acquisitions(root, 'models'), []);
+});
+
+test('RPC cancellation control joins actual native download settlement', async function joinedRPCPreparation(t) {
+    const entered = deferred();
+    const aborted = deferred();
+    const finish = deferred();
+    const cancellation = new AbortController();
+    const reason = new Error('Caller cancelled this preparation.');
+    const {service} = await fixture(t, function pendingFetch(url, {signal}) {
+        entered.resolve();
+        return new Promise(function pendingResponse(resolve, reject) {
+            signal.addEventListener('abort', function abortResponse() {
+                aborted.resolve();
+                finish.promise.then(function nativeDrain() { reject(signal.reason); });
+            }, {once: true});
+        });
+    }, function releaseGate() { finish.resolve(); });
+    const events = [];
+    const task = service.methods['modelAssets.prepare']({
+        id: 'rpc-preparation', workingDirectory: 'models', members: [{path: 'model.gguf', url: 'https://models.invalid/pending'}]
+    }, {signal: cancellation.signal, emit(event, payload) { events.push({event, payload}); }});
+    const rejected = assert.rejects(task, function originalReason(error) { return error === reason; });
+    await entered.promise;
+    cancellation.abort(reason);
+    let settled = false;
+    const cleanup = service.methods['modelAssets.cancelPrepare'].handle({id: 'rpc-preparation'})
+        .then(function joined() { settled = true; });
+    await aborted.promise;
+    assert.equal(settled, false);
+    assert.ok(events.every(function correlated(event) { return event.event === 'modelAssets.progress' && event.payload.id === 'rpc-preparation'; }));
+    finish.resolve();
+    await rejected;
+    await cleanup;
+    assert.deepEqual(service.current().projections, []);
+});
+
+test('browser native preparation correlates ordered callbacks and joins remote cancellation', async function browserPreparationCancellation(t) {
+    const entered = deferred();
+    const cleanupEntered = deferred();
+    const finishCleanup = deferred();
+    const cancellation = new AbortController();
+    const reason = new Error('Stop this selected download.');
+    t.after(function releasePendingPreparation() { cancellation.abort(reason); finishCleanup.resolve(); });
+    const listeners = new Set();
+    const seen = [];
+    const client = {
+        uuid() { return 'browser-selected-download'; },
+        events: {on(event, listener) { listeners.add(listener); return function unsubscribe() { listeners.delete(listener); }; }},
+        invoke(method, params, options) {
+            if (method === 'modelAssets.cancelPrepare') { cleanupEntered.resolve(); return finishCleanup.promise; }
+            assert.equal(method, 'modelAssets.prepare');
+            return new Promise(function pendingPreparation(resolve, reject) {
+                options.signal.addEventListener('abort', function locallyAborted() {
+                    const error = new Error('The request was cancelled locally.');
+                    error.code = 'ARCANE_REQUEST_ABORTED';
+                    reject(error);
+                }, {once: true});
+                for (const listener of listeners) {
+                    listener({id: 'another-operation', progress: {phase: 'unrelated'}});
+                    listener({id: params.id, progress: {phase: 'open'}});
+                    listener({id: params.id, progress: {phase: 'download', path: 'model.gguf'}});
+                }
+                entered.resolve();
+            });
+        }
+    };
+    const task = downloadCoreModelAssets({client, workingDirectory: 'models', members: [{path: 'model.gguf', url: 'https://models.invalid/model'}], signal: cancellation.signal,
+        async onProgress(event) { seen.push(event); }
+    });
+    let settled = false;
+    const rejected = assert.rejects(task, function originalReason(error) { return error === reason; }).then(function settledPreparation() { settled = true; });
+    await entered.promise;
+    await Promise.resolve();
+    cancellation.abort(reason);
+    await cleanupEntered.promise;
+    assert.equal(settled, false);
+    assert.ok(seen.every(function correlated(event) { return event.phase !== 'unrelated'; }));
+    finishCleanup.resolve();
+    await rejected;
+    assert.equal(listeners.size, 0);
+});
+
+test('one archive member can stream into every declared destination', async function repeatedArchiveSource(t) {
+    const original = '  Complete shared tokenizer original.\r\n月 🧀  ';
+    const {service} = await fixture(t, async function selectedArchive() { return new Response(tarMember('dictionary.txt', original)); });
+    const projection = await service.prepare({
+        id: 'two-destinations', workingDirectory: 'models',
+        archives: [{url: 'https://models.invalid/dictionary.tar', format: 'tar', members: [
+            {path: 'first/dictionary.txt', member: 'dictionary.txt'}, {path: 'second/dictionary.txt', member: 'dictionary.txt'}
+        ]}]
+    });
+    assert.equal(projection.members.length, 2);
+    for (const member of projection.members) assert.equal(await readFile(member.nativePath, 'utf8'), original);
+});
+
+test('an archive server ignoring Range is cancelled without consuming its unrequested body', async function ignoredArchiveRange(t) {
+    const cancelled = deferred();
+    const {service} = await fixture(t, async function fullArchiveResponse() {
+        return new Response(new ReadableStream({cancel() { cancelled.resolve(); }}));
+    });
+    await assert.rejects(service.prepare({
+        id: 'ignored-range', workingDirectory: 'models',
+        archives: [{url: 'https://models.invalid/archive', format: 'tar', ranges: [{start: 0, end: 511}], members: [{path: 'config.json', member: 'config.json'}]}]
+    }), {code: 'MODEL_ASSET_ARCHIVE_RANGE_FAILED', status: 200});
+    await cancelled.promise;
+});
+
+function paxRecord(key, value) {
+    const body = ` ${key}=${value}\n`;
+    let length = Buffer.from(body).length + 1;
+    while (Buffer.from(`${length}${body}`).length !== length) length = Buffer.from(`${length}${body}`).length;
+    return `${length}${body}`;
+}
+
+test('archive PAX paths select complete original companion content', async function paxArchivePath(t) {
+    const name = './tokenizers/complete-dictionary.txt';
+    const original = '  Every original line.\r\n月 🧀\n  ';
+    const archive = Buffer.concat([tarMember('PaxHeader', paxRecord('path', name), 'x'), tarMember('placeholder', original)]);
+    const {service} = await fixture(t, async function selectedArchive() { return new Response(archive); });
+    const projection = await service.prepare({
+        id: 'pax-selected', workingDirectory: 'models',
+        archives: [{url: 'https://models.invalid/pax.tar', format: 'tar', members: [{path: 'tokenizer/dictionary.txt', member: 'tokenizers/complete-dictionary.txt'}]}]
+    });
+    assert.equal(await readFile(projection.members[0].nativePath, 'utf8'), original);
+});
+
+test('acquisition discovery expands missing GGUF shards and chooses the first shard while retaining companions', async function discoverAcquisitionShards(t) {
+    const {service} = await fixture(t, async function fetchSelected(url) { return new Response(`Complete ${url}.`); });
+    const first = {path: 'moon-00001-of-00002.gguf', url: 'https://models.invalid/moon-part1'};
+    const second = {path: 'moon-00002-of-00002.gguf', url: 'https://models.invalid/moon-part2'};
+    const companion = {path: 'tokenizer.json', url: 'https://models.invalid/tokenizer'};
+    const incomplete = await service.prepare({id: 'partial-shards', workingDirectory: 'models', members: [companion, second]});
+    const complete = await service.prepare({id: 'reversed-shards', workingDirectory: 'models', members: [companion, second, first]});
+    await service.release(incomplete.id);
+    await service.release(complete.id);
+    const result = await service.discover({directories: ['models']});
+    const partial = result.models.find(function incompleteSet(model) { return model.directory === incomplete.directory; });
+    const ready = result.models.find(function completeSet(model) { return model.directory === complete.directory; });
+    for (const model of [partial, ready]) {
+        assert.equal(model.entryPath, first.path);
+        assert.deepEqual(model.members.map(function memberPath(member) { return member.path; }), [companion.path, first.path, second.path]);
+    }
+    assert.equal(partial.complete, false);
+    assert.deepEqual(partial.missingMembers, [first.path]);
+    assert.equal(ready.complete, true);
+    assert.deepEqual(ready.missingMembers, []);
+});
+
+test('discovery follows installed-model links without repeating linked-directory cycles', async function linkedInstalledModels(t) {
+    const {root, service} = await fixture(t, function unusedNetwork() { throw new Error('Linked discovery must not fetch.'); });
+    const originals = path.join(root, 'originals');
+    const selected = path.join(root, 'selected');
+    await mkdir(originals);
+    await mkdir(selected);
+    await writeFile(path.join(originals, 'complete.model'), 'Complete linked model.');
+    try {
+        await symlink(path.join(originals, 'complete.model'), path.join(selected, 'moon.gguf'), 'file');
+        await symlink(selected, path.join(selected, 'same-directory'), process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (error) {
+        if (error.code !== 'EPERM' && error.code !== 'EACCES') throw error;
+        t.skip('This fixture host does not permit symbolic links.');
+        return;
+    }
+    const result = await service.discover({directories: [selected]});
+    assert.equal(result.models.length, 1);
+    assert.equal(result.models[0].entryPath, 'moon.gguf');
+    assert.equal(result.models[0].complete, true);
 });

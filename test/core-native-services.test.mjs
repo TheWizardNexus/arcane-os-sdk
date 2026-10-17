@@ -7,6 +7,29 @@ import {createModelAssetService} from '../src/core/services/model-assets.mjs';
 import {createExecutionDeviceService} from '../src/core/services/execution-devices.mjs';
 import {CORE_PROTOCOL} from '../browser-runtime/core/contracts.mjs';
 
+test('explicit local runtime preparation leaves startup available without installing or loading models', async function explicitPreparation(t) {
+    let preparations = 0;
+    const service = createLocalAIService({runtimes: []}, {
+        autoStart: false,
+        async prepare() { preparations += 1; return []; }
+    });
+    const runtime = createCoreRuntime({services: [service]});
+    t.after(function closeRuntime() { return runtime.close(); });
+    await runtime.getService('local-ai');
+    assert.equal(preparations, 0);
+    runtime.start();
+    for (const id of ['first-preparation', 'reuse-preparation']) {
+        const response = await runtime.handle({protocol: CORE_PROTOCOL, type: 'request', id,
+            method: 'localai.prepare', parameters: {}});
+        assert.equal(response.ok, true);
+    }
+    assert.equal(preparations, 1);
+    await runtime.close();
+    assert.throws(function noPreparationAfterShutdown() {
+        service.methods['localai.prepare']({}, {signal: new AbortController().signal});
+    }, {name: 'AbortError'});
+});
+
 test('native services reuse the selected ONNX and model-assets owners without loading a model', async function nativeOwners(t) {
     let catalogDisposals = 0;
     const executionDevices = {

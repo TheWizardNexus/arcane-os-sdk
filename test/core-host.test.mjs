@@ -125,12 +125,15 @@ test('native launch resolver shares the selected app state and preserves explici
     assert.deepEqual(resolveNativeLaunchContext({appId, context: resolved}), resolved);
     const omitted = resolveNativeLaunchContext({appId, context: {stateRoot}});
     assert.equal(omitted.workspaceRoot, path.join(stateRoot, 'Workspace'));
+    assert.equal(omitted.modelsDirectory, path.join(stateRoot, 'Models'));
     assert.equal(Object.hasOwn(omitted, 'sharedHost'), false);
     const selected = {endpoint: 'app-owned-endpoint', logFile: '../app-owned-log', extra: {complete: true}};
     assert.deepEqual(resolveNativeLaunchContext({appId, context: {stateRoot, sharedHost: selected}}).sharedHost, selected);
     for (const workspaceRoot of ['', null, false, '../explicit']) {
         assert.equal(resolveNativeLaunchContext({appId, context: {stateRoot, workspaceRoot}}).workspaceRoot, workspaceRoot);
     }
+    const modelsDirectory = path.join(launchFixtureDirectory, 'explicit model home');
+    assert.equal(resolveNativeLaunchContext({appId, context: {stateRoot, modelsDirectory}}).modelsDirectory, modelsDirectory);
     const otherState = resolveNativeLaunchContext({appId, context: {stateRoot: stateRoot + '-other', sharedHost: {}}});
     assert.notEqual(otherState.sharedHost.endpoint, resolved.sharedHost.endpoint);
 });

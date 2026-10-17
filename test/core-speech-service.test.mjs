@@ -2,6 +2,38 @@ import assert from 'node:assert/strict';
 import test from '../src/testing.mjs';
 import {createSpeechService} from '../src/core/services/speech.mjs';
 
+test('explicit speech startup observes roles without loading or downloading until selected', async function explicitSpeechStartup() {
+    let state = {providerId: 'nemotron', modelId: 'speech-model', state: 'unloaded', loaded: false};
+    let listener;
+    const loads = [];
+    const engine = {
+        current() { return state; },
+        subscribe(observe) { listener = observe; observe(state); return function stop() { listener = null; }; },
+        async load(selection) {
+            loads.push(selection);
+            state = {...state, state: 'ready', loaded: true};
+            listener?.(state);
+            return state;
+        },
+        async transcribe() { return {text: 'The moon ordered all the cheese.'}; },
+        async close() {}
+    };
+    const service = createSpeechService({stt: engine, autoLoad: false});
+    try {
+        service.start({emit() {}});
+        await Promise.resolve();
+        assert.equal(loads.length, 0);
+        assert.equal(service.current().roles.stt.state, 'unloaded');
+        const selected = {role: 'stt', assetProjectionId: 'complete-speech-files'};
+        await service.methods['speech.load'](selected);
+        assert.equal(loads.length, 1);
+        assert.equal(loads[0].assetProjectionId, selected.assetProjectionId);
+        assert.equal(service.current().transcriptionAvailable, true);
+    } finally {
+        await service.dispose();
+    }
+});
+
 test('speech service forwards actual Core request correlation outside the complete payload', async function speechCorrelation() {
     const payload = {audioBase64: 'YWJj', model: 'whisper-small', complete: '  all\ncontent  '};
     const result = {text: '  Complete transcript\n  '};

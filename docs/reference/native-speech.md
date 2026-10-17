@@ -1,6 +1,6 @@
 # Native speech service
 
-`createSpeechService({stt, tts, signal} = {})` composes independently selected
+`createSpeechService({stt, tts, signal, autoLoad = true} = {})` composes independently selected
 native speech engines into one Core service. It is the named and default export
 from `arcane-os/core/speech`.
 
@@ -49,6 +49,13 @@ omitted/null/empty-field semantics.
 independently. It returns immediately, allowing Core and `speech.status` to
 respond while models load. A failure in one role leaves the other role usable.
 Each engine publishes the actual state of its selected model.
+
+Use `autoLoad: false` when the host first needs the user to select or download
+model files. Startup still subscribes and exposes the ordinary unloaded state;
+it does not call either engine's `load()`. Explicit `speech.load({role,
+...selection})` activates the prepared role afterward. The default remains
+`true` for existing hosts. This option changes service startup, not the selected
+engine's missing-model errors or inference readiness requirement.
 
 `current()` and `speech.status` return the same snapshot:
 
@@ -288,6 +295,99 @@ share one shutdown promise. Actual engine cleanup failures reject with an
 `AggregateError` and remain in role diagnostics. `dispose()` additionally
 releases the service's event subscriptions. New work after shutdown begins
 rejects with `CORE_CLOSING`.
+
+## Selected NeMo model acquisition
+
+`NEMO_SPEECH_MODELS`, `prepareNemotronModels`, and `prepareMagpieModels` are
+named exports from `arcane-os/local-ai/nemotron`. Importing them performs no
+network access, installation, model loading, or inference. The catalog records
+NVIDIA's selected [NeMo-Speech.cpp v0.2.0 model index](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/models/index.json):
+
+| Role | Complete default selection |
+|---|---|
+| `stt` | Nemotron 3.5 streaming ASR Q8_0 and Nemotron 3 Diarization Q8_0. |
+| `tts` | Magpie multilingual v2607 F16, NanoCodec 22 kHz F16 decoder, and all ten matching tokenizer/configuration/speaker-map members from the same Magpie revision. |
+
+Each role exposes `{modelId, providerId, name, members, resourcePaths}`.
+`members` contains ordered `{path, url}` file sources. TTS also exposes
+`archives`, with the upstream uncompressed `.nemo` TAR source, its selected
+transport ranges, and exact `{path, member}` tokenizer entries. The shared
+[model-assets service](model-assets.md) owns discovery, acquisition, progress,
+cancellation, persistence, and projection lifetime; these helpers do not create
+another downloader or store. Tokenizer files retain their complete original
+contents. The selected tokenizer configuration and its referenced JSON speaker
+map continue to own voice IDs.
+
+```js
+import {createNemotronRuntime, prepareNemotronModels} from 'arcane-os/local-ai/nemotron';
+import {createSpeechService} from 'arcane-os/core/speech';
+
+const stt = createNemotronRuntime({runtime, modelAssets, gpu: -1});
+const speech = createSpeechService({stt, autoLoad: false});
+// Run this only for the user's explicit model preparation action.
+const prepared = await prepareNemotronModels({
+  modelAssets,
+  workingDirectory: modelsDirectory,
+  directories: [modelsDirectory, appModelsDirectory],
+  signal,
+  onProgress: showModelProgress
+});
+try {
+  await stt.load({
+    assetProjectionId: prepared.assetProjectionId,
+    resourcePaths: prepared.resourcePaths,
+    signal
+  });
+} finally {
+  await prepared.release();
+}
+```
+
+Both preparation helpers accept `{modelAssets, workingDirectory, directories,
+id, signal, onProgress, refresh = false}`. With `directories`, they ask the
+shared owner for the first complete matching catalog selection in those roots
+before downloading. `openExisting()` borrows its original files and never
+deletes them. Incomplete selections stay visible through the owner's discovery
+results and are not mistaken for a complete model. When no complete match is
+available, the existing acquisition path prepares the complete selected set;
+its completed downloads remain reusable. Explicit `refresh: true` requests a
+fresh acquisition. The host chooses the roots: its portable native launch
+context supplies `modelsDirectory` under the resolved per-user `stateRoot` by
+default, while explicit directory overrides remain supported. An application
+may include its own `models` directory among the discovery roots.
+
+The result is `{assetProjectionId, directory, members, resourcePaths, release}`.
+`release()` is idempotent and releases preparation ownership. Each engine
+retains the projection synchronously when `load()` accepts it, so the caller
+may release its preparation after starting that load. Nemotron accepts
+`modelAssets`, `assetProjectionId`, and `resourcePaths` in its constructor and
+`assetProjectionId`/`resourcePaths` in `load()`, with roles `{model, diarization}`.
+Magpie uses `{model, codec, tokenizerConfig}`. Native file paths still work
+through the engines' existing options. Nemotron requires unloading before
+changing an active selection; its retained files are released only after
+native work and helper exit have joined. Load failures also join asset cleanup,
+and cleanup failures remain observable.
+
+`onProgress` receives ordered, awaited shared-owner phase and file-completion
+events, including reuse and ready for installed selections. Signal cancellation
+stops that preparation's work; an abort after projection creation releases it
+before rejecting. Engine load cancellation remains separate: cancelling the
+caller's wait does not cancel a shared activation; explicit engine unload/close
+owns that cancellation.
+
+The default GGUF selections are individual complete upstream files. The shared
+owner also discovers ordered GGUF shard sets and reports their missing members;
+HTTP range transfers and tokenizer TAR ranges are transport mechanisms, not
+additional model shards. A discovered shard set alone does not establish that a
+selected native engine can load that model. The engine remains the authority
+for model compatibility and actual readiness.
+
+The [upstream native runtime](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/docs/install.md)
+provides Windows, Linux, and macOS distributions. Model files and that runtime
+remain separate upstream assets, not vendored SDK payloads. This acquisition
+integration received source review only; no download, inference, or new platform
+execution is claimed here. See the [Nemotron](native-nemotron.md) and
+[Magpie](native-magpie.md) contracts for native preparation and execution evidence.
 
 ## Native Kokoro engine
 

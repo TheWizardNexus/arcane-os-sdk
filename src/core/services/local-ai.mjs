@@ -121,7 +121,7 @@ function collectCompletion(completion, chunk) {
 }
 
 /** Core owns native processes; applications own runtime and model selection. */
-export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent, prepare, executionDevices} = {}) {
+export function createLocalAIService(configuration, {appRoot, runtimes = [], signal, onEvent, prepare, executionDevices, autoStart = true} = {}) {
     const config = normalizeLocalAIConfig(configuration) ?? {runtimes: []};
     const lifetime = new AbortController();
     const lifetimeSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
@@ -130,6 +130,8 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
     const owner = {};
     const events = createArcaneEventSource(owner, {source: 'core-local-ai', eventTypes: ['localai.state']});
     let context;
+    let preparing;
+    let prepared = false;
     let modelAssetOwner;
     let closed = false;
     let onnx;
@@ -738,17 +740,20 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
         });
     }
 
-    const service = {
-        name: 'local-ai',
-        current: snapshot,
-        getONNXRuntime() {
-            return requireONNX();
-        },
-        async start(currentContext) {
-            context = currentContext;
+    function prepareEngines(requestSignal) {
+        lifetimeSignal.throwIfAborted();
+        requestSignal?.throwIfAborted();
+        if (prepared) return Promise.resolve(snapshot());
+        if (preparing) return awaitReadiness(preparing, requestSignal ?? lifetimeSignal);
+        const operationSignal = requestSignal ? AbortSignal.any([lifetimeSignal, requestSignal]) : lifetimeSignal;
+        const task = Promise.resolve().then(async function prepareSelectedEngines() {
+            operationSignal.throwIfAborted();
             if (prepare) {
-                runtimes = await prepare({signal: lifetimeSignal, onEvent});
-                lifetimeSignal.throwIfAborted();
+                runtimes = await prepare({signal: operationSignal, onEvent: function preparationProgress(event) {
+                    context?.emit('localai.preparation', event);
+                    return onEvent?.(event);
+                }});
+                operationSignal.throwIfAborted();
                 onnxRecord = runtimes.find(function installedONNX(runtime) { return runtime.id === 'onnx'; });
             }
             for (const requirement of config.runtimes) {
@@ -764,11 +769,40 @@ export function createLocalAIService(configuration, {appRoot, runtimes = [], sig
                     state: {id: requirement.id, installed: runtimes.some(function installed(record) { return record.id === requirement.id && record.executable; }), available: false, state: 'starting'}
                 };
                 engines.set(engine.id, engine);
-                startEngine(engine);
+                try { startEngine(engine); }
+                catch (error) {
+                    engines.delete(engine.id);
+                    throw error;
+                }
             }
             publish();
+            prepared = true;
+        });
+        preparing = task;
+        jobs.add(task);
+        function releasePreparation() {
+            jobs.delete(task);
+            if (preparing === task) preparing = null;
+        }
+        task.then(releasePreparation, releasePreparation);
+        return task;
+    }
+
+    const service = {
+        name: 'local-ai',
+        current: snapshot,
+        getONNXRuntime() {
+            return requireONNX();
+        },
+        async start(currentContext) {
+            context = currentContext;
+            if (autoStart === false) return;
+            return prepareEngines(lifetimeSignal);
         },
         methods: {
+            'localai.prepare': function prepareSelectedRuntime(_parameters, request) {
+                return prepareEngines(request.signal).then(snapshot);
+            },
             'localai.services.recover': async function recoverServices({runtimes: selected = [...engines.keys(), ...(onnxSelected ? ['onnx'] : [])]} = {}, request) {
                 request.signal.throwIfAborted();
                 const selectedEngines = selected.map(function selectedEngine(id) {

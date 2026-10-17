@@ -39,6 +39,7 @@ export function resolveNativeLaunchContext({appId, context = {}} = {}) {
     const resolved = {
         ...context,
         stateRoot,
+        modelsDirectory: context.modelsDirectory === undefined ? path.join(root, 'Models') : context.modelsDirectory,
         workspaceRoot: context.workspaceRoot === undefined ? path.join(root, 'Workspace') : context.workspaceRoot
     };
     if (context.sharedHost !== undefined) {

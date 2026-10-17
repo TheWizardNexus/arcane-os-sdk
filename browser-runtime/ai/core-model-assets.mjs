@@ -3,6 +3,80 @@ import {getInstalledCoreClient} from '../core/client.mjs';
 
 const is = new Is(false);
 
+/** Inspect selected native directories without downloading or loading a model. */
+export function discoverCoreModelAssets({client = getInstalledCoreClient(), directories, catalog, recursive, signal} = {}) {
+    requireCore(client);
+    return client.invoke('modelAssets.discover', {directories, catalog, recursive}, {signal, timeoutMs: 0});
+}
+
+/** Retain existing complete files without copying them into an application build. */
+export function openExistingCoreModelAssets({client = getInstalledCoreClient(), directory, members, signal} = {}) {
+    return prepareNativeProjection(client, 'modelAssets.openExisting', {directory, members}, {signal});
+}
+
+/** Explicitly download a selected complete native model and its companions. */
+export function downloadCoreModelAssets({
+    client = getInstalledCoreClient(), workingDirectory, members, archives, refresh = false, signal, onProgress
+} = {}) {
+    return prepareNativeProjection(client, 'modelAssets.prepare', {workingDirectory, members, archives, refresh}, {signal, onProgress});
+}
+
+function requireCore(client) {
+    if (!is.function(client?.invoke)) {
+        const error = new Error('Native model assets require an available Core connection.');
+        error.code = 'ARCANE_MODEL_ASSETS_CORE_UNAVAILABLE';
+        throw error;
+    }
+}
+
+async function prepareNativeProjection(client, method, params, {signal, onProgress}) {
+    requireCore(client);
+    if (!is.function(client.uuid)) throw new TypeError('Model asset preparation requires Core operation ids.');
+    if (onProgress !== undefined && !is.function(onProgress)) throw new TypeError('Model asset onProgress must be a function.');
+    if (onProgress && !is.function(client.events?.on)) throw new TypeError('Model asset progress requires Core events.');
+    const id = client.uuid();
+    const controller = new AbortController();
+    const operationSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+    operationSignal.throwIfAborted();
+    let delivery = Promise.resolve();
+    let callbackFailure;
+    let releaseTask;
+    const unsubscribe = onProgress ? client.events.on('modelAssets.progress', function receiveProgress(event) {
+        if (event?.id !== id || operationSignal.aborted) return;
+        delivery = delivery.then(function orderedProgress() {
+            if (!operationSignal.aborted) return onProgress(event.progress);
+        });
+        delivery.catch(function failedProgress(error) {
+            callbackFailure ??= error;
+            controller.abort(error);
+        });
+    }) : undefined;
+
+    function release() {
+        releaseTask ??= client.invoke('modelAssets.release', {id}, {timeoutMs: 0});
+        return releaseTask;
+    }
+
+    try {
+        const projection = await client.invoke(method, {id, ...params}, {signal: operationSignal, timeoutMs: 0});
+        await delivery;
+        operationSignal.throwIfAborted();
+        return {id, directory: projection.directory, members: projection.members, release};
+    } catch (error) {
+        const reason = callbackFailure ?? (error?.code === 'ARCANE_REQUEST_ABORTED' && operationSignal.aborted ? operationSignal.reason : error);
+        controller.abort(reason);
+        const errors = [reason];
+        try {
+            if (method === 'modelAssets.prepare') await client.invoke('modelAssets.cancelPrepare', {id}, {timeoutMs: 0});
+            else await release();
+        } catch (cleanupError) { if (!errors.includes(cleanupError)) errors.push(cleanupError); }
+        try { await delivery; }
+        catch (deliveryError) { if (!errors.includes(deliveryError)) errors.push(deliveryError); }
+        if (errors.length > 1) throw new AggregateError(errors, 'Native model preparation and cleanup failed.', {cause: reason});
+        throw reason;
+    } finally { unsubscribe?.(); }
+}
+
 /** Projects complete caller-owned assets through Core without changing their store. */
 export async function prepareCoreModelAssets({
     client = getInstalledCoreClient(), workingDirectory, members, signal, onProgress
