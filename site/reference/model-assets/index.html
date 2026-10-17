@@ -13,10 +13,10 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native model acquisitions and working projections</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-model-acquisitions-and-working-projections">Native model acquisitions and working projections</h1><p class="doc-lead">Browser preparation and native retain/release ownership were first published in arcane-os@0.61.0. Browser preparation is exported by arcane-os/ai/core-model-assets, and the native service by arcane-os/core/model-assets. The image example below uses arcane-os/ai/core-image, published in the same release.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native model acquisitions and working projections</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-model-acquisitions-and-working-projections">Native model acquisitions and working projections</h1><p class="doc-lead">Browser preparation and native retain/release ownership were first published in arcane-os@0.61.0. Browser preparation is exported by arcane-os/ai/core-model-assets, and the native service by arcane-os/core/model-assets. The image example below uses arcane-os/ai/core-image, published in the same release.</p><div class="doc-meta"><span>SDK 0.96.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/model-assets.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#core-transport-operations">Core transport operations</a></nav></details><p>Browser preparation and native retain/release ownership were first published in <code>arcane-os@0.61.0</code>. Browser
+      <article class="prose reference-prose" data-reference-source="docs/reference/model-assets.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#discover-and-open-installed-files">Discover and open installed files</a><a href="#core-transport-operations">Core transport operations</a></nav></details><p>Browser preparation and native retain/release ownership were first published in <code>arcane-os@0.61.0</code>. Browser
 preparation is exported by <code>arcane-os/ai/core-model-assets</code>, and the native
 service by <code>arcane-os/core/model-assets</code>. The image example below uses
 <code>arcane-os/ai/core-image</code>, published in the same release.</p>
@@ -111,11 +111,11 @@ try {
     await use.release();
 }
 </code></pre></div>
-<p><code>prepare({id,workingDirectory,members,signal,onProgress,refresh=false})</code> reuses
+<p><code>prepare({id,workingDirectory,members,archives,signal,onProgress,refresh=false})</code> reuses
 a complete native acquisition or fetches the explicitly selected members.
 Every member has its original relative <code>path</code> and selected <code>url</code>; the caller
 supplies the complete companion-file set. Independent members download
-concurrently. Each complete response stream is written directly to its native
+concurrently, with up to four independent source transfers active. Each complete response stream is written directly to its native
 file, without a whole-model buffer or base64 conversion. No model or runtime
 is selected or downloaded by service startup. The result remains the ready
 projection snapshot with ordered <code>members: [{path,nativePath}]</code>.</p>
@@ -141,7 +141,155 @@ preparation observes in order. Each caller owns its callbacks; a slow or failed
 callback does not hold another caller&#39;s transfer or result. Callbacks must not
 await cleanup of the preparation currently calling them. Callback failures
 reject that caller&#39;s preparation. HTTP failures
-retain <code>url</code>, <code>status</code> and the complete response text in <code>response</code>.</p>
+retain <code>url</code>, <code>status</code> and the complete response text in <code>response</code>.
+During an active member, repeated activity notifications are emitted at most
+once per second; opening, member completion and terminal phases remain distinct.
+Progress describes files and phases, never transfer volume.</p>
+<h3 id="selected-archive-companions">Selected archive companions</h3>
+<p>An optional <code>archives</code> array acquires exact companion members from an upstream
+uncompressed TAR source through this same acquisition owner:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const projection = await modelAssets.prepare({
+    id: selectedOperationId,
+    workingDirectory: selectedModelDirectory,
+    members: selectedModelFiles,
+    archives: [{
+        url: selectedArchiveURL,
+        format: &#39;tar&#39;,
+        members: [
+            {path: &#39;tokenizer/model_config.yaml&#39;, member: &#39;model_config.yaml&#39;},
+            {path: &#39;tokenizer/speakers.json&#39;, member: &#39;speakers.json&#39;}
+        ]
+    }],
+    signal,
+    onProgress
+});
+</code></pre></div>
+<p>The result orders ordinary members first, followed by each archive&#39;s declared
+members. Extraction preserves each complete selected file. TAR names and PAX
+path records select members; a leading <code>./</code> is archive path framing. Missing
+selected members reject preparation and identify the missing names. Gzip and
+other archive formats are outside this reader&#39;s contract.</p>
+<p>When the upstream catalog supplies aligned TAR segments, an archive may include
+<code>ranges:[{start,end,stopBefore?}]</code>. The reader requests each inclusive HTTP range
+once and parses its TAR framing; <code>stopBefore</code> ends that segment before the
+specified member. Offsets and TAR lengths are solely external transport framing.
+They are never download progress, model readiness criteria or content identity.
+Ranges require the matching HTTP partial-content response; no complete-archive
+fallback is silently substituted. Native reuse identifies archive members by
+their selected URL, archive member name and output path, alongside ordinary
+members, without re-fetching an already completed set.</p>
+<h2 id="discover-and-open-installed-files">Discover and open installed files</h2>
+<p><code>discover({directories,catalog=[],recursive=true,signal})</code> inspects only the
+explicit directories, without downloading, copying, loading or selecting a
+model. Paths resolve from <code>appRoot</code>. It returns:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">const result = {
+    directories: [{directory, exists, error}], // error is present only on failure
+    models: [{
+        directory,
+        entryPath,
+        members: [{path, nativePath, available}],
+        missingMembers: [],
+        complete: true,
+        source: &#39;directory&#39;, // or &#39;catalog&#39; or &#39;acquisition&#39;
+        catalogId // present for a matching caller-owned catalog entry
+    }]
+};
+</code></pre></div>
+<p>Ordinary <code>.gguf</code> files are candidates. Split names such as
+<code>moon-00001-of-00003.gguf</code> form one candidate with all expected members in numeric
+order, including explicit missing members. The first shard is <code>entryPath</code>,
+including when a completed acquisition declared only later shards or listed
+them out of order. Acquisition candidates retain all their ordinary and
+companion members alongside these required shards; separate filename groups
+are never inferred to be one model. Symlinked model files and directories are
+followed, with already visited directory targets reused rather than rescanned.
+Discovery does not establish a model&#39;s role, runtime compatibility or successful
+inference. Those selections remain with the application and engine owners.</p>
+<p>Catalog entries are <code>{id,members:[{path,url?}],archives?,entryPath?}</code>. They describe
+an exact companion set and can include nested tokenizer files or multiple model
+files. A discovered catalog candidate reports every expected member, including
+missing companions. Completed native acquisition records are also discoverable;
+when the catalog supplies URLs or archive member names, acquisition matching
+also preserves those recorded source selections. A different pinned source with
+the same filenames is not relabeled as that catalog selection. Path-only catalogs
+and ordinary installed-directory candidates make no source-revision claim.
+Unfinished acquisition attempts are ignored. Discovery never removes either.
+Set <code>recursive:false</code> for a directory-only inspection. Missing root directories
+are reported with <code>exists:false</code>; other root access failures include their
+complete serialized error. A failure while reading a descendant is surfaced.</p>
+<p><code>openExisting({id,directory,members:[{path}],signal})</code> opens a complete selected
+set as an ordinary ready projection. It rechecks every member and reports
+<code>MODEL_ASSET_MEMBERS_MISSING</code> with <code>members</code> when files are absent. It performs
+no copy or network request. Engines use the same <code>retain(id)</code> lifecycle.
+Preparation release, engine unload and service disposal never delete borrowed
+originals. External edits or deletion remain controlled by the files&#39; owner.</p>
+<p>The application supplies persistent model directories separately from disposable
+build output. The native launch context exposes its platform-specific
+<code>modelsDirectory</code>; apps may additionally inspect selected application directories.
+The model-assets service creates no platform directory policy of its own.</p>
+<p><code>resolveNativeLaunchContext({appId,context})</code> defaults <code>modelsDirectory</code> to
+<code>Models</code> beneath the resolved persistent <code>stateRoot</code>. It preserves an explicitly
+supplied <code>modelsDirectory</code> unchanged and creates or migrates no files:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Host</th>
+<th>Default application state root</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>%LOCALAPPDATA%/Arcane/&lt;appId&gt;</code>; the user&#39;s <code>AppData/Local</code> when that environment variable is absent</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>~/Library/Application Support/Arcane/&lt;appId&gt;</code></td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>$XDG_DATA_HOME/Arcane/&lt;appId&gt;</code> when absolute, otherwise <code>~/.local/share/Arcane/&lt;appId&gt;</code></td>
+</tr>
+<tr>
+<td>Android or another host adaptation</td>
+<td>The host supplies its explicit app-private <code>stateRoot</code></td>
+</tr></tbody>
+</table>
+</div>
+<p>Pass this <code>modelsDirectory</code> as the acquisition <code>workingDirectory</code> and as one
+discovery directory. Completed files then live beneath its <code>model-assets</code>
+subdirectory, separate from replaceable application builds. Additional selected
+application directories can participate in the same discovery call.</p>
+<h3 id="prepare-a-selected-local-runtime-on-demand">Prepare a selected local runtime on demand</h3>
+<p><code>createLocalAIService(configuration,{autoStart:false,...options})</code> registers the
+existing local-AI owner without preparing or starting its selected runtimes at
+Core startup. The default remains <code>autoStart:true</code>, preserving existing startup
+behavior. After the user explicitly requests preparation, invoke
+<code>client.invoke(&#39;localai.prepare&#39;, {}, {signal,timeoutMs:0})</code>. The operation uses
+the configured existing runtime preparation callback and returns the current
+local-AI state; it does not invent a runtime or model selection.</p>
+<p>Preparation callback events are published as <code>localai.preparation</code> with their
+complete original event payload. Subscribe through the existing Core event
+owner to display actual preparation phases. Concurrent preparation requests
+reuse the owner&#39;s in-flight work, and subsequent completed calls reuse its
+prepared state. Runtime and model selection, explicit model acquisition and
+microphone activation remain app-owned; preparation is not an inference or
+microphone operation. Rendering the interface and
+discovering installed files need not wait for runtime preparation.</p>
+<h3 id="browser-discovery-and-explicit-download">Browser discovery and explicit download</h3>
+<p><code>arcane-os/ai/core-model-assets</code> additionally exports
+<code>discoverCoreModelAssets({client,directories,catalog,recursive,signal})</code>,
+<code>openExistingCoreModelAssets({client,directory,members,signal})</code>, and
+<code>downloadCoreModelAssets({client,workingDirectory,members,archives,refresh,signal,onProgress})</code>.
+<code>client</code> defaults to the installed Core client. Discovery returns the native
+record above; opening and downloading return <code>{id,directory,members,release}</code>.
+The existing Blob-based <code>prepareCoreModelAssets</code> keeps its original contract.</p>
+<p>Download progress callbacks receive the complete semantic progress record,
+correlated to this preparation and observed in order. Callback failure cancels
+the operation. Cancellation joins explicit native cleanup and local callback
+delivery before the helper settles; cleanup failures remain observable.
+Callbacks must not await their own enclosing preparation or cancellation join.
+Applications initiate downloads explicitly and display actual phases, selected
+member paths, completed-file counts and errors in the appropriate surface.</p>
 <p><code>release(id)</code> relinquishes preparation ownership without a request signal.
 Same-process callers sharing the actual store, complete source selection and
 refresh mode share an acquisition, including across service instances. They
@@ -178,7 +326,8 @@ try {
 }
 </code></pre></div>
 <p><code>createModelAssetService({appRoot})</code> returns a Core service with <code>current()</code>,
-<code>prepare(options)</code>, <code>retain(id)</code>, <code>release(id)</code> and <code>dispose()</code>. <code>retain()</code> accepts only a completed projection
+<code>discover(options)</code>, <code>openExisting(options)</code>, <code>prepare(options)</code>, <code>retain(id)</code>,
+<code>release(id)</code> and <code>dispose()</code>. <code>retain()</code> accepts only a completed projection
 and returns <code>{id,directory,members,release}</code>. A native engine takes this handle
 before loading and releases it after actual unload, failed-load cleanup or
 worker exit. A rejected inference/load promise alone does not establish native
@@ -242,6 +391,26 @@ for source selection, cancellation and complete row/output contracts.</p>
 <td>Preparing projection and native member paths</td>
 </tr>
 <tr>
+<td><code>modelAssets.discover</code></td>
+<td><code>{directories,catalog?,recursive?}</code></td>
+<td>Directory status and complete/incomplete model candidates</td>
+</tr>
+<tr>
+<td><code>modelAssets.openExisting</code></td>
+<td><code>{id,directory,members:[{path}]}</code></td>
+<td>Ready retained projection of existing originals</td>
+</tr>
+<tr>
+<td><code>modelAssets.prepare</code></td>
+<td><code>{id,workingDirectory,members,archives?,refresh?}</code></td>
+<td>Ready persistent acquisition; request-scoped <code>modelAssets.progress</code> emits <code>{id,progress}</code></td>
+</tr>
+<tr>
+<td><code>modelAssets.cancelPrepare</code></td>
+<td><code>{id}</code></td>
+<td>Cancel and join the matching native preparation, then release its preparation ownership</td>
+</tr>
+<tr>
 <td><code>modelAssets.write</code></td>
 <td><code>{id,memberIndex,contentBase64}</code></td>
 <td><code>{id,memberIndex,written:true}</code> after the native write</td>
@@ -266,16 +435,20 @@ for source selection, cancellation and complete row/output contracts.</p>
 <p>The browser helper owns this transport sequence. Correlation IDs identify
 operations; they are unrelated to content identity. Original model files remain
 separate and complete. A retry creates a new working projection from the stored
-assets; it does not redownload them or replace the authoritative DBOPFS record.</p>
+assets; it does not redownload them or replace the authoritative DBOPFS record.
+<code>cancelPrepare</code> and <code>release</code> have service lifetime so cancellation of the
+original request cannot cancel its cleanup control. Native preparation follows
+the original request signal, including connection cancellation; raw RPC callers
+join <code>cancelPrepare</code> when cancelling and release any successful unused projection.</p>
 <p>The implementation uses browser streams, the existing portable Core JSON
 transport and Node filesystem operations. Native paths and cleanup follow the
 host&#39;s Windows, Linux or macOS filesystem behavior. Android requires its host&#39;s
 Core/filesystem adaptation. These are source-level platform contracts, not a
 claim of execution on every target.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#core-transport-operations">Core transport operations</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#browser-preparation">Browser preparation</a><a href="#native-ownership">Native ownership</a><a href="#discover-and-open-installed-files">Discover and open installed files</a><a href="#core-transport-operations">Core transport operations</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.96.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

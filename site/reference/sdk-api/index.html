@@ -13,7 +13,7 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.96.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
@@ -2483,6 +2483,27 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.</p
 <td>Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation</td>
 </tr>
 <tr>
+<td><code>NEMO_SPEECH_MODELS</code></td>
+<td>constant</td>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Core native speech</td>
+<td>Node; selected upstream model catalog, no acquisition at import</td>
+</tr>
+<tr>
+<td><code>prepareNemotronModels()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Core native speech</td>
+<td>Node with the shared model-assets service</td>
+</tr>
+<tr>
+<td><code>prepareMagpieModels()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Core native speech</td>
+<td>Node with the shared model-assets service</td>
+</tr>
+<tr>
 <td><code>createNemotronRuntime default export</code></td>
 <td>function</td>
 <td><code>arcane-os/local-ai/nemotron</code></td>
@@ -2572,6 +2593,27 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.</p
 <td><code>arcane-os/ai/core-model-assets</code></td>
 <td>Core model assets</td>
 <td>Browser with complete Blob/File members and available Core service</td>
+</tr>
+<tr>
+<td><code>discoverCoreModelAssets()</code></td>
+<td>function</td>
+<td><code>arcane-os/ai/core-model-assets</code></td>
+<td>Core model assets</td>
+<td>Browser with an available model-assets Core service</td>
+</tr>
+<tr>
+<td><code>openExistingCoreModelAssets()</code></td>
+<td>function</td>
+<td><code>arcane-os/ai/core-model-assets</code></td>
+<td>Core model assets</td>
+<td>Browser with an available model-assets Core service</td>
+</tr>
+<tr>
+<td><code>downloadCoreModelAssets()</code></td>
+<td>function</td>
+<td><code>arcane-os/ai/core-model-assets</code></td>
+<td>Core model assets</td>
+<td>Browser with an available model-assets Core service</td>
 </tr>
 <tr>
 <td><code>createModelAssetService()</code></td>
@@ -7678,7 +7720,12 @@ The returned <code>arcane-native-builder/1</code> provider exposes
 reports <code>ARCANE_NATIVE_RUN_UNSUPPORTED</code>.</p>
 <p><code>build()</code> copies the complete selected app and dependency releases, the
 published SDK/runtime dependencies and the canonical Core entry/client into a
-fresh output directory. Service factories are imported only when a real native
+temporary assembly, then publishes it at <code>&lt;outputRoot&gt;/&lt;app-id&gt;/</code>. Later
+successful builds replace only that app&#39;s generated output. Publication retains
+the previous output until the completion callback and cancellation boundary
+accept the replacement; failure restores it. Models and saved state belong in
+their separate persistent directories. See <a href="../core-native-packaging/#output-and-host-contract">stable output and recovery</a>.
+Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.</p>
 <p>The generated <code>runtime/arcane-core.mjs</code> also accepts
 <code>--arcane-app-entry &lt;app-relative-module&gt;</code> through the host&#39;s supported Node
@@ -7778,6 +7825,10 @@ downloads and extracts the matching <code>arcane-native-windows-x64.tar.gz</code
 the selected output root. There is no compiler or OS checkout requirement for
 application builds. The build machine needs its normal Node/npm toolchain and
 <code>tar</code>; execution needs Windows x64, .NET Framework 4.6.2 or later and WebView2.</p>
+<p>Successful builds publish the complete payload at <code>&lt;outputRoot&gt;/&lt;app-id&gt;/</code>,
+replacing that app&#39;s prior generated artifact through the same
+<a href="../core-native-packaging/#output-and-host-contract">joined publication lifecycle</a>.
+Runtime caches, models, saved profiles and unrelated outputs remain separate.</p>
 <p>The matching Windows host consumes <code>appDescriptor.native.window</code> through
 <code>manifest.window</code>. Optional <code>width</code> and <code>height</code> select initial client dimensions
 in 96-DPI logical units; the host scales them for its actual DPI and fits the
@@ -7859,6 +7910,9 @@ Neither an available source implementation nor <code>doctor()</code> proves that
 asset is published or its Mac runtime has been executed.</p>
 <p>Build preserves the complete portable payload inside the bundle&#39;s Resources
 directory (<code>target.rootDir</code>) and returns its <code>.app</code> location as <code>bundleRoot</code>.
+The accepted bundle is <code>&lt;outputRoot&gt;/&lt;app-id&gt;.app/</code>; a later successful build
+replaces that bundle through the shared <a href="../core-native-packaging/#output-and-host-contract">publication lifecycle</a>,
+preserving separate saved state and model directories.
 The bundle supplies the SDK launcher and selected Node runtime. <code>verify()</code>
 reads assembled files; <code>run()</code> directly launches the bundled executable only on
 the matching Darwin architecture, observes diagnostics and waits for graceful
@@ -7987,6 +8041,11 @@ absolute <code>$XDG_DATA_HOME/Arcane/&lt;appId&gt;</code> or <code>~/.local/shar
 Android and other adapted hosts provide their actual <code>stateRoot</code> and own native
 IPC/process adaptation.</p>
 <p>An omitted <code>workspaceRoot</code> becomes <code>&lt;absolute selected stateRoot&gt;/Workspace</code>.
+An omitted <code>modelsDirectory</code> becomes <code>&lt;absolute selected stateRoot&gt;/Models</code>.
+Explicit model directories remain unchanged. Services pass this persistent
+directory to the shared model-assets owner; resolution creates or migrates no
+files. These per-app model locations remain separate from replaceable native
+build output. See <a href="../model-assets/">persistent model locations</a>.
 Only a selected <code>sharedHost</code> object receives a default endpoint and log file:
 Windows uses a named pipe containing the URL-encoded complete absolute state
 path; Linux/macOS use <code>&lt;absolute selected stateRoot&gt;/core.sock</code>. The log is
@@ -8246,7 +8305,7 @@ selection, streaming, cancellation and primary-model reload behavior.</p>
 service. Runtime installation, process availability and model readiness remain
 separate states; prompts, models and application policy remain caller-owned.</p>
 <h4 id="signature-and-result-124">Signature and result</h4>
-<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices,autoStart=true}={})
 </code></pre></div>
 <p>Import it from <code>arcane-os/core/local-ai</code>. <code>configuration</code> is the authored local-AI
 record; <code>appRoot</code> resolves its relative model paths and <code>runtimes</code> supplies
@@ -8266,6 +8325,15 @@ preparation; the development listener and independently composed image/model
 asset services keep their own lifetimes. Pass only llama.cpp/Ollama/ONNX
 requirements to this factory; <code>createLocalImageService()</code> owns selected image
 requirements. The managed development and native entrypoints separate them.</p>
+<p><code>autoStart:false</code> leaves these selected engines unprepared and unstarted during
+Core startup. Call <code>client.invoke(&#39;localai.prepare&#39;, {}, {signal})</code> when the
+application explicitly requests preparation. The operation invokes the
+configured <code>prepare</code> owner, emits its complete events as <code>localai.preparation</code>,
+starts configured engines and returns current state. Concurrent callers share
+in-flight preparation; completed preparation is reused. Engine/model readiness
+remains separate, so this result alone does not establish inference readiness.
+The default <code>autoStart:true</code> preserves startup preparation. No model is selected
+by this option.</p>
 <p>The service provides <code>localai.status</code>, explicit <code>localai.services.recover</code>,
 <code>llama.status/models/load/unload/chat</code>, <code>onnx.status/load/run/unload</code>, and the documented native Ollama methods.
 <code>localai.state</code> reports runtime/model changes. <code>llama.status</code> and <code>llama.models</code>
@@ -8511,7 +8579,8 @@ array to populate a native Kokoro voice selector.</p>
 microphone, loading a model or starting inference at construction.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">createNemotronRuntime({
     runtime, prepare, modelId = &#39;nemotron-3.5-asr-streaming-0.6b&#39;,
-    modelPath, diarizationModelPath, gpu, onEvent
+    modelPath, diarizationModelPath, modelAssets, assetProjectionId,
+    resourcePaths, gpu, onEvent
 } = {})
 </code></pre></div>
 <p>Supply a prepared <code>runtime</code> or lazy <code>prepare({signal,onEvent})</code> descriptor
@@ -8519,6 +8588,13 @@ with <code>helperExecutable</code> and selected native library paths. Select <co
 explicitly (native ordinal, or <code>-1</code> for CPU). Model paths may come from the
 descriptor; omit the diarization path when speaker labels are not requested.
 Preparation, models and device selection remain caller-owned.</p>
+<p>Alternatively supply the existing <code>modelAssets</code> service and a completed
+<code>assetProjectionId</code>, with <code>resourcePaths:{model,diarization?}</code> naming exact
+projection members. <code>load()</code> retains that projection before yielding and keeps
+it through actual helper cleanup; the caller can release preparation ownership
+after loading begins. Explicit load accepts these selection fields, and an
+active selection must be unloaded before replacement. Direct paths remain
+supported. See <a href="#preparenemotronmodels">shared catalog preparation</a>.</p>
 <h4 id="returned-members-and-lifetime">Returned members and lifetime</h4>
 <p>The engine exposes <code>current/subscribe/load/unload/transcribe/openStream/close</code>.
 Current state and replaying subscriptions report actual loaded readiness,
@@ -8559,6 +8635,42 @@ callback rules and cancellation/reset outcomes.</p>
 <h3 id="createnemotronruntime-default-export">createNemotronRuntime default export</h3>
 <p>The default export from <code>arcane-os/local-ai/nemotron</code> is the same
 <code>createNemotronRuntime</code> function, with identical inputs, results and lifetime.</p>
+<h3 id="nemospeechmodels"><code>NEMO_SPEECH_MODELS</code></h3>
+<p>Import this catalog from <code>arcane-os/local-ai/nemotron</code>. <code>stt</code> describes the
+selected Nemotron ASR and diarization GGUF companions; <code>tts</code> describes Magpie,
+NanoCodec and the matching ten tokenizer/configuration members. Each selection
+contains <code>modelId</code>, <code>providerId</code>, <code>name</code>, ordinary <code>members</code>, <code>resourcePaths</code>
+and optional <code>archives</code>. The upstream selections come from NVIDIA&#39;s
+NeMo-Speech.cpp 0.2.0 catalog. Importing the catalog performs no I/O and installs
+no runtime or model. See <a href="../native-speech/#selected-nemo-model-acquisition">the exact companion contract</a>.</p>
+<h3 id="preparenemotronmodels">prepareNemotronModels()</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">prepareNemotronModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/local-ai/nemotron</code>. Explicitly prepares the catalog&#39;s
+complete ASR and diarization selection through the existing model-assets
+service. Optional <code>directories</code> are searched first when <code>refresh</code> is false;
+the first complete matching catalog record is opened without downloading.
+Otherwise the shared <code>prepare</code> owner acquires the complete selection beneath
+<code>workingDirectory/model-assets/</code>. <code>refresh:true</code> requests a separate acquisition.</p>
+<p>The promise resolves to <code>{assetProjectionId,directory,members,resourcePaths,release}</code>.
+An omitted <code>id</code> is generated. Ordered asynchronous <code>onProgress</code> receives full
+file-based semantic progress; existing selections report <code>reuse</code> then <code>ready</code>.
+Call the idempotent asynchronous <code>release()</code> to relinquish preparation ownership
+after the engine has retained it. Complete acquisitions and borrowed originals
+remain stored. Cancellation and callback failures join cleanup and preserve
+actual failures. The wrapper selects no device, installs no native runtime and
+starts no microphone or inference. See <a href="../native-speech/#selected-nemo-model-acquisition">native model acquisition</a>.</p>
+<h3 id="preparemagpiemodels">prepareMagpieModels()</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">prepareMagpieModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/local-ai/nemotron</code>. It has the same preparation,
+discovery, progress, cancellation and release contract as <code>prepareNemotronModels</code>,
+using the catalog&#39;s complete Magpie/NanoCodec/tokenizer selection. Its returned
+<code>resourcePaths</code> contains <code>model</code>, <code>codec</code> and <code>tokenizerConfig</code>. The shared TAR
+reader extracts the ten selected tokenizer members from the catalog&#39;s selected
+upstream archive ranges; offsets stay transport-local. Pass the completed
+projection to the existing Magpie engine. Voice, language and device selection
+remain caller-owned; preparation performs no synthesis.</p>
 <h3 id="buildnemotronhelper">buildNemotronHelper()</h3>
 <h4 id="overview-and-syntax-1">Overview and syntax</h4>
 <p><code>buildNemotronHelper({runtime,outputRoot,signal,onEvent}={})</code> configures, builds
@@ -8780,7 +8892,7 @@ covers that composition. Applications normally select the precompiled asset
 through <code>encoder: &#39;openvino-npu&#39;</code>; they do not run this producer at startup.</p>
 <h3 id="createspeechservice">createSpeechService()</h3>
 <h4 id="overview-and-usage">Overview and usage</h4>
-<p><code>createSpeechService({stt,tts,signal}={})</code> from <code>arcane-os/core/speech</code> composes
+<p><code>createSpeechService({stt,tts,signal,autoLoad=true}={})</code> from <code>arcane-os/core/speech</code> composes
 independently selected STT and TTS engines as one Core service. Supply either
 role or both. Construction downloads, installs and loads nothing; the host
 owns engine creation, model/device selection and supported formats.</p>
@@ -8816,7 +8928,10 @@ joins the selected engine&#39;s native work. See the <a href="../native-speech/#
 <ul>
 <li><code>start(context)</code> subscribes and starts both configured engine loads
 independently, returning immediately. Core and status remain responsive
-during loading; one role&#39;s failure leaves the other usable.</li>
+during loading; one role&#39;s failure leaves the other usable.
+With <code>autoLoad:false</code>, subscriptions and role capabilities remain available
+while startup requests no engine load. Explicit <code>speech.load</code> activates
+the selected role. The default preserves automatic startup loading.</li>
 <li><code>current()</code> and <code>methods[&#39;speech.status&#39;]()</code> return the same snapshot:
 <code>ready</code>, <code>transcriptionAvailable</code>, <code>synthesisAvailable</code>, <code>status</code>,
 <code>sttEngine</code>, <code>ttsEngine</code>, <code>roles.stt</code>, <code>roles.tts</code> and <code>closed</code>.
@@ -8887,14 +9002,21 @@ engine. See <a href="../model-assets/">complete preparation and cleanup usage</a
 <h3 id="createmodelassetservice">createModelAssetService()</h3>
 <p><code>createModelAssetService({appRoot=process.cwd()}={})</code> from
 <code>arcane-os/core/model-assets</code> returns the Core service for
-<code>modelAssets.open/write/complete/release/status</code> and <code>modelAssets.state</code>.
+<code>modelAssets.open/write/complete/release/status</code>,
+<code>modelAssets.discover/openExisting/prepare/cancelPrepare</code>, and <code>modelAssets.state</code>.
 Relative working directories resolve from <code>appRoot</code>; explicit absolute
 directories remain caller-selected. Each projection has its own child
 directory and complete member files.</p>
 <p><code>current()</code> returns <code>{closing,projections}</code>. <code>retain(id)</code> accepts a completed
 projection and returns <code>{id,directory,members,release}</code> for a native owner.
-Native <code>prepare({id,workingDirectory,members,signal,onProgress,refresh=false})</code>
-accepts ordered <code>{path,url}</code> members and returns their ready projection.
+Native <code>prepare({id,workingDirectory,members=[],archives=[],signal,onProgress,refresh=false})</code>
+accepts ordered <code>{path,url}</code> members and optional uncompressed TAR selections,
+returning their complete ready projection. An archive declares
+<code>{url,format:&#39;tar&#39;,ranges?,members:[{path,member}]}</code>. Optional inclusive
+<code>{start,end,stopBefore?}</code> ranges use HTTP partial responses; the parser handles
+ordinary and PAX member paths and preserves each selected file completely.
+All declared companions must finish before readiness. Range framing stays
+transport-local.
 Complete native acquisitions persist beneath <code>workingDirectory/model-assets/</code>
 through unload, disposal and restart; ordinary calls reuse the exact complete
 ordered source selection without a network freshness check. Explicit
@@ -8903,7 +9025,28 @@ Independent members transfer concurrently and progress reports phases and
 completed files. Matching same-process preparations share acquisition with
 independent callbacks and cancellation; the last interested cancellation joins
 unfinished I/O and removes only that attempt. Separate processes may acquire
-the same selection independently. Startup downloads nothing.
+the same selection independently. Startup downloads nothing.</p>
+<p><code>discover({directories,catalog=[],recursive=true,signal})</code> reads only explicit
+installed directories and returns <code>{directories,models}</code>. Directory observations
+contain <code>{directory,exists,error?}</code>. Each model record has
+<code>{directory,entryPath,members:[{path,nativePath,available}],missingMembers,complete,source,catalogId?}</code>.
+The source is <code>directory</code>, <code>catalog</code> or <code>acquisition</code>. Split GGUF filename sets
+are one numerically ordered selection, including missing expected shards and
+the first shard as entry. This grouping also applies to completed acquisitions;
+all declared companions remain present. Ordinary readable symlinked files and
+directories are followed, with real-path cycle detection.</p>
+<p>Catalog entries <code>{id,members,archives?,entryPath?}</code> declare exact companion sets.
+Acquisition-backed matching honors supplied source URLs and archive member
+names; path-only catalogs and ordinary directory discovery make no origin or
+runtime-readiness claim. No files are downloaded, loaded or moved by discovery.</p>
+<p><code>openExisting({id,directory,members:[{path}],signal})</code> opens a complete borrowed
+projection using those existing files. Missing members reject with
+<code>MODEL_ASSET_MEMBERS_MISSING</code> and the complete missing-member list. Release
+never deletes or copies borrowed originals. The three new operations also have
+matching Core RPC methods. Request-scoped <code>modelAssets.progress</code> carries
+<code>{id,progress}</code> with full file-based semantic progress; <code>cancelPrepare</code> aborts
+and joins actual acquisition cleanup. The browser helpers below preserve the
+request correlation and cancellation joins.
 <code>release(id)</code> relinquishes live preparation ownership. Native retains continue
 through actual engine release; completed native acquisitions remain stored.
 Browser <code>open/write/complete</code> projections retain their temporary lifetime and
@@ -8914,6 +9057,34 @@ all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model
 files remain with their application owner. See
 <a href="../model-assets/#native-ownership">working-file service and wire operations</a>.</p>
+<h3 id="discovercoremodelassets">discoverCoreModelAssets()</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">discoverCoreModelAssets({client=getInstalledCoreClient(),directories,catalog,recursive,signal}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/ai/core-model-assets</code>. Resolves the native <code>discover</code>
+result described above through the installed Core connection. Directories and
+catalog selections remain application-owned. Complete shard and companion
+availability is filesystem evidence, not a selected or loaded model. See
+<a href="../model-assets/">discovery records</a>.</p>
+<h3 id="openexistingcoremodelassets">openExistingCoreModelAssets()</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">openExistingCoreModelAssets({client=getInstalledCoreClient(),directory,members,signal}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/ai/core-model-assets</code>. Opens selected complete existing
+files through Core and returns <code>{id,directory,members,release}</code>. The helper
+generates its projection ID; <code>release()</code> is asynchronous and idempotent.
+Native engines retain their own use; borrowed original files remain intact.
+Cancellation joins uncancelled cleanup before rejecting.</p>
+<h3 id="downloadcoremodelassets">downloadCoreModelAssets()</h3>
+<div class="code-block reference-code"><div class="code-bar"><span>Code</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-text">downloadCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,archives,refresh=false,signal,onProgress}={})
+</code></pre></div>
+<p>Import from <code>arcane-os/ai/core-model-assets</code>. Explicitly invokes native
+acquisition for complete ordinary and optional TAR-selected members and returns
+<code>{id,directory,members,release}</code>. It generates the ID, observes only that request&#39;s
+complete progress, and awaits asynchronous callbacks in order. Cancellation or
+a callback failure joins native <code>cancelPrepare</code> cleanup and local callback
+delivery before settlement; actual cleanup failures remain observable.
+Release relinquishes preparation ownership while completed downloads remain
+stored. No model, runtime or device is selected implicitly. See
+<a href="../model-assets/">download and progress usage</a>.</p>
 <h3 id="createmodelassetservice-default-export">createModelAssetService default export</h3>
 <p>The default export from <code>arcane-os/core/model-assets</code> is the same
 <code>createModelAssetService</code> factory and lifecycle described above.</p>
@@ -11100,6 +11271,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.96.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

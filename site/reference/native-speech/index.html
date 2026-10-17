@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
-  <meta name="description" content="createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.">
+  <meta name="description" content="createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.">
   <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
   <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-speech/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native speech service · Arcane OS SDK"><meta property="og:description" content="createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native speech service · Arcane OS SDK"><meta name="twitter:description" content="createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native speech service · Arcane OS SDK"><meta property="og:description" content="createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-speech/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native speech service · Arcane OS SDK"><meta name="twitter:description" content="createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
   <title>Native speech service | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
 </head>
 <body data-page="reference">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal, autoLoad = true} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.96.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
       <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#selected-nemo-model-acquisition">Selected NeMo model acquisition</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal, autoLoad = true} = {})</code> composes independently selected
 native speech engines into one Core service. It is the named and default export
 from <code>arcane-os/core/speech</code>.</p>
 <p>The host supplies an STT engine, a TTS engine, or both. Construction performs no
@@ -57,6 +57,11 @@ omitted/null/empty-field semantics.</p>
 independently. It returns immediately, allowing Core and <code>speech.status</code> to
 respond while models load. A failure in one role leaves the other role usable.
 Each engine publishes the actual state of its selected model.</p>
+<p>Use <code>autoLoad: false</code> when the host first needs the user to select or download
+model files. Startup still subscribes and exposes the ordinary unloaded state;
+it does not call either engine&#39;s <code>load()</code>. Explicit <code>speech.load({role, ...selection})</code> activates the prepared role afterward. The default remains
+<code>true</code> for existing hosts. This option changes service startup, not the selected
+engine&#39;s missing-model errors or inference readiness requirement.</p>
 <p><code>current()</code> and <code>speech.status</code> return the same snapshot:</p>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
@@ -292,6 +297,100 @@ share one shutdown promise. Actual engine cleanup failures reject with an
 <code>AggregateError</code> and remain in role diagnostics. <code>dispose()</code> additionally
 releases the service&#39;s event subscriptions. New work after shutdown begins
 rejects with <code>CORE_CLOSING</code>.</p>
+<h2 id="selected-nemo-model-acquisition">Selected NeMo model acquisition</h2>
+<p><code>NEMO_SPEECH_MODELS</code>, <code>prepareNemotronModels</code>, and <code>prepareMagpieModels</code> are
+named exports from <code>arcane-os/local-ai/nemotron</code>. Importing them performs no
+network access, installation, model loading, or inference. The catalog records
+NVIDIA&#39;s selected <a href="https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/models/index.json" target="_blank" rel="noreferrer">NeMo-Speech.cpp v0.2.0 model index</a>:</p>
+<div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Complete default selection</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>stt</code></td>
+<td>Nemotron 3.5 streaming ASR Q8<em>0 and Nemotron 3 Diarization Q8</em>0.</td>
+</tr>
+<tr>
+<td><code>tts</code></td>
+<td>Magpie multilingual v2607 F16, NanoCodec 22 kHz F16 decoder, and all ten matching tokenizer/configuration/speaker-map members from the same Magpie revision.</td>
+</tr></tbody>
+</table>
+</div>
+<p>Each role exposes <code>{modelId, providerId, name, members, resourcePaths}</code>.
+<code>members</code> contains ordered <code>{path, url}</code> file sources. TTS also exposes
+<code>archives</code>, with the upstream uncompressed <code>.nemo</code> TAR source, its selected
+transport ranges, and exact <code>{path, member}</code> tokenizer entries. The shared
+<a href="../model-assets/">model-assets service</a> owns discovery, acquisition, progress,
+cancellation, persistence, and projection lifetime; these helpers do not create
+another downloader or store. Tokenizer files retain their complete original
+contents. The selected tokenizer configuration and its referenced JSON speaker
+map continue to own voice IDs.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createNemotronRuntime, prepareNemotronModels} from &#39;arcane-os/local-ai/nemotron&#39;;
+import {createSpeechService} from &#39;arcane-os/core/speech&#39;;
+
+const stt = createNemotronRuntime({runtime, modelAssets, gpu: -1});
+const speech = createSpeechService({stt, autoLoad: false});
+// Run this only for the user&#39;s explicit model preparation action.
+const prepared = await prepareNemotronModels({
+  modelAssets,
+  workingDirectory: modelsDirectory,
+  directories: [modelsDirectory, appModelsDirectory],
+  signal,
+  onProgress: showModelProgress
+});
+try {
+  await stt.load({
+    assetProjectionId: prepared.assetProjectionId,
+    resourcePaths: prepared.resourcePaths,
+    signal
+  });
+} finally {
+  await prepared.release();
+}
+</code></pre></div>
+<p>Both preparation helpers accept <code>{modelAssets, workingDirectory, directories, id, signal, onProgress, refresh = false}</code>. With <code>directories</code>, they ask the
+shared owner for the first complete matching catalog selection in those roots
+before downloading. <code>openExisting()</code> borrows its original files and never
+deletes them. Incomplete selections stay visible through the owner&#39;s discovery
+results and are not mistaken for a complete model. When no complete match is
+available, the existing acquisition path prepares the complete selected set;
+its completed downloads remain reusable. Explicit <code>refresh: true</code> requests a
+fresh acquisition. The host chooses the roots: its portable native launch
+context supplies <code>modelsDirectory</code> under the resolved per-user <code>stateRoot</code> by
+default, while explicit directory overrides remain supported. An application
+may include its own <code>models</code> directory among the discovery roots.</p>
+<p>The result is <code>{assetProjectionId, directory, members, resourcePaths, release}</code>.
+<code>release()</code> is idempotent and releases preparation ownership. Each engine
+retains the projection synchronously when <code>load()</code> accepts it, so the caller
+may release its preparation after starting that load. Nemotron accepts
+<code>modelAssets</code>, <code>assetProjectionId</code>, and <code>resourcePaths</code> in its constructor and
+<code>assetProjectionId</code>/<code>resourcePaths</code> in <code>load()</code>, with roles <code>{model, diarization}</code>.
+Magpie uses <code>{model, codec, tokenizerConfig}</code>. Native file paths still work
+through the engines&#39; existing options. Nemotron requires unloading before
+changing an active selection; its retained files are released only after
+native work and helper exit have joined. Load failures also join asset cleanup,
+and cleanup failures remain observable.</p>
+<p><code>onProgress</code> receives ordered, awaited shared-owner phase and file-completion
+events, including reuse and ready for installed selections. Signal cancellation
+stops that preparation&#39;s work; an abort after projection creation releases it
+before rejecting. Engine load cancellation remains separate: cancelling the
+caller&#39;s wait does not cancel a shared activation; explicit engine unload/close
+owns that cancellation.</p>
+<p>The default GGUF selections are individual complete upstream files. The shared
+owner also discovers ordered GGUF shard sets and reports their missing members;
+HTTP range transfers and tokenizer TAR ranges are transport mechanisms, not
+additional model shards. A discovered shard set alone does not establish that a
+selected native engine can load that model. The engine remains the authority
+for model compatibility and actual readiness.</p>
+<p>The <a href="https://github.com/NVIDIA/NeMo-Speech.cpp/blob/v0.2.0/docs/install.md" target="_blank" rel="noreferrer">upstream native runtime</a>
+provides Windows, Linux, and macOS distributions. Model files and that runtime
+remain separate upstream assets, not vendored SDK payloads. This acquisition
+integration received source review only; no download, inference, or new platform
+execution is claimed here. See the <a href="../native-nemotron/">Nemotron</a> and
+<a href="../native-magpie/">Magpie</a> contracts for native preparation and execution evidence.</p>
 <h2 id="native-kokoro-engine">Native Kokoro engine</h2>
 <p><code>createNativeKokoroRuntime</code> is the named and default export from
 <code>arcane-os/local-ai/kokoro</code>. It uses the existing native ONNX owner for model
@@ -505,9 +604,9 @@ subscriptions. They do not close the host&#39;s shared engines or alter complete
 speech requests and results. Browser and explicitly registered speech providers
 retain their existing lifecycle contracts.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#selected-nemo-model-acquisition">Selected NeMo model acquisition</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.96.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>
