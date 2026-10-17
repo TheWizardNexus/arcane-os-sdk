@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#040915"><meta name="color-scheme" content="dark">
+  <meta name="description" content="arcane-os/local-ai/nemotron provides createNemotronRuntime, a Node/Core adapter for NVIDIA&#39;s public NeMo Speech ASR C ABI. One owned helper retains the selected recognizer and optional diarization model. One active audio stream belongs to that engine at a time. Existing Whisper transcription and standalone diarization remain separate supported capabilities.">
+  <meta name="robots" content="index, follow"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <link rel="canonical" href="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-nemotron/"><link rel="icon" type="image/png" href="../../assets/arcane-sigil-512.png"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../reference.css">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="Arcane OS SDK"><meta property="og:title" content="Native Nemotron streaming transcription · Arcane OS SDK"><meta property="og:description" content="arcane-os/local-ai/nemotron provides createNemotronRuntime, a Node/Core adapter for NVIDIA&#39;s public NeMo Speech ASR C ABI. One owned helper retains the selected recognizer and optional diarization model. One active audio stream belongs to that engine at a time. Existing Whisper transcription and standalone diarization remain separate supported capabilities."><meta property="og:url" content="https://thewizardnexus.github.io/arcane-os-sdk/reference/native-nemotron/"><meta property="og:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta property="og:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Native Nemotron streaming transcription · Arcane OS SDK"><meta name="twitter:description" content="arcane-os/local-ai/nemotron provides createNemotronRuntime, a Node/Core adapter for NVIDIA&#39;s public NeMo Speech ASR C ABI. One owned helper retains the selected recognizer and optional diarization model. One active audio stream belongs to that engine at a time. Existing Whisper transcription and standalone diarization remain separate supported capabilities."><meta name="twitter:image" content="https://thewizardnexus.github.io/arcane-os-sdk/assets/arcane-os-sdk-readme-header.png"><meta name="twitter:image:alt" content="Arcane OS SDK — external application SDK and command-line toolchain">
+  <title>Native Nemotron streaming transcription | Arcane OS SDK</title><script src="../../app.js" defer></script><script src="../reference.js" type="module"></script>
+</head>
+<body data-page="reference">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
+  <main id="main-content">
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native Nemotron streaming transcription</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-nemotron-streaming-transcription">Native Nemotron streaming transcription</h1><p class="doc-lead">arcane-os/local-ai/nemotron provides createNemotronRuntime, a Node/Core adapter for NVIDIA&#39;s public NeMo Speech ASR C ABI. One owned helper retains the selected recognizer and optional diarization model. One active audio stream belongs to that engine at a time. Existing Whisper transcription and standalone diarization remain separate supported capabilities.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <div class="docs-layout section-shell">
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="./" aria-current="page">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-nemotron.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#preparation-and-selection">Preparation and selection</a><a href="#engine-lifecycle">Engine lifecycle</a><a href="#ordered-streaming">Ordered streaming</a><a href="#cancellation-and-complete-recordings">Cancellation and complete recordings</a><a href="#evidence-boundary">Evidence boundary</a></nav></details><p><code>arcane-os/local-ai/nemotron</code> provides <code>createNemotronRuntime</code>, a Node/Core
+adapter for NVIDIA&#39;s public NeMo Speech ASR C ABI. One owned helper retains the
+selected recognizer and optional diarization model. One active audio stream
+belongs to that engine at a time. Existing Whisper transcription and standalone
+diarization remain separate supported capabilities.</p>
+<p>This adapter has no microphone, playback, conversational endpoint detector,
+keyword classifier, cloud fallback or automatic engine replacement. The host
+owns capture and the model owns conversational interpretation. A final ASR
+segment does not establish that the person has finished thinking, yielded the
+conversation, approved an action or issued an instruction.</p>
+<h2 id="preparation-and-selection">Preparation and selection</h2>
+<p>Select an upstream NeMo Speech runtime with its public ASR headers, library,
+runtime dependencies and CMake package configuration. This implementation was
+source-reviewed against the installed NVIDIA NeMo-Speech.cpp 0.2.0 public ABI,
+<code>nemotron-3.5-asr-streaming-0.6b</code> and <code>Nemotron-3-Diarization</code>. Acquire runtime and
+model assets through their upstream distribution; the SDK adapter does not
+download or redistribute them.</p>
+<p><code>arcane-os/local-ai/nemotron/build</code> exports <code>buildNemotronHelper</code>:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {buildNemotronHelper} from &#39;arcane-os/local-ai/nemotron/build&#39;;
+import {createNemotronRuntime} from &#39;arcane-os/local-ai/nemotron&#39;;
+
+const built = await buildNemotronHelper(
+    {
+        runtime: {cmakeDirectory: selectedNeMoCmakeDirectory},
+        outputRoot: selectedHelperOutputDirectory,
+        signal,
+        onEvent
+    }
+);
+const engine = createNemotronRuntime(
+    {
+        runtime: {
+            helperExecutable: built.helperExecutable,
+            binaryDirectory: selectedNeMoBinaryDirectory,
+            libraryDirectory: selectedNeMoLibraryDirectory
+        },
+        modelPath: selectedAsrModelPath,
+        diarizationModelPath: selectedDiarizationModelPath,
+        gpu: selectedNativeGpuOrdinal,
+        onEvent
+    }
+);
+await engine.load();
+</code></pre></div>
+<p>The builder requires CMake 3.26 or later and a platform C++17 toolchain. It
+configures, builds and installs only the first-party helper, returning
+<code>helperExecutable</code>, its <code>executable</code> alias, <code>root</code>, <code>platform</code>, <code>architecture</code>
+and complete configure/build/install diagnostics. The caller selects the output
+directory and supplies the appropriate installed upstream runtime. Windows
+loads its runtime through the child&#39;s <code>PATH</code>; Linux uses <code>LD_LIBRARY_PATH</code> and
+macOS uses <code>DYLD_LIBRARY_PATH</code>, alongside the helper&#39;s loader-relative paths.
+<code>runtime.env</code> supplies additional child-only environment settings.</p>
+<p><code>gpu</code> is required: supply the native runtime&#39;s selected GPU ordinal or explicitly
+select <code>-1</code> for CPU. Device selection belongs to the host. When the host changes
+<code>CUDA_VISIBLE_DEVICES</code>, the ordinal must describe that child&#39;s visible devices.
+The adapter reports <code>requestedGpu</code>; <code>observedBackend</code> remains <code>null</code> because a
+requested device alone does not prove GPU inference.</p>
+<p>Instead of <code>runtime</code>, supply an asynchronous
+<code>prepare({signal, onEvent})</code> function returning that prepared descriptor.
+Preparation runs during <code>load</code>, never at construction. <code>modelPath</code>,
+<code>diarizationModelPath</code> and <code>gpu</code> may also be supplied by the returned descriptor.
+Omit <code>diarizationModelPath</code> when speaker labels are not requested.</p>
+<h2 id="engine-lifecycle">Engine lifecycle</h2>
+<ul>
+<li><code>current()</code> returns selected provider/model, lifecycle <code>state</code>, <code>loaded</code>,
+<code>busy</code>, native version, requested device, active speaker scope, errors and any
+explicit reset requirement.</li>
+<li><code>subscribe(listener, {replay: true, signal} = {})</code> immediately replays current
+state and observes subsequent lifecycle events; it returns an unsubscribe
+function.</li>
+<li><code>load({modelId, modelPath, diarizationModelPath, gpu, signal} = {})</code> loads the
+selected models and resolves only when native readiness is reported.
+<code>modelId</code> defaults to <code>nemotron-3.5-asr-streaming-0.6b</code>. Concurrent callers share
+that load; one caller&#39;s signal cancels its wait, not the shared load. Unload
+before replacing an active selection.</li>
+<li><code>unload()</code> cancels and joins the active stream and model preparation, closes
+the owned helper, and retains selection for a later explicit load.</li>
+<li><code>close()</code> joins unload and disposes lifecycle subscriptions.</li>
+</ul>
+<p>The host can compose this engine into the existing
+<a href="../native-speech/"><code>createSpeechService</code></a> STT engine seam. Readiness follows
+the selected engine, not an application startup barrier.</p>
+<h2 id="ordered-streaming">Ordered streaming</h2>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const stream = await engine.openStream(
+    {
+        model: &#39;nemotron-3.5-asr-streaming-0.6b&#39;,
+        sampleRate: actualCaptureSampleRate,
+        signal,
+        onUpdate: async function showRecognition(result) {
+            await displayCompleteSnapshot(result);
+        }
+    }
+);
+await stream.push(monoFloat32Samples);
+await stream.forceEndpoint();
+// The same stream accepts the next utterance, preserving its speaker scope.
+await stream.push(nextMonoFloat32Samples);
+await stream.finish();
+await stream.completion;
+</code></pre></div>
+<p><code>openStream({sampleRate = 16000, languageCode, model, onUpdate, signal} = {})</code>
+requires the selected model to be ready, or waits for its already-started load.
+It never silently reloads after a reset. An explicit <code>model</code> must match the
+loaded selection. <code>sampleRate</code> is the actual input rate: an integer from 8000
+through 96000, or <code>0</code> for the model rate. It is passed unchanged to the native
+API. The transport&#39;s ordered 100 ms scheduling does not reinterpret a 48 kHz
+recording as 16 kHz or discard audio.</p>
+<p>The returned handle contains <code>push</code>, <code>forceEndpoint</code>, <code>finish</code>, <code>cancel</code>,
+<code>completion</code>, <code>current</code>, <code>sampleRate</code> and <code>speakerScope</code>:</p>
+<ul>
+<li><code>push(audio)</code> accepts mono <code>Float32Array</code> or
+<code>{encoding: &#39;f32le&#39;, data: BASE64}</code> and resolves to all ordered snapshots from
+that input. The encoded form carries exact little-endian float32 samples.
+Keep a supplied array unchanged until its push settles. Other encoded
+recordings produce <code>NEMOTRON_AUDIO_FORMAT_UNSUPPORTED</code>; caller-owned decoding
+is required.</li>
+<li><code>forceEndpoint()</code> drains the current ASR utterance while retaining the native
+stream, recognizer and diarization scope. Capture closure and conversational
+turn completion remain the host&#39;s decisions.</li>
+<li><code>finish()</code> queues behind all accepted input, terminally finishes and drains
+the native stream, delivers remaining snapshots, and resolves with that final
+drain&#39;s snapshot array. The loaded engine remains available for another
+stream.</li>
+<li><code>current()</code> returns the latest delivered snapshot, or <code>null</code> before one is
+available.</li>
+<li><code>completion</code> settles after terminal finish or joined cancellation. Successful
+finish resolves to the final drain&#39;s snapshots; earlier snapshots have already
+been delivered through <code>onUpdate</code> and each operation&#39;s result.</li>
+</ul>
+<p>Each snapshot includes <code>sequence</code>, <code>final</code>, <code>audioProcessedSeconds</code>,
+<code>channelTag</code>, <code>speakerScope</code>, and every native <code>alternatives</code> record with its
+exact <code>text</code>, <code>confidence</code>, <code>languageCodes</code> and <code>words</code>. Every word preserves
+<code>word</code>, <code>startTimeMs</code>, <code>endTimeMs</code>, <code>confidence</code> and numeric <code>speaker</code>. Top-level
+<code>text</code> and <code>words</code> expose the first alternative without changing its content.</p>
+<p>Partial snapshots are provisional replacements, not appended transcript text.
+Native endpoint finals describe individual utterances in a continuing stream;
+they are forwarded unchanged. Keep their boundaries distinct. Speaker numbers
+distinguish voices within the reported scope, not named people or biometric
+identity. A new stream has a new scope. Timestamp values retain the native
+runtime&#39;s units and origin without an invented offset.</p>
+<p>Callbacks run serially in native result order and may be asynchronous. A
+callback failure stops the stream, remains observable, and retains complete
+native result records in diagnostics. Inside an active <code>onUpdate</code> callback,
+calling <code>push</code>, <code>forceEndpoint</code>, <code>finish</code>, <code>cancel</code>, <code>unload</code> or <code>close</code> raises
+<code>NEMOTRON_CALLBACK_WAIT</code>: those joined operations would wait for the callback
+itself. Abort the caller-owned signal synchronously if cancellation is needed
+there, return from the callback, then join through the external owner.</p>
+<h2 id="cancellation-and-complete-recordings">Cancellation and complete recordings</h2>
+<p><code>cancel(reason)</code> and an aborted stream signal first request ordinary native
+stream closure. If a noninterruptible public-ABI call is in flight, cancellation
+terminates only this engine&#39;s owned helper and joins it. It also joins accepted
+JavaScript operations and output callbacks before releasing stream ownership.
+Explicit cancellation resolves <code>completion</code> and <code>cancel</code> with
+<code>{cancelled: true, resetRequired, speakerScope, diagnostics?}</code>. Actual native,
+callback or cleanup failures reject and retain their diagnostic causes.</p>
+<p>After helper termination, <code>current()</code> reports <code>resetRequired: true</code>, a reset
+record and <code>state: &#39;unloaded&#39;</code>. The next caller must explicitly <code>load()</code>;
+recognizer replacement and speaker-scope reset are never silent. Ordinary
+stream closure keeps the loaded helper. No cancellation claims that unfinished
+recognition produced a complete final.</p>
+<p><code>transcribe(request, {signal, onProgress, onUpdate} = {})</code> uses the same stream
+implementation for complete recordings. Supply <code>{audio, sampleRate, model?, languageCode?}</code> or a direct supported audio value at the default sample rate.
+It returns <code>{text, words, results, speakerScope}</code>, retaining all final records
+in <code>results</code>, and emits accepted/recognizing progress. Its final text is the
+ordered concatenation of native final text without inserted separators. It
+does not decode WAV, MP3 or other encoded recording formats.</p>
+<h2 id="evidence-boundary">Evidence boundary</h2>
+<p>The adapter, transport and platform paths have been source-reviewed. On October
+17, 2026, the selected Windows x64 helper configured, compiled and installed
+successfully against installed NeMo-Speech.cpp 0.2.0 using CMake 4.4.3, Visual
+Studio 2022, MSVC 19.44.35217 and Windows SDK 10.0.26100. Each operation exited 0;
+complete diagnostics remain in the SDK&#39;s ignored selected-output directory. The
+helper was not launched, and there is no measured latency, GPU-inference,
+microphone, diarization, audio playback or multi-utterance acceptance result for
+this adapter. Linux and macOS compilation and execution remain unverified.
+Compilation, header review and upstream documentation remain distinct from a
+built native application&#39;s observed behavior. Android requires the necessary
+host integration and a matching native runtime.</p>
+</article>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#preparation-and-selection">Preparation and selection</a><a href="#engine-lifecycle">Engine lifecycle</a><a href="#ordered-streaming">Ordered streaming</a><a href="#cancellation-and-complete-recordings">Cancellation and complete recordings</a><a href="#evidence-boundary">Evidence boundary</a></nav></aside>
+    </div>
+  </main>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+</body>
+</html>

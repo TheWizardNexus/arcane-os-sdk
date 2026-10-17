@@ -13,9 +13,9 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="./" aria-current="page">API</a><a href="../">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.94.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Arcane OS SDK JavaScript API</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="arcane-os-sdk-javascript-api">Arcane OS SDK JavaScript API</h1><p class="doc-lead">The npm package exposes a Node.js ESM control plane, the portable arcane-os/event-manager, arcane-os/logging, arcane-os/mail, arcane-os/preference-store, arcane-os/speech-playback, arcane-os/websocket-client, arcane-os/speech-text, arcane-os/ai/tool-text-stream, arcane-os/ai/twin-cloud, and arcane-os/browser-device entrypoints, and the browser-only arcane-os/pwa, arcane-os/ai/browser-wasm, and arcane-os/ai/browser-decisions entrypoints. The arcane-os/ai/browser-speech entrypoint includes local and native browser providers plus a cloud TTS adapter usable in Node with Fetch and Blob. The arcane-os/modules/ and arcane-os/entities/ paths resolve directly to the existing runtime files, with their actual extension. They are public Node package exports and managed browser keys, without a wrapper. For example, import.meta.resolve(&#39;arcane-os/modules/WaitForComponent.js&#39;) retains the module directory needed to resolve ../components/modal.html. Lowercase runtime subpaths also expose existing module namespaces through both Node package exports and managed browser imports, as listed below. Established browser names such as arcane/AIProviderRuntime, arcane/AIRuntimeState, and arcane/ThemeBootstrap remain compatibility names in physical/nested maps; direct-installed root maps use the package namespace instead. Applications call globalThis.Arcane for capability-gated host behavior.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="./" aria-current="page">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="../native-speech/">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
       <article class="prose reference-prose" data-reference-source="docs/reference/sdk-api.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></details><p>The npm package exposes a Node.js ESM control plane, the portable
 <code>arcane-os/event-manager</code>, <code>arcane-os/logging</code>, <code>arcane-os/mail</code>,
 <code>arcane-os/preference-store</code>, <code>arcane-os/speech-playback</code>, <code>arcane-os/websocket-client</code>,
@@ -223,6 +223,22 @@ runtime layouts.</p>
 <tr>
 <td><code>arcane-os/core/speech</code></td>
 <td>Independent injected STT/TTS engine loading, request cancellation and joined Core service lifetime.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Retained native streaming recognition with complete timed words and optional diarization.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/nemotron/build</code></td>
+<td>First-party ASR helper build against a prepared NeMo runtime.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/magpie</code></td>
+<td>Retained native Magpie/NanoCodec synthesis with complete audio or ordered PCM.</td>
+</tr>
+<tr>
+<td><code>arcane-os/local-ai/magpie/build</code></td>
+<td>First-party TTS helper build against a prepared NeMo runtime.</td>
 </tr>
 <tr>
 <td><code>arcane-os/local-ai/whisper</code></td>
@@ -2458,6 +2474,62 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.</p
 <td><code>arcane-os/local-ai/kokoro</code></td>
 <td>Core native speech</td>
 <td>Complete 28-voice US/GB selection</td>
+</tr>
+<tr>
+<td><code>createNemotronRuntime()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Core native speech</td>
+<td>Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation</td>
+</tr>
+<tr>
+<td><code>createNemotronRuntime default export</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron</code></td>
+<td>Core native speech</td>
+<td>Same named function</td>
+</tr>
+<tr>
+<td><code>buildNemotronHelper()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron/build</code></td>
+<td>Core native speech</td>
+<td>Node with CMake 3.26+, C++17 toolchain and platform-matching public NeMo ASR headers/libraries/CMake package</td>
+</tr>
+<tr>
+<td><code>buildNemotronHelper default export</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/nemotron/build</code></td>
+<td>Core native speech</td>
+<td>Same named function</td>
+</tr>
+<tr>
+<td><code>createMagpieRuntime()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/magpie</code></td>
+<td>Core native speech</td>
+<td>Node with a matching first-party helper, selected NeMo TTS runtime, Magpie/tokenizer and NanoCodec assets; Windows/Linux/macOS source, Android host adaptation</td>
+</tr>
+<tr>
+<td><code>createMagpieRuntime default export</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/magpie</code></td>
+<td>Core native speech</td>
+<td>Same named function</td>
+</tr>
+<tr>
+<td><code>buildMagpieHelper()</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/magpie/build</code></td>
+<td>Core native speech</td>
+<td>Node with CMake 3.26+, C++17 toolchain, platform threads and matching public NeMo TTS headers/libraries/CMake package</td>
+</tr>
+<tr>
+<td><code>buildMagpieHelper default export</code></td>
+<td>function</td>
+<td><code>arcane-os/local-ai/magpie/build</code></td>
+<td>Core native speech</td>
+<td>Same named function</td>
 </tr>
 <tr>
 <td><code>createWhisperRuntime()</code></td>
@@ -7097,6 +7169,17 @@ interruption belongs to the registered service and engine; this facade supplies
 no engine. The native routes of <code>AI.fetchTTS(payload, signal)</code> and
 <code>AI.fetchSTT(audio, signal)</code> forward their signals through these calls and
 normalize cancellation to <code>AbortError</code> with <code>ARCANE_AI_REQUEST_ABORTED</code>.</p>
+<p><code>facade.speech.openStream(request,options)</code> returns
+<code>{streamId,ready,completion,current,push,forceEndpoint,finish,cancel}</code>.
+Ordered Float32 input retains the actual declared sample rate. Endpoint preserves
+stream/speaker scope and waits preceding updates; finish drains terminally.
+Do not await endpoint/finish/completion from their own update callback. Explicit
+cancel joins its native cleanup control, unlike ordinary signal cancellation.
+<code>synthesizeStream(request,{signal,onAudio,onProgress,onRequest})</code> awaits each
+complete ordered Uint8Array PCM contribution and its consumption acknowledgement,
+returns terminal metadata, and joins native cancellation. It plays no audio.
+Both streaming operations have no fixed timeout. Engine support/readiness remains
+independent from facade availability. See <a href="../core-client/#streaming-native-speech">streaming native speech</a>.</p>
 <p><code>facade.window.state({signal}?)</code> reads the calling document&#39;s native window;
 <code>facade.window.setState({state}, {signal}?)</code> selects <code>normal</code>, <code>maximized</code> or
 <code>fullscreen</code> for that same window. The matching Windows host returns
@@ -8422,6 +8505,156 @@ It describes the engine&#39;s mono PCM synthesis rate in samples per second.</p>
 US/GB voice identifiers. The engine uses <code>af_heart</code> when the caller omits
 <code>voice</code>; an explicit unsupported selection reports an error. Use this complete
 array to populate a native Kokoro voice selector.</p>
+<h3 id="createnemotronruntime">createNemotronRuntime()</h3>
+<h4 id="overview-and-syntax">Overview and syntax</h4>
+<p>Creates one retained native recognizer and optional diarizer without opening a
+microphone, loading a model or starting inference at construction.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">createNemotronRuntime({
+    runtime, prepare, modelId = &#39;nemotron-3.5-asr-streaming-0.6b&#39;,
+    modelPath, diarizationModelPath, gpu, onEvent
+} = {})
+</code></pre></div>
+<p>Supply a prepared <code>runtime</code> or lazy <code>prepare({signal,onEvent})</code> descriptor
+with <code>helperExecutable</code> and selected native library paths. Select <code>gpu</code>
+explicitly (native ordinal, or <code>-1</code> for CPU). Model paths may come from the
+descriptor; omit the diarization path when speaker labels are not requested.
+Preparation, models and device selection remain caller-owned.</p>
+<h4 id="returned-members-and-lifetime">Returned members and lifetime</h4>
+<p>The engine exposes <code>current/subscribe/load/unload/transcribe/openStream/close</code>.
+Current state and replaying subscriptions report actual loaded readiness,
+native version, requested device, active speaker scope, error and reset state.
+<code>load</code> initializes the selection; <code>unload</code> and <code>close</code> join owned cleanup.</p>
+<p><code>openStream({sampleRate=16000,languageCode,model,onUpdate,signal})</code> resolves an
+owned <code>push/forceEndpoint/finish/cancel/completion/current</code> handle plus
+<code>sampleRate</code> and <code>speakerScope</code>. Feed mono <code>Float32Array</code> or
+<code>{encoding:&#39;f32le&#39;,data:BASE64}</code> at the actual declared rate. The native sample
+rate contract accepts integer 8000–96000 or 0 for model rate. No encoded-media
+decoder is supplied. Updates preserve every alternative, text, word, timestamp,
+numeric speaker and final/provisional status.</p>
+<p><code>forceEndpoint</code> drains an utterance while retaining stream and speaker scope;
+<code>finish</code> terminally drains accepted input. Partial snapshots replace; finals
+remain separate recognition segments, never inferred conversational completion.
+<code>transcribe({audio,sampleRate,model?,languageCode?},options)</code> uses this same
+stream and returns complete <code>{text,words,results,speakerScope}</code>.</p>
+<p>Cancellation joins native and callback cleanup. Terminating genuinely
+noninterruptible helper work exposes <code>resetRequired</code> and requires explicit
+reload; no engine restarts silently. Callbacks must return before joining their
+own stream/engine lifecycle, otherwise <code>NEMOTRON_CALLBACK_WAIT</code> is reported.
+Unsupported input reports <code>NEMOTRON_AUDIO_FORMAT_UNSUPPORTED</code>; native, callback
+and cleanup failures remain observable.</p>
+<h4 id="availability-and-example-1">Availability and example</h4>
+<p>Node on Windows, Linux and macOS with the first-party helper and matching
+upstream NeMo ASR runtime/models; Android requires host adaptation. Selected
+Windows helper compilation is recorded in the <a href="../native-nemotron/">engine guide</a>;
+that is separate from inference, microphone or other-platform execution.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createNemotronRuntime} from &#39;arcane-os/local-ai/nemotron&#39;;
+
+function prepareDragonInterpreter(runtime, modelPath, gpu) {
+    return createNemotronRuntime({runtime, modelPath, gpu});
+}
+// The native owner explicitly loads, supplies PCM and joins close.
+</code></pre></div>
+<p>See <a href="../native-nemotron/">native Nemotron</a> for complete options, snapshots,
+callback rules and cancellation/reset outcomes.</p>
+<h3 id="createnemotronruntime-default-export">createNemotronRuntime default export</h3>
+<p>The default export from <code>arcane-os/local-ai/nemotron</code> is the same
+<code>createNemotronRuntime</code> function, with identical inputs, results and lifetime.</p>
+<h3 id="buildnemotronhelper">buildNemotronHelper()</h3>
+<h4 id="overview-and-syntax-1">Overview and syntax</h4>
+<p><code>buildNemotronHelper({runtime,outputRoot,signal,onEvent}={})</code> configures, builds
+and installs only the first-party Nemotron helper. <code>runtime.cmakeDirectory</code>
+selects an installed NeMo CMake package with its matching public ASR headers and
+libraries; <code>outputRoot</code> is the caller-owned output directory.</p>
+<h4 id="result-availability-and-example">Result, availability and example</h4>
+<p>Returns <code>{platform,architecture,root,helperExecutable,executable,diagnostics}</code>;
+<code>executable</code> aliases <code>helperExecutable</code>, and diagnostics retains complete
+configure/compile/install results. Requires Node, CMake 3.26+, a C++17 compiler
+and matching platform runtime. It downloads no dependency or model and performs
+no inference. Cancellation and process failures remain observable.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {buildNemotronHelper} from &#39;arcane-os/local-ai/nemotron/build&#39;;
+
+async function buildSelectedRecognizer(runtime, outputRoot, signal, onEvent) {
+    return buildNemotronHelper({runtime, outputRoot, signal, onEvent});
+}
+</code></pre></div>
+<p>See <a href="../native-nemotron/#preparation-and-selection">preparation and selection</a>.</p>
+<h3 id="buildnemotronhelper-default-export">buildNemotronHelper default export</h3>
+<p>The default export from <code>arcane-os/local-ai/nemotron/build</code> is the same
+<code>buildNemotronHelper</code> function.</p>
+<h3 id="createmagpieruntime">createMagpieRuntime()</h3>
+<h4 id="overview-and-syntax-2">Overview and syntax</h4>
+<p>Creates one retained native Magpie/NanoCodec synthesis owner. Construction
+downloads, loads and plays nothing.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">createMagpieRuntime({
+    runtime, prepare, paths, modelAssets, assetProjectionId, resourcePaths,
+    modelId = &#39;magpie&#39;, voice = &#39;Aria&#39;, languageCode = &#39;en-US&#39;,
+    executionTarget, signal, onEvent
+} = {})
+</code></pre></div>
+<p>Supply a prepared executable/library descriptor or <code>prepare({signal})</code>.
+Select matching Magpie, NanoCodec and tokenizer <code>paths</code>, or an existing
+model-assets projection and <code>resourcePaths</code>. Explicit <code>executionTarget</code>
+selects CPU or CUDA with the host&#39;s visible device/UUID; no provider or device
+fallback is inferred. The tokenizer&#39;s own speaker map determines voice IDs.</p>
+<h4 id="returned-members-and-lifetime-1">Returned members and lifetime</h4>
+<p>The engine exposes <code>current/subscribe/load/unload/synthesize/synthesizeStream/stop/close</code>.
+State includes independent loaded readiness, active/queued requests, voice and
+language defaults, model-owned voices and streaming/format capability.
+<code>load</code> retains selected models; <code>unload</code> and <code>close</code> join owned work/assets.</p>
+<p>Both synthesis methods accept exact <code>{input,model?,voice?,languageCode?,speed?}</code>;
+language is separate control information, and native speed must be 1.
+<code>synthesize(request,{signal,requestId,onProgress})</code> returns complete base64
+WAV (default) or PCM audio, MIME/format and speech metadata. Select
+<code>responseFormat:&#39;pcm&#39;</code> explicitly when needed.
+<code>synthesizeStream(request,{signal,requestId,onProgress,onAudio})</code> requires an
+awaited ordered <code>onAudio({pcm,format,sampleRate,channels,requestId})</code> callback.
+PCM is a Node Buffer of signed 16-bit little-endian samples; terminal metadata
+has <code>complete:true</code> without retaining the complete audio again. Playback
+belongs to the caller.</p>
+<p>Requests retain FIFO ownership. <code>stop({requestId})</code> stops only that queued or
+active utterance and joins native/callback cleanup; cancellation rejects
+synthesis. In-flight native interruption is observed at a PCM callback boundary.
+A callback can abort its caller-owned signal and return; self-joining lifecycle
+calls reject <code>MAGPIE_CALLBACK_WAIT</code>. Complete native and cleanup errors remain
+observable. An interrupted request never returns fabricated complete audio.</p>
+<h4 id="availability-and-example-2">Availability and example</h4>
+<p>Node on Windows, Linux and macOS with a matching helper, upstream NeMo TTS
+runtime and selected model assets; Android needs host adaptation. The
+<a href="../native-magpie/">engine guide</a> separates selected Windows compilation from
+unverified inference, playback and other-platform execution.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {createMagpieRuntime} from &#39;arcane-os/local-ai/magpie&#39;;
+
+function prepareDragonAnnouncer(runtime, paths, executionTarget) {
+    return createMagpieRuntime({runtime, paths, executionTarget});
+}
+// The native owner loads explicitly; synthesis returns audio, not playback.
+</code></pre></div>
+<p>See <a href="../native-magpie/">native Magpie</a> for complete selection, language, voices,
+callback constraints and request lifetime.</p>
+<h3 id="createmagpieruntime-default-export">createMagpieRuntime default export</h3>
+<p>The default export from <code>arcane-os/local-ai/magpie</code> is the same
+<code>createMagpieRuntime</code> function, with identical inputs, results and lifetime.</p>
+<h3 id="buildmagpiehelper">buildMagpieHelper()</h3>
+<h4 id="overview-and-syntax-3">Overview and syntax</h4>
+<p><code>buildMagpieHelper({runtime,outputRoot,signal,onEvent}={})</code> configures, builds
+and installs the first-party Magpie helper against the caller&#39;s installed
+<code>runtime.cmakeDirectory</code>, public NeMo TTS headers and matching libraries.</p>
+<h4 id="result-availability-and-example-1">Result, availability and example</h4>
+<p>Returns <code>{platform,architecture,root,helperExecutable,diagnostics}</code>, preserving
+complete configure/compile/install results. Requires Node, CMake 3.26+, C++17,
+platform threads and matching NeMo libraries. <code>outputRoot</code> belongs to the
+caller. It downloads no dependency, model or voice and performs no inference.
+Cancellation and process failures remain observable.</p>
+<div class="code-block reference-code"><div class="code-bar"><span>javascript</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-javascript">import {buildMagpieHelper} from &#39;arcane-os/local-ai/magpie/build&#39;;
+
+async function buildSelectedAnnouncer(runtime, outputRoot, signal, onEvent) {
+    return buildMagpieHelper({runtime, outputRoot, signal, onEvent});
+}
+</code></pre></div>
+<p>See <a href="../native-magpie/#build-the-first-party-helper">helper build prerequisites</a>.</p>
+<h3 id="buildmagpiehelper-default-export">buildMagpieHelper default export</h3>
+<p>The default export from <code>arcane-os/local-ai/magpie/build</code> is the same
+<code>buildMagpieHelper</code> function.</p>
 <h3 id="createwhisperruntime">createWhisperRuntime()</h3>
 <h4 id="overview-206">Overview</h4>
 <p>Creates one retained native Whisper engine from a prepared runtime or a lazy
@@ -8436,7 +8669,7 @@ omitting it uses the runtime&#39;s selected model. <code>onEvent</code> receives
 native preparation/process diagnostics. The runtime describes matching helper,
 Whisper backend libraries, decoder and model files; see the complete
 <a href="../local-whisper/">native Whisper preparation contract</a>.</p>
-<h4 id="returned-members-and-lifetime">Returned members and lifetime</h4>
+<h4 id="returned-members-and-lifetime-2">Returned members and lifetime</h4>
 <div class="table-wrap" data-columns="2" role="region" aria-label="Scrollable reference table" tabindex="0"><table>
 <thead>
 <tr>
@@ -8485,7 +8718,7 @@ transport correlation, never a generated replacement or payload field; it
 remains through terminal error settlement and clears or changes on the next
 request/load/unload/close. The <a href="../native-speech/">shared speech adapter</a> preserves
 only that continuing owned request, while new requests require actual readiness.</p>
-<h4 id="availability-and-example-1">Availability and example</h4>
+<h4 id="availability-and-example-3">Availability and example</h4>
 <p>Node on Windows, Linux and macOS with matching native resources; Android needs
 the corresponding host/process adaptation. Prepared files establish resource
 availability, not execution on every platform. This uses an already prepared
@@ -8566,6 +8799,17 @@ core.start();
 requests and results unchanged. Format decoding, model processing and encoding
 remain with that engine. This factory supplies no speech engine or automatic
 browser/native provider selection.</p>
+<p>Optional engine <code>openStream({...options,signal,onUpdate})</code> supplies continuous
+recognition; optional <code>synthesizeStream(request,{signal,onProgress,onAudio,requestId})</code>
+supplies awaited ordered PCM output. Each role reports <code>supportsStreaming</code>
+independently from loaded readiness. The Core streaming methods are
+<code>speech.open</code>, <code>push</code>, <code>endpoint</code>, <code>finish</code>, <code>cancel</code>, <code>synthesizeStream</code>,
+<code>audioConsumed</code> and <code>cancelSynthesis</code> (each under <code>speech.</code>). Request-scoped
+<code>speech.opened</code>, <code>speech.transcription</code> and <code>speech.audio</code> events retain stream
+ownership; TTS acknowledgements apply backpressure while control traffic continues.
+Endpoint drains an utterance without closing its stream; finish closes terminally.
+ASR finals are recognition segments, not conversational decisions. Cancellation
+joins the selected engine&#39;s native work. See the <a href="../native-speech/#continuous-transcription-and-streaming-synthesis">complete streaming contract</a>.</p>
 <h4 id="members-results-and-events">Members, results and events</h4>
 <p>The returned object has <code>name: &#39;speech&#39;</code>, <code>current</code>, <code>subscribe</code>, <code>close</code>,
 <code>start</code>, <code>methods</code>, <code>drain</code> and <code>dispose</code>:</p>
@@ -8618,10 +8862,12 @@ their operation with <code>SPEECH_ENGINE_UNAVAILABLE</code>; work after shutdown
 rejects with <code>CORE_CLOSING</code>. Engine errors remain observable, and engine cleanup
 failures reject shutdown with <code>AggregateError</code>. Asynchronous listener failures
 reach developer diagnostics. Engine platform support remains its own contract;
-this Node composition layer adds no engine dependency. Existing AI readiness
-consumers recognize <code>whisper.cpp</code> and <code>kokoro-onnx</code> IDs independently of the
-service&#39;s engine-neutral interface. See the <a href="../native-speech/">complete engine and lifetime
-contract</a>.</p>
+this Node composition layer adds no engine dependency. The shared AI adapter
+follows the selected model and engine in per-role snapshots, including Nemotron
+and Magpie. Only its older aggregate-only fallback retains fixed
+<code>whisper.cpp</code>/<code>whisper-small</code> and <code>kokoro-onnx</code>/<code>kokoro</code> expectations.
+Unavailable streaming operations reject <code>SPEECH_OPERATION_UNAVAILABLE</code> without
+fallback. See the <a href="../native-speech/">complete engine and lifetime contract</a>.</p>
 <h3 id="createspeechservice-default-export">createSpeechService default export</h3>
 <p>The default export from <code>arcane-os/core/speech</code> is the same
 <code>createSpeechService</code> factory, with identical inputs, results and lifecycle.</p>
@@ -8824,7 +9070,7 @@ complete console diagnostics by default.</p>
 to <code>coreRequestId</code>, and its matching <code>data.requestId</code> compatibility mapping.
 Additive <code>clientRequestId</code> exposes the original client ID independently; other
 parameters, results and event data remain unchanged.</p>
-<h4 id="availability-and-example-2">Availability and example</h4>
+<h4 id="availability-and-example-4">Availability and example</h4>
 <p>Node supports app-selected named pipes on Windows and Unix-domain sockets on
 Linux/macOS; Android needs its host adaptation. Parent directories must exist.
 An occupied endpoint returns native <code>EADDRINUSE</code> with
@@ -10854,6 +11100,6 @@ contract. See <a href="../protocols/#native-only-application-resources">native-o
       <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#import-map">Import map</a><a href="#shared-operation-contract">Shared operation contract</a><a href="#canonical-member-inventory">Canonical member inventory</a><a href="#packaging-and-release-bundles">Packaging and release bundles</a><a href="#runtime-and-app-descriptors">Runtime and app descriptors</a><a href="#targets-native-plans-and-providers">Targets, native plans, and providers</a><a href="#identity-and-protocol-constants">Identity and protocol constants</a><a href="#errors">Errors</a><a href="#workspace-doctor-repository-and-server">Workspace, doctor, repository, and server</a><a href="#headless-toolchain-operations">Headless toolchain operations</a><a href="#events-processes-and-testing">Events, processes, and testing</a><a href="#explicit-sdk-update-checks">Explicit SDK update checks</a><a href="#central-events-time-travel-and-dom-instrumentation">Central events, time travel, and DOM instrumentation</a><a href="#core-client-and-native-runtime">Core client and native runtime</a><a href="#browser-speech-providers">Browser speech providers</a><a href="#portable-mail">Portable Mail</a><a href="#shared-logging">Shared logging</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.94.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

@@ -66,6 +66,8 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-app-control/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-decisions/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-diagnostics/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-magpie/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-nemotron/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/native-speech/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/overview/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/protocols/</loc></url>
@@ -131,6 +133,8 @@
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/memory-records/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/message-advisory/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/model-definition/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/native-speech-capture/</loc></url>
+  <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/native-speech-playback/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama-model-identifier/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama-settings/</loc></url>
   <url><loc>https://thewizardnexus.github.io/arcane-os-sdk/reference/runtime-modules/ollama/</loc></url>

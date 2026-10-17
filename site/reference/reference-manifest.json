@@ -3,16 +3,16 @@
   "generatedBy": "tools/build-reference-site.mjs",
   "canonicalRoot": "https://thewizardnexus.github.io/arcane-os-sdk/",
   "versions": {
-    "sdk": "0.94.0",
+    "sdk": "0.95.0",
     "runtime": "0.8.12",
     "protocol": "arcane/1"
   },
   "counts": {
-    "markdownPages": 58,
+    "markdownPages": 60,
     "collectionPages": 2,
-    "generatedPages": 95,
-    "runtimeModulePages": 93,
-    "htmlPages": 155,
+    "generatedPages": 97,
+    "runtimeModulePages": 95,
+    "htmlPages": 159,
     "inventories": 4
   },
   "pages": [
@@ -335,6 +335,18 @@
       "kind": "markdown"
     },
     {
+      "source": "docs/reference/native-magpie.md",
+      "output": "site/reference/native-magpie/index.html",
+      "route": "reference/native-magpie/",
+      "kind": "markdown"
+    },
+    {
+      "source": "docs/reference/native-nemotron.md",
+      "output": "site/reference/native-nemotron/index.html",
+      "route": "reference/native-nemotron/",
+      "kind": "markdown"
+    },
+    {
       "source": "docs/reference/native-speech.md",
       "output": "site/reference/native-speech/index.html",
       "route": "reference/native-speech/",
@@ -429,7 +441,7 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 6,
-        "reviewedCallables": 25,
+        "reviewedCallables": 27,
         "publicMembers": 34,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
@@ -474,7 +486,7 @@
       "moduleClassification": "public-first-party",
       "contractCounts": {
         "exports": 9,
-        "reviewedCallables": 20,
+        "reviewedCallables": 23,
         "publicMembers": 45,
         "literalCustomEvents": 0,
         "directCodedFailures": 33,
@@ -760,7 +772,7 @@
       "contractCounts": {
         "exports": 1,
         "reviewedCallables": 0,
-        "publicMembers": 4,
+        "publicMembers": 5,
         "literalCustomEvents": 0,
         "directCodedFailures": 0,
         "exportedErrorSubclasses": 0
@@ -1240,6 +1252,36 @@
       "contractCounts": {
         "exports": 2,
         "reviewedCallables": 2,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 2,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/NativeSpeechCapture.js",
+      "output": "site/reference/runtime-modules/native-speech-capture/index.html",
+      "route": "reference/runtime-modules/native-speech-capture/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 1,
+        "publicMembers": 0,
+        "literalCustomEvents": 0,
+        "directCodedFailures": 0,
+        "exportedErrorSubclasses": 0
+      }
+    },
+    {
+      "source": "runtime/arcane/modules/NativeSpeechPlayback.js",
+      "output": "site/reference/runtime-modules/native-speech-playback/index.html",
+      "route": "reference/runtime-modules/native-speech-playback/",
+      "kind": "runtime-module",
+      "moduleClassification": "public-first-party",
+      "contractCounts": {
+        "exports": 1,
+        "reviewedCallables": 1,
         "publicMembers": 0,
         "literalCustomEvents": 0,
         "directCodedFailures": 2,

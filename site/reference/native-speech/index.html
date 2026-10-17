@@ -13,16 +13,17 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header" data-site-header><a class="brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="48" height="48"><span><strong>Arcane OS</strong><small>SDK docs</small></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="nav-toggle-line" aria-hidden="true"></span><span class="visually-hidden">Open navigation</span></button><nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation" data-navigation><a href="../../examples/">Hello World</a><a href="../../guides/">Guides</a><a href="../sdk-api/">API</a><a href="../" aria-current="page">Reference</a><a class="repo-link" href="https://github.com/TheWizardNexus/arcane-os-sdk" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav></header>
   <main id="main-content">
-    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.94.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
+    <header class="doc-hero section-shell"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="../../">Docs</a><span aria-hidden="true">/</span><a href="../">Reference</a><span aria-hidden="true">/</span><span aria-current="page">Native speech service</span></nav><p class="eyebrow">Capability first · transport second</p><h1 id="native-speech-service">Native speech service</h1><p class="doc-lead">createSpeechService({stt, tts, signal} = {}) composes independently selected native speech engines into one Core service. It is the named and default export from arcane-os/core/speech.</p><div class="doc-meta"><span>SDK 0.95.0</span><span>Runtime 0.8.12</span><span>Protocol arcane/1</span></div></header>
     <div class="docs-layout section-shell">
-      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
-      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
+      <aside class="docs-sidebar reference-sidebar" aria-label="Reference navigation"><section><h2>Start here</h2><nav aria-label="Start here reference navigation"><a href="../overview/">Overview</a><a href="../sdk-api/">SDK JavaScript API</a><a href="../cli/">CLI</a><a href="../event-manager/">EventManager</a><a href="../availability-and-normalization/">Availability</a><a href="../protocols/">Protocols</a><a href="../behavioral-testing/">Behavioral testing</a></nav></section><section><h2>Runtime</h2><nav aria-label="Runtime reference navigation"><a href="../ai/">Normalized AI</a><a href="../ai/twin-cloud/">TWiN Cloud quick start</a><a href="../ai/browser-wasm/">Browser-WASM AI</a><a href="../ai/browser-decisions/">Browser typed decisions</a><a href="../ai/browser-speech/">Browser speech</a><a href="../websocket-client/">Shared WebSocket clients</a><a href="../runtime-modules/">Modules</a><a href="../runtime-entities/">Entities</a><a href="../runtime-components/">Components</a><a href="../arcane-ollama/">Ollama provider API (advanced)</a></nav></section><section><h2>Core</h2><nav aria-label="Core reference navigation"><a href="../core/">Core map</a><a href="../core-client/">Core browser client</a><a href="../core-runtime/">Native Core runtime</a><a href="../core-development/">Development Core services</a><a href="../core-shared-host/">Shared Core host</a><a href="../native-app-control/">Native app control</a><a href="../codex-app-server/">Codex App Server</a><a href="../mcp-stdio/">MCP STDIO server</a><a href="../local-ai/">Local AI through Core</a><a href="../model-observation/">Existing model observation</a><a href="../document-acquisition/">Native document acquisition</a><a href="../execution-devices/">Physical execution devices</a><a href="../native-decisions/">Native typed decisions</a><a href="../local-image-flux/">FLUX.2 Klein 4B</a><a href="../local-image-sdxl/">SDXL Base 1.0</a><a href="./" aria-current="page">Native speech service</a><a href="../native-nemotron/">Native Nemotron</a><a href="../native-magpie/">Native Magpie</a><a href="../local-whisper/">Native Whisper</a><a href="../guides/native-whisper-openvino/">Intel NPU Whisper</a><a href="../core-repositories/">Native repository workspaces</a><a href="../core-native-packaging/">Portable Core packaging</a><a href="../core/arcane-api/">Arcane API</a><a href="../core/capabilities/">Capabilities and admission</a><a href="../core/reference/arcane-api/ai-and-ollama/#arcaneaichat">Arcane.ai.chat()</a><a href="../core/arcane-events/">Events</a><a href="../core/arcane-ai-contracts/">AI contracts</a><a href="../core/arcane-entities/">Entity exports</a><a href="../core/ollama-module/">Ollama internals (advanced)</a><a href="../core/reference/arcane-api/">Focused member guides</a></nav></section><section><h2>Data</h2><nav aria-label="Data reference navigation"><a href="../inventory/">Machine inventories</a></nav></section></aside>
+      <article class="prose reference-prose" data-reference-source="docs/reference/native-speech.md"><details class="reference-toc-compact"><summary>On this page</summary><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></details><p><code>createSpeechService({stt, tts, signal} = {})</code> composes independently selected
 native speech engines into one Core service. It is the named and default export
 from <code>arcane-os/core/speech</code>.</p>
 <p>The host supplies an STT engine, a TTS engine, or both. Construction performs no
 installation, model download, model loading, or inference. Core registration
 exposes <code>speech.status</code>, <code>speech.load</code>, <code>speech.unload</code>, <code>speech.transcribe</code>,
-and <code>speech.synthesize</code>; an operation whose engine was omitted rejects with
+and <code>speech.synthesize</code>, plus the optional streaming operations described below;
+an ordinary operation whose engine was omitted rejects with
 <code>SPEECH_ENGINE_UNAVAILABLE</code>.
 The optional <code>signal</code> controls the service lifetime.</p>
 <div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">import {createCoreRuntime} from &#39;arcane-os/core/runtime&#39;;
@@ -44,6 +45,14 @@ same service, readiness events, complete request/result contract and cancellatio
 path. The host selects that encoder and its paired model resources; the browser
 continues calling <code>speech.transcribe</code> without loading native libraries itself.</p>
 <h2 id="startup-and-status">Startup and status</h2>
+<p>A speech-only interface can construct the shared browser AI API with explicit
+<code>null</code> for both the language-model service and model:
+<code>new AI(null, &#39;LOCAL_SPEACH&#39;, &#39;LOCAL_SPEACH&#39;, null, ttsModel, sttModel)</code>.
+This leaves both LLM routes unselected from construction onward; it does not
+register or activate the historical default language provider. Select a real
+language model later through <code>configureProviders</code>. Omitted or empty constructor
+arguments keep their historical defaults, and <code>setAI</code> retains its existing
+omitted/null/empty-field semantics.</p>
 <p><code>start(context)</code> subscribes to each configured engine and starts their loads
 independently. It returns immediately, allowing Core and <code>speech.status</code> to
 respond while models load. A failure in one role leaves the other role usable.
@@ -90,9 +99,15 @@ Each engine publishes the actual state of its selected model.</p>
 <code>busy</code>, with its complete error or progress information when present. An
 omitted role has <code>state: &#39;unavailable&#39;</code>, <code>loaded: false</code>, and <code>busy: false</code>.
 File presence, a spawned process, and a callable bridge do not establish loaded
-model readiness. Existing readiness consumers additionally recognize
-the engine IDs <code>whisper.cpp</code> and <code>kokoro-onnx</code>; another engine ID requires the
-corresponding consumer integration.</p>
+model readiness. The shared AI adapter follows the selected engine identity
+and model in these per-role snapshots, including Nemotron and Magpie. Only the
+older aggregate-only fallback retains fixed <code>whisper.cpp</code>/<code>whisper-small</code> and
+<code>kokoro-onnx</code>/<code>kokoro</code> expectations.</p>
+<p>Each role also reports <code>supportsStreaming</code>: STT requires the configured
+engine&#39;s <code>openStream()</code> method, and TTS requires its <code>synthesizeStream()</code> method.
+This capability is independent of <code>loaded</code> and <code>available</code>; a facade method
+alone does not establish support in the selected engine. Complete engine state,
+including <code>defaultVoice</code> and <code>voices</code> when supplied, remains present.</p>
 <h2 id="explicit-role-activation">Explicit role activation</h2>
 <p><code>speech.load({role, ...selection})</code> and <code>speech.unload({role, ...selection})</code>
 route only to the selected <code>stt</code> or <code>tts</code> engine. The service separates the
@@ -126,6 +141,112 @@ a speech request. Subsequent progress is the selected engine&#39;s actual report
 cancelled requests publish no later progress.
 Role load/unload acknowledgements additionally carry <code>operation: &#39;load&#39;</code> or
 <code>&#39;unload&#39;</code> in that progress record.</p>
+<h2 id="continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</h2>
+<p><code>Arcane.speech.openStream(request, {signal, onUpdate, onProgress, onRequest})</code>
+returns an owned handle immediately:</p>
+<div class="code-block reference-code"><div class="code-bar"><span>js</span><span data-copy-status role="status" aria-live="polite" aria-atomic="true"></span><button type="button" data-copy-button>Copy</button></div><pre><code class="language-js">const recognition = Arcane.speech.openStream({sampleRate: 16000}, {
+  signal,
+  onUpdate: function retainNativeSnapshot(result) {
+    // Keep the complete snapshot. The application decides when to take a turn.
+    showRecognition(result);
+  }
+});
+await recognition.ready;
+await recognition.push(pcm); // Float32Array, supplied in capture order.
+await recognition.forceEndpoint(); // Finalizes recognition, keeps the stream.
+const complete = await recognition.finish(); // Drains and closes this stream.
+</code></pre></div>
+<p>The handle exposes <code>streamId</code>, <code>ready</code>, <code>completion</code>, <code>current()</code>,
+<code>push(Float32Array)</code>, <code>forceEndpoint()</code>, <code>finish()</code>, and <code>cancel(reason)</code>.
+<code>ready</code> resolves with the native-open acknowledgement; <code>completion</code> resolves
+with the engine&#39;s complete terminal result or rejects with its actual failure.
+<code>current()</code> returns the latest delivered complete snapshot. Pushes and endpoint
+controls are ordered, and each returned promise lets the producer apply
+backpressure without dropping captured samples. <code>forceEndpoint()</code> waits for
+ordered update callbacks preceding its control response, so an external Reply
+control can consume those final segments. <code>finish()</code> follows every accepted
+push and waits for final callback delivery. An update callback must not await
+its own <code>forceEndpoint()</code>, <code>finish()</code>, or <code>completion</code> delivery join; invoke these
+controls outside the callback. <code>cancel()</code> targets this
+stream, suppresses later callbacks immediately, and awaits its explicit native
+cleanup control; it leaves the other speech role alone. Aborting the caller&#39;s
+signal uses ordinary Core request cancellation and can settle the browser&#39;s
+request before native cleanup finishes.
+Creation opens no microphone: the selected capture owner supplies PCM.</p>
+<p>Updates are the engine&#39;s unchanged snapshots, including provisional/final
+status, words, timestamps, and speaker scope when supplied. A provisional
+snapshot replaces the preceding provisional snapshot; it is not appended text.
+An ASR final or silence boundary is recognition output, not a completed human
+turn, an instruction, or approval. <code>forceEndpoint()</code> preserves the native
+stream&#39;s speaker scope according to its engine contract. The application owns
+conversational meaning, turn completion, tool selection, and whether to issue
+an LLM request. The SDK starts no chat request from an update.</p>
+<p>The underlying <code>speech.open</code> request remains pending for the entire stream,
+with no fixed request timeout. <code>speech.opened</code> and <code>speech.transcription</code>
+events use that request&#39;s scoped emitter, carrying <code>{streamId, ...metadata}</code>
+and <code>{streamId, result}</code> respectively. They reach only the owning connection.
+<code>speech.push</code>, <code>speech.endpoint</code>, <code>speech.finish</code>, and <code>speech.cancel</code> address
+the same stream. Client close, document retirement, transport disconnect, or
+the request signal cancels the native stream through normal Core request
+ownership. This stream is not accepted service-lifetime background work.</p>
+<p><code>Arcane.speech.synthesizeStream(request, {signal, onAudio, onProgress, onRequest})</code> returns a promise for the complete native terminal metadata.
+The complete synthesis payload reaches the selected engine unchanged.
+The required <code>onAudio(audio)</code> consumer receives every ordered native PCM contribution, preserving
+its metadata; <code>audio.pcm</code> is a <code>Uint8Array</code>, interpreted using the supplied
+<code>format</code>, <code>channels</code>, and <code>sampleRate</code>. Magpie supplies signed little-endian
+16-bit mono PCM. The facade does not play audio, infer audible completion, or
+add a voice, language, speed, or output limit. The selected playback owner
+consumes this stream and owns its actual playback completion and interruption.
+Give each utterance its own signal to stop precisely that utterance without
+stopping microphone capture or unrelated synthesis.</p>
+<p>The synthesis request has no fixed timeout. Its request-scoped <code>speech.audio</code>
+events contain <code>{streamId, sequence, audio}</code>; <code>speech.progress</code> also carries the
+stream correlation. The facade serializes asynchronous callbacks and sends
+<code>speech.audioConsumed</code> for that exact stream and sequence only after <code>onAudio</code>
+completes. The native producer awaits this acknowledgement before contributing
+the next PCM chunk; the event parser remains free to handle control messages.
+Sequence and acknowledgement metadata stay outside the audio payload.</p>
+<p>Aborting the utterance signal suppresses later callback delivery and sends
+<code>speech.cancelSynthesis</code>. That scoped control releases pending audio
+acknowledgements and joins the native synthesis task. The facade keeps the
+original response pending and joins this cleanup control before settling;
+ordinary cancellation rejects with the caller&#39;s reason. Callback failure
+cancels the same owned operation and retains its complete failure together with
+any native cleanup failure. Successful completion waits for all callback
+delivery. A callback may abort its caller-owned signal, while its own completion
+must not await the same synthesis promise. A transport failure remains an error,
+not evidence of completed native cleanup. Playback completion remains with the
+selected playback owner, independently of synthesis completion.</p>
+<p>The Core transport uses base64 only for PCM framing: STT transfers exact
+Float32 bit patterns as little-endian samples, and TTS transfers the engine&#39;s
+complete PCM before decoding it back to the original sample representation.
+Routing and callbacks stay outside transcript and synthesis payloads.
+Existing file transcription, complete-audio synthesis, model loading, and
+unloading methods keep their original contracts. A selected engine without the
+requested streaming method reports <code>SPEECH_OPERATION_UNAVAILABLE</code>; the SDK
+selects no replacement engine or capture path.</p>
+<h3 id="shared-ai-capture-and-playback">Shared AI capture and playback</h3>
+<p>The built-in native AI adapter advertises continuous capture only when the
+selected STT engine reports streaming support. <code>ai.createTranscriptionCapture</code>
+uses the shared microphone owner, forwards the caller&#39;s media constraints and
+actual sample rate, and preserves every ordered PCM sample. Its <code>onUpdate</code>,
+<code>onInterim</code>, and <code>onSegment</code> callbacks receive the complete recognition record
+and a second <code>{requestStop}</code> argument. A callback can call <code>requestStop()</code> and
+return; the external owner joins <code>capture.stop()</code> or <code>capture.done</code>. Do not
+await those joins or <code>forceEndpoint()</code> from their own recognition callback.
+Stop drains accepted audio and final recognition; cancel joins microphone and
+native cleanup without inventing a completed transcript. Neither action sends
+a chat turn automatically.</p>
+<p>For a selected streaming TTS engine, <code>ai.prepareTTSPlayback()</code> returns an inert
+playback descriptor. Its <code>play()</code> consumes native PCM through the existing AI
+provider lane and shared audio output. Playback stop affects only that utterance;
+the control&#39;s <code>released</code> promise joins native cleanup. Existing full-audio
+<code>fetchTTS()</code> remains available. <code>streamTTS(text, end, {languageCode})</code>,
+<code>prepareTTSPlayback({input, languageCode, ...})</code>, and
+<code>fetchTTS({input, languageCode, ...})</code> carry the caller&#39;s per-utterance language
+to the native engine separately from the unchanged text. The SDK does not infer
+language or create conversation replies. See the
+<a href="../native-nemotron/">Nemotron</a> and <a href="../native-magpie/">Magpie</a> engine contracts.</p>
 <h2 id="engine-interface">Engine interface</h2>
 <p>Each supplied engine implements:</p>
 <ul>
@@ -140,6 +261,13 @@ assets resolves to its ordinary unloaded state.</li>
 <li><code>transcribe(request, {signal, onProgress, requestId})</code> for STT, or
 <code>synthesize(request, {signal, onProgress, requestId})</code> for TTS. <code>requestId</code> is
 the actual Core request&#39;s control metadata, separate from the unchanged payload.</li>
+<li>Optional <code>openStream({...options, signal, onUpdate})</code> for continuous STT,
+returning <code>{push, forceEndpoint, finish, cancel, completion, current}</code>.
+Its cancellation must settle <code>completion</code> without requiring service shutdown.</li>
+<li>Optional <code>synthesizeStream(request, {signal, onProgress, onAudio, requestId})</code>
+for streaming TTS. Each <code>onAudio</code> value contains the complete <code>pcm</code> Buffer
+and its format metadata; the engine awaits each callback before producing the
+next contribution and joins native cleanup before settling cancellation.</li>
 <li><code>close()</code>, cancelling and joining its native work and releasing its resources.</li>
 </ul>
 <p>The service forwards each complete transcription/synthesis request and result
@@ -377,9 +505,9 @@ subscriptions. They do not close the host&#39;s shared engines or alter complete
 speech requests and results. Browser and explicitly registered speech providers
 retain their existing lifecycle contracts.</p>
 </article>
-      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
+      <aside class="on-this-page reference-toc" aria-label="On this page"><p>On this page</p><nav aria-label="On this page"><a href="#startup-and-status">Startup and status</a><a href="#explicit-role-activation">Explicit role activation</a><a href="#events-and-subscriptions">Events and subscriptions</a><a href="#continuous-transcription-and-streaming-synthesis">Continuous transcription and streaming synthesis</a><a href="#engine-interface">Engine interface</a><a href="#cancellation-and-shutdown">Cancellation and shutdown</a><a href="#native-kokoro-engine">Native Kokoro engine</a><a href="#ai-built-in-native-speech-readiness">AI built-in native speech readiness</a></nav></aside>
     </div>
   </main>
-  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.94.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
+  <footer class="site-footer section-shell"><a class="brand footer-brand" href="../../" aria-label="Arcane OS SDK documentation home"><img src="../../assets/arcane-sigil-512.png" alt="" width="40" height="40"><span><strong>Arcane OS SDK</strong><small>The Wizard Nexus</small></span></a><p>Reference describes SDK 0.95.0, Core reference 0.8.12, and protocol arcane/1. Check npm for the current registry channel.</p><nav aria-label="Footer navigation"><a href="../../architecture/">Architecture</a><a href="../../compatibility/">Compatibility</a><span>AGPL-3.0-only · commercial terms available</span></nav></footer>
 </body>
 </html>

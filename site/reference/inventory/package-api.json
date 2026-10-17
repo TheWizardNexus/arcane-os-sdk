@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.94.0",
+  "sdkVersion": "0.95.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 314,
+  "memberCount": 322,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
@@ -251,6 +251,134 @@
       "normalization": "Complete ordered voice array exported by the frontend; af_heart is the omitted voice default. An unsupported explicit voice reports its actual incompatibility without substitution."
     },
     {
+      "id": "local-ai-nemotron:createNemotronRuntime",
+      "name": "createNemotronRuntime",
+      "displayName": "createNemotronRuntime()",
+      "kind": "function",
+      "signature": "createNemotronRuntime({runtime,prepare,modelId='nemotron-3.5-asr-streaming-0.6b',modelPath,diarizationModelPath,gpu,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron",
+      "group": "Core native speech",
+      "summary": "Retains one native recognizer and optional diarizer across explicit utterance endpoints.",
+      "availability": "Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation",
+      "protocol": "Native ASR C ABI through one retained helper and replaying nemotron.state",
+      "normalization": "Returns current/subscribe/load/unload/transcribe/openStream/close. Exact ordered Float32 or f32le input uses the actual declared sample rate; complete snapshots retain alternatives, words, timestamps and speaker scope. forceEndpoint preserves the native stream; finish drains terminally. Callback joins reject NEMOTRON_CALLBACK_WAIT. Cancellation joins cleanup and exposes resetRequired when an in-flight native call requires helper termination; explicit load is required afterward. No microphone, semantic completion or fallback."
+    },
+    {
+      "id": "local-ai-nemotron:default",
+      "name": "default",
+      "displayName": "createNemotronRuntime default export",
+      "kind": "function",
+      "signature": "default as createNemotronRuntime",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron",
+      "group": "Core native speech",
+      "summary": "Default binding for the same createNemotronRuntime function.",
+      "availability": "Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation",
+      "protocol": "Native ASR C ABI through one retained helper and replaying nemotron.state",
+      "normalization": "Binding identity equals the named createNemotronRuntime export"
+    },
+    {
+      "id": "local-ai-nemotron-build:buildNemotronHelper",
+      "name": "buildNemotronHelper",
+      "displayName": "buildNemotronHelper()",
+      "kind": "function",
+      "signature": "async buildNemotronHelper({runtime,outputRoot,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron/build"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron/build",
+      "group": "Core native speech",
+      "summary": "Builds the first-party retained Nemotron ASR helper against a caller-selected NeMo installation.",
+      "availability": "Node with CMake 3.26+, C++17 toolchain and platform-matching public NeMo ASR headers/libraries/CMake package",
+      "protocol": "Owned configure/build/install process lifecycle",
+      "normalization": "runtime.cmakeDirectory and outputRoot select the prepared upstream installation and owned output. Returns platform/architecture/root/helperExecutable/executable and complete configure/compile/install diagnostics. Preserves cancellation and process failures; installs no dependency, model or toolchain and performs no inference."
+    },
+    {
+      "id": "local-ai-nemotron-build:default",
+      "name": "default",
+      "displayName": "buildNemotronHelper default export",
+      "kind": "function",
+      "signature": "default as buildNemotronHelper",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron/build"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron/build",
+      "group": "Core native speech",
+      "summary": "Default binding for the same buildNemotronHelper function.",
+      "availability": "Node with CMake 3.26+, C++17 toolchain and platform-matching public NeMo ASR headers/libraries/CMake package",
+      "protocol": "Owned configure/build/install process lifecycle",
+      "normalization": "Binding identity equals the named buildNemotronHelper export"
+    },
+    {
+      "id": "local-ai-magpie:createMagpieRuntime",
+      "name": "createMagpieRuntime",
+      "displayName": "createMagpieRuntime()",
+      "kind": "function",
+      "signature": "createMagpieRuntime({runtime,prepare,paths,modelAssets,assetProjectionId,resourcePaths,modelId='magpie',voice='Aria',languageCode='en-US',executionTarget,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/magpie"
+      ],
+      "primaryImport": "arcane-os/local-ai/magpie",
+      "group": "Core native speech",
+      "summary": "Retains native Magpie and NanoCodec for complete audio or ordered PCM synthesis.",
+      "availability": "Node with a matching first-party helper, selected NeMo TTS runtime, Magpie/tokenizer and NanoCodec assets; Windows/Linux/macOS source, Android host adaptation",
+      "protocol": "Native TTS C ABI through one retained helper and replaying magpie.state",
+      "normalization": "Returns current/subscribe/load/unload/synthesize/synthesizeStream/stop/close. Explicit CPU/CUDA selection, model-owned voice map and per-request language remain separate from exact input. Complete wav/pcm export and awaited ordered s16le onAudio delivery share FIFO request ownership. Native speed is 1. Stop targets a requestId and joins native/callback cleanup; self-joins reject MAGPIE_CALLBACK_WAIT. Playback and conversational meaning remain caller-owned; no download or fallback."
+    },
+    {
+      "id": "local-ai-magpie:default",
+      "name": "default",
+      "displayName": "createMagpieRuntime default export",
+      "kind": "function",
+      "signature": "default as createMagpieRuntime",
+      "entrypoints": [
+        "arcane-os/local-ai/magpie"
+      ],
+      "primaryImport": "arcane-os/local-ai/magpie",
+      "group": "Core native speech",
+      "summary": "Default binding for the same createMagpieRuntime function.",
+      "availability": "Node with a matching first-party helper, selected NeMo TTS runtime, Magpie/tokenizer and NanoCodec assets; Windows/Linux/macOS source, Android host adaptation",
+      "protocol": "Native TTS C ABI through one retained helper and replaying magpie.state",
+      "normalization": "Binding identity equals the named createMagpieRuntime export"
+    },
+    {
+      "id": "local-ai-magpie-build:buildMagpieHelper",
+      "name": "buildMagpieHelper",
+      "displayName": "buildMagpieHelper()",
+      "kind": "function",
+      "signature": "async buildMagpieHelper({runtime,outputRoot,signal,onEvent}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/magpie/build"
+      ],
+      "primaryImport": "arcane-os/local-ai/magpie/build",
+      "group": "Core native speech",
+      "summary": "Builds the first-party Magpie synthesis helper against a caller-selected NeMo installation.",
+      "availability": "Node with CMake 3.26+, C++17 toolchain, platform threads and matching public NeMo TTS headers/libraries/CMake package",
+      "protocol": "Owned configure/build/install process lifecycle",
+      "normalization": "runtime.cmakeDirectory and outputRoot select the prepared upstream installation and owned output. Returns platform/architecture/root/helperExecutable and complete configure/compile/install diagnostics. Preserves cancellation and process failures; installs no dependency, model or toolchain and performs no inference."
+    },
+    {
+      "id": "local-ai-magpie-build:default",
+      "name": "default",
+      "displayName": "buildMagpieHelper default export",
+      "kind": "function",
+      "signature": "default as buildMagpieHelper",
+      "entrypoints": [
+        "arcane-os/local-ai/magpie/build"
+      ],
+      "primaryImport": "arcane-os/local-ai/magpie/build",
+      "group": "Core native speech",
+      "summary": "Default binding for the same buildMagpieHelper function.",
+      "availability": "Node with CMake 3.26+, C++17 toolchain, platform threads and matching public NeMo TTS headers/libraries/CMake package",
+      "protocol": "Owned configure/build/install process lifecycle",
+      "normalization": "Binding identity equals the named buildMagpieHelper export"
+    },
+    {
       "id": "local-ai-whisper:createWhisperRuntime",
       "name": "createWhisperRuntime",
       "displayName": "createWhisperRuntime()",
@@ -429,8 +557,8 @@
       "group": "Core native speech",
       "summary": "Composes host-supplied transcription and synthesis engines with independent loading and role readiness.",
       "availability": "Node Core with explicitly supplied engines; engine platform, model and format support remain engine-owned",
-      "protocol": "arcane/1 speech.status/load/unload/transcribe/synthesize with speech.state/progress",
-      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown. Explicit load/unload require role stt or tts and forward the remaining activation fields and complete result through that role's configured engine; supported preparation remains with that engine. Startup waiting is independently owned from caller cancellation; no automatic provider selection is introduced."
+      "protocol": "arcane/1 speech.status/load/unload/transcribe/synthesize; optional open/push/endpoint/finish/cancel/synthesizeStream/audioConsumed/cancelSynthesis with speech.state/progress/opened/transcription/audio",
+      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown. Explicit load/unload require role stt or tts and forward the remaining activation fields and complete result through that role's configured engine; supported preparation remains with that engine. Per-role supportsStreaming reflects actual engine methods independently of readiness. Request-scoped streaming retains exact PCM and unchanged snapshots; endpoint preserves stream scope, terminal finish drains, and cancellation joins native ownership. Awaited TTS audio acknowledgements apply producer backpressure without blocking control traffic. ASR finals do not decide conversation completion. Startup waiting is independently owned from caller cancellation; no automatic provider selection is introduced."
     },
     {
       "id": "core-speech:default",
@@ -4444,7 +4572,7 @@
       "summary": "Projects a Core client into the established application-facing Arcane namespace.",
       "availability": "Browser and native WebView JavaScript hosts with a Core client",
       "protocol": "arcane/1 compatibility facade",
-      "normalization": "Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.state({signal}?) reads the requesting window and window.setState({state},{signal}?) selects normal, maximized or fullscreen. The matching Windows host returns {platform:'windows',supported:true,state}, including observed minimized state, restores normal bounds/frame controls on leaving fullscreen and prevents activation/focus assignment during visible state transitions without changing TopMost, Core, origin or profile. Saved Settings remain application-owned; cancellation does not undo an applied change and unavailable hosts retain their actual errors without fallback. window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance. notifications.status/show/state/close forward complete caller requests and standard invoke options; status normalizes only METHOD_NOT_ALLOWED with core-namespace-unavailable while retaining the complete original error. Matching native window hosts retain complete notification records and ordered revisions across renderer navigation, with notifications.state events and subscribe-before-snapshot recovery. Submitted means native Show returned, not displayed or read; cancellation after submission does not remove an accepted notice, and explicit close retains its record. Recipient, text, trigger, deduplication and navigation policy remains application-owned. speech.load(request,options) and speech.unload(request,options) forward complete activation requests, cancellation and request observers with no elapsed-time cutoff; selected engines own preparation and native retirement."
+      "normalization": "speech.openStream(request,options) returns streamId/ready/completion/current/push/forceEndpoint/finish/cancel with ordered exact Float32 input and complete snapshot callbacks; endpoint/finish delivery joins must occur outside their own callbacks. Explicit stream cancel joins native cleanup, distinct from ordinary signal cancellation. speech.synthesizeStream(request,{signal,onAudio,onProgress,onRequest}) awaits required ordered Uint8Array PCM callbacks and exact consumption acknowledgements, joins cancellation, and returns complete terminal metadata without playback. Both streams have no fixed timeout. Routes namespace methods through client.invoke while retaining operation-specific parameters, correlation, streaming callbacks, timeouts and cancellation; window.state({signal}?) reads the requesting window and window.setState({state},{signal}?) selects normal, maximized or fullscreen. The matching Windows host returns {platform:'windows',supported:true,state}, including observed minimized state, restores normal bounds/frame controls on leaving fullscreen and prevents activation/focus assignment during visible state transitions without changing TopMost, Core, origin or profile. Saved Settings remain application-owned; cancellation does not undo an applied change and unavailable hosts retain their actual errors without fallback. window.setTheme(presentation,{signal}?) forwards the complete per-window backgroundColor/textColor record, with omitted fields unchanged and null reset, and returns the host's actual applied/unsupported result without changing system appearance. notifications.status/show/state/close forward complete caller requests and standard invoke options; status normalizes only METHOD_NOT_ALLOWED with core-namespace-unavailable while retaining the complete original error. Matching native window hosts retain complete notification records and ordered revisions across renderer navigation, with notifications.state events and subscribe-before-snapshot recovery. Submitted means native Show returned, not displayed or read; cancellation after submission does not remove an accepted notice, and explicit close retains its record. Recipient, text, trigger, deduplication and navigation policy remains application-owned. speech.load(request,options) and speech.unload(request,options) forward complete activation requests, cancellation and request observers with no elapsed-time cutoff; selected engines own preparation and native retirement."
     },
     {
       "id": "core-client:installCoreClient",
