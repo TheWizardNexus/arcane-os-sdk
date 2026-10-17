@@ -1,17 +1,113 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "0.95.0",
+  "sdkVersion": "0.96.0",
   "environment": {
     "runtime": "Node.js for Node entrypoints; browser for browser-only entrypoints",
     "minimumVersion": "22.23.2 for Node entrypoints",
     "moduleSystem": "ESM"
   },
-  "memberCount": 322,
+  "memberCount": 328,
   "runtimeSubpathPatterns": {
     "arcane-os/modules/*": "./runtime/arcane/modules/*",
     "arcane-os/entities/*": "./runtime/arcane/entities/*"
   },
   "members": [
+    {
+      "id": "local-ai-nemotron:NEMO_SPEECH_MODELS",
+      "name": "NEMO_SPEECH_MODELS",
+      "displayName": "NEMO_SPEECH_MODELS",
+      "kind": "constant",
+      "signature": "NEMO_SPEECH_MODELS",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron",
+      "group": "Core native speech",
+      "summary": "Describes the selected complete Nemotron and Magpie upstream model companions.",
+      "availability": "Node; importing this catalog performs no I/O",
+      "protocol": "Selected NVIDIA NeMo-Speech.cpp 0.2.0 model catalog",
+      "normalization": "stt selects ASR and diarization; tts selects Magpie, NanoCodec and ten tokenizer/configuration members. Each record exposes modelId, providerId, name, members, resourcePaths and optional archives. No acquisition, runtime install, device choice or inference occurs at import."
+    },
+    {
+      "id": "local-ai-nemotron:prepareNemotronModels",
+      "name": "prepareNemotronModels",
+      "displayName": "prepareNemotronModels()",
+      "kind": "function",
+      "signature": "prepareNemotronModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron",
+      "group": "Core native speech",
+      "summary": "Explicitly prepares the complete ASR and diarization catalog selection.",
+      "availability": "Node with the existing model-assets service",
+      "protocol": "Native model-assets discovery and persistent preparation",
+      "normalization": "Resolves assetProjectionId, directory, members, resourcePaths and idempotent asynchronous release(). An omitted id is generated. Optional directories are searched first unless refresh:true; the first complete matching catalog selection is borrowed, otherwise shared prepare acquires the complete set beneath workingDirectory/model-assets. Ordered asynchronous onProgress receives full file-based semantic events; reused selections report reuse then ready. Cancellation and callback failures join cleanup. Engines retain actual use; callers release preparation ownership after retention. Complete acquisitions and borrowed originals remain stored. No runtime install, device choice, microphone or inference."
+    },
+    {
+      "id": "local-ai-nemotron:prepareMagpieModels",
+      "name": "prepareMagpieModels",
+      "displayName": "prepareMagpieModels()",
+      "kind": "function",
+      "signature": "prepareMagpieModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})",
+      "entrypoints": [
+        "arcane-os/local-ai/nemotron"
+      ],
+      "primaryImport": "arcane-os/local-ai/nemotron",
+      "group": "Core native speech",
+      "summary": "Explicitly prepares Magpie, NanoCodec and all matching tokenizer companions.",
+      "availability": "Node with the existing model-assets service",
+      "protocol": "Native model-assets discovery and persistent preparation",
+      "normalization": "Same discovery, preparation, cancellation, ordered progress and release contract as prepareNemotronModels, using NEMO_SPEECH_MODELS.tts. Resolves assetProjectionId, directory, members, resourcePaths and release; resourcePaths contains model, codec and tokenizerConfig. The shared TAR owner extracts ten selected tokenizer/configuration members from upstream ranges while preserving complete files. Voice, language and device remain caller-owned; preparation performs no synthesis."
+    },
+    {
+      "id": "core-model-assets:discoverCoreModelAssets",
+      "name": "discoverCoreModelAssets",
+      "displayName": "discoverCoreModelAssets()",
+      "kind": "function",
+      "signature": "discoverCoreModelAssets({client=getInstalledCoreClient(),directories,catalog,recursive,signal}={})",
+      "entrypoints": [
+        "arcane-os/ai/core-model-assets"
+      ],
+      "primaryImport": "arcane-os/ai/core-model-assets",
+      "group": "Core model assets",
+      "summary": "Discovers installed native model sets and companions in explicit directories.",
+      "availability": "Browser with an available model-assets Core service",
+      "protocol": "arcane/1 modelAssets.discover",
+      "normalization": "Resolves the native directories/models result unchanged, including ordered GGUF shards, missingMembers, completeness and catalog/acquisition source records. Directories and catalogs remain application-owned; filesystem availability does not establish model selection or readiness. No download, copy, move or engine load. Missing Core reports ARCANE_MODEL_ASSETS_CORE_UNAVAILABLE; actual operation and cancellation failures remain observable."
+    },
+    {
+      "id": "core-model-assets:openExistingCoreModelAssets",
+      "name": "openExistingCoreModelAssets",
+      "displayName": "openExistingCoreModelAssets()",
+      "kind": "function",
+      "signature": "openExistingCoreModelAssets({client=getInstalledCoreClient(),directory,members,signal}={})",
+      "entrypoints": [
+        "arcane-os/ai/core-model-assets"
+      ],
+      "primaryImport": "arcane-os/ai/core-model-assets",
+      "group": "Core model assets",
+      "summary": "Opens a complete borrowed projection without copying installed model originals.",
+      "availability": "Browser with an available model-assets Core service",
+      "protocol": "arcane/1 modelAssets.openExisting and modelAssets.release",
+      "normalization": "Generates its projection id and resolves id, directory, members and idempotent asynchronous release(). Native engines retain their own use; borrowed originals remain intact. Missing members report MODEL_ASSET_MEMBERS_MISSING with the complete list. Cancellation joins uncancelled release before rejecting; actual Core and cleanup failures remain observable."
+    },
+    {
+      "id": "core-model-assets:downloadCoreModelAssets",
+      "name": "downloadCoreModelAssets",
+      "displayName": "downloadCoreModelAssets()",
+      "kind": "function",
+      "signature": "downloadCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,archives,refresh=false,signal,onProgress}={})",
+      "entrypoints": [
+        "arcane-os/ai/core-model-assets"
+      ],
+      "primaryImport": "arcane-os/ai/core-model-assets",
+      "group": "Core model assets",
+      "summary": "Acquires a complete native model selection with correlated progress and joined cancellation.",
+      "availability": "Browser with an available model-assets Core service",
+      "protocol": "arcane/1 modelAssets.prepare/cancelPrepare/release and modelAssets.progress",
+      "normalization": "Generates its projection id and resolves id, directory, members and idempotent asynchronous release(). The native owner acquires complete ordinary and TAR-selected companions; full request-correlated file-based progress awaits asynchronous callbacks in order. Cancellation or callback failure joins native cancelPrepare cleanup and callback delivery before settlement; actual cleanup failures remain observable. Release relinquishes preparation ownership while completed downloads remain stored. No implicit model, runtime or device selection."
+    },
     {
       "id": "core-document-acquisition:createDocumentAcquisitionService",
       "name": "createDocumentAcquisitionService",
@@ -255,7 +351,7 @@
       "name": "createNemotronRuntime",
       "displayName": "createNemotronRuntime()",
       "kind": "function",
-      "signature": "createNemotronRuntime({runtime,prepare,modelId='nemotron-3.5-asr-streaming-0.6b',modelPath,diarizationModelPath,gpu,onEvent}={})",
+      "signature": "createNemotronRuntime({runtime,prepare,modelId='nemotron-3.5-asr-streaming-0.6b',modelPath,diarizationModelPath,modelAssets,assetProjectionId,resourcePaths,gpu,onEvent}={})",
       "entrypoints": [
         "arcane-os/local-ai/nemotron"
       ],
@@ -264,7 +360,7 @@
       "summary": "Retains one native recognizer and optional diarizer across explicit utterance endpoints.",
       "availability": "Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation",
       "protocol": "Native ASR C ABI through one retained helper and replaying nemotron.state",
-      "normalization": "Returns current/subscribe/load/unload/transcribe/openStream/close. Exact ordered Float32 or f32le input uses the actual declared sample rate; complete snapshots retain alternatives, words, timestamps and speaker scope. forceEndpoint preserves the native stream; finish drains terminally. Callback joins reject NEMOTRON_CALLBACK_WAIT. Cancellation joins cleanup and exposes resetRequired when an in-flight native call requires helper termination; explicit load is required afterward. No microphone, semantic completion or fallback."
+      "normalization": "Returns current/subscribe/load/unload/transcribe/openStream/close. Exact ordered Float32 or f32le input uses the actual declared sample rate; complete snapshots retain alternatives, words, timestamps and speaker scope. forceEndpoint preserves the native stream; finish drains terminally. Callback joins reject NEMOTRON_CALLBACK_WAIT. Cancellation joins cleanup and exposes resetRequired when an in-flight native call requires helper termination; explicit load is required afterward. No microphone, semantic completion or fallback. Optional modelAssets and completed assetProjectionId select exact resourcePaths.model and optional resourcePaths.diarization members. Load retains that projection before yielding through actual helper cleanup; callers may release preparation ownership after loading begins. An active selection must be unloaded before replacement; direct paths remain supported."
     },
     {
       "id": "local-ai-nemotron:default",
@@ -551,14 +647,14 @@
       "name": "createSpeechService",
       "displayName": "createSpeechService()",
       "kind": "function",
-      "signature": "createSpeechService({stt,tts,signal}={})",
+      "signature": "createSpeechService({stt,tts,signal,autoLoad=true}={})",
       "entrypoints": ["arcane-os/core/speech"],
       "primaryImport": "arcane-os/core/speech",
       "group": "Core native speech",
       "summary": "Composes host-supplied transcription and synthesis engines with independent loading and role readiness.",
       "availability": "Node Core with explicitly supplied engines; engine platform, model and format support remain engine-owned",
       "protocol": "arcane/1 speech.status/load/unload/transcribe/synthesize; optional open/push/endpoint/finish/cancel/synthesizeStream/audioConsumed/cancelSynthesis with speech.state/progress/opened/transcription/audio",
-      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown. Explicit load/unload require role stt or tts and forward the remaining activation fields and complete result through that role's configured engine; supported preparation remains with that engine. Per-role supportsStreaming reflects actual engine methods independently of readiness. Request-scoped streaming retains exact PCM and unchanged snapshots; endpoint preserves stream scope, terminal finish drains, and cancellation joins native ownership. Awaited TTS audio acknowledgements apply producer backpressure without blocking control traffic. ASR finals do not decide conversation completion. Startup waiting is independently owned from caller cancellation; no automatic provider selection is introduced."
+      "normalization": "Returns current/subscribe/close/start/methods/drain/dispose; forwards complete requests and results unchanged; replaying service state, synchronous accepted Thinking, combined request/lifetime cancellation and concurrent joined engine shutdown. Explicit load/unload require role stt or tts and forward the remaining activation fields and complete result through that role's configured engine; supported preparation remains with that engine. Per-role supportsStreaming reflects actual engine methods independently of readiness. Request-scoped streaming retains exact PCM and unchanged snapshots; endpoint preserves stream scope, terminal finish drains, and cancellation joins native ownership. Awaited TTS audio acknowledgements apply producer backpressure without blocking control traffic. ASR finals do not decide conversation completion. Startup waiting is independently owned from caller cancellation; no automatic provider selection is introduced. autoLoad:false exposes subscriptions and role capabilities without startup loads; explicit speech.load activates the selected role. Omission preserves independent automatic startup loading."
     },
     {
       "id": "core-speech:default",
@@ -655,8 +751,8 @@
       "group": "Core model assets",
       "summary": "Owns persistent native model acquisitions, temporary browser projections and actual engine retain lifetimes.",
       "availability": "Node Core with an application-selected working directory",
-      "protocol": "arcane/1 modelAssets.open/write/complete/release/status and modelAssets.state",
-      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress,refresh=false}) reuses complete exact ordered source selections stored beneath workingDirectory/model-assets or streams every selected upstream member concurrently. Complete acquisitions survive release, disposal and restart. refresh:true acquires a separate complete set without overwriting retained originals; ordinary reuse makes no network freshness claim. Matching same-process callers share acquisition with independent callbacks/cancellation, and the final interested cancellation joins unfinished I/O before removing only that attempt. Separate processes may fetch independently. release(id) relinquishes live preparation ownership; actual native retain lifetimes remain. Browser open/write/complete projections retain temporary cleanup after final native use. Startup downloads nothing; no migration, eviction or partial-transfer resumption."
+      "protocol": "arcane/1 modelAssets.open/write/complete/release/status/discover/openExisting/prepare/cancelPrepare, modelAssets.state and modelAssets.progress",
+      "normalization": "Returns current/prepare/retain/release/dispose and Core service lifecycle. Explicit prepare({id,workingDirectory,members:[{path,url}],signal,onProgress,refresh=false}) reuses complete exact ordered source selections stored beneath workingDirectory/model-assets or streams every selected upstream member concurrently. Complete acquisitions survive release, disposal and restart. refresh:true acquires a separate complete set without overwriting retained originals; ordinary reuse makes no network freshness claim. Matching same-process callers share acquisition with independent callbacks/cancellation, and the final interested cancellation joins unfinished I/O before removing only that attempt. Separate processes may fetch independently. release(id) relinquishes live preparation ownership; actual native retain lifetimes remain. Browser open/write/complete projections retain temporary cleanup after final native use. Startup downloads nothing; no migration, eviction or partial-transfer resumption. discover({directories,catalog=[],recursive=true,signal}) reads explicit installed locations and returns directories and models, including ordered split GGUF sets, missingMembers, catalog companions and completed acquisitions. Readable symlinks are followed with real-path cycle detection. Source URL/archive matching belongs to supplied catalogs; path-only and ordinary discovery make no origin or readiness claim. openExisting({id,directory,members:[{path}],signal}) borrows complete originals without copying; absent members report MODEL_ASSET_MEMBERS_MISSING with the complete missing-member list. Release preserves borrowed originals. Native prepare additionally accepts members=[] and archives=[], with optional {url,format:'tar',ranges?,members:[{path,member}]} selections and PAX paths. Inclusive HTTP ranges are transport-local; every selected companion must finish before readiness. Core exposes matching discover/openExisting/prepare/cancelPrepare methods and request-correlated modelAssets.progress with complete file-based semantic progress. cancelPrepare aborts and joins actual acquisition cleanup."
     },
     {
       "id": "core-model-assets-service:default",
@@ -789,14 +885,14 @@
       "name": "createLocalAIService",
       "displayName": "createLocalAIService()",
       "kind": "function",
-      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})",
+      "signature": "createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices,autoStart=true}={})",
       "entrypoints": ["arcane-os/core/local-ai"],
       "primaryImport": "arcane-os/core/local-ai",
       "group": "Core local AI",
       "summary": "Composes selected native llama.cpp, Ollama and ONNX engines as a Core service with retained process/worker ownership and model lifecycle.",
       "availability": "Node with selected upstream runtime distributions or available configured system services",
       "protocol": "arcane/1 methods and events; llama.cpp OpenAI HTTP/SSE, Ollama native HTTP/NDJSON and ONNX tensor transport",
-      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup. Optional executionDevices supplies a borrowed catalog to ONNX and llama.cpp; its supplying owner retains catalog disposal responsibility. onnx.load forwards executionPreference and executionTarget with existing model-path resolution, cancellation and omitted-target behavior. getONNXRuntime() returns the actual prepared ONNX owner for native composition after context.getService('local-ai'); callers reacquire after recovery and retain the acquired handle for cleanup. llama.load({model,assetProjectionId,resourcePaths,executionTarget}) retains resourcePaths.model from the existing model-assets owner through actual managed process exit. Omitted target retains the same model's selection or configured default; null requests the runtime default. Explicit Windows NVIDIA targets resolve this host's deviceId to its CUDA device identity; unsupported or unavailable selections report their actual failure without substitution. execution distinguishes requested/resolved/configured targets from observedTarget:null. Existing external listeners retain their model/device ownership and reject managed reconfiguration. llama.status/models observe without starting or restarting an engine. Independent services, complete responses and exact owned-process cleanup remain unchanged."
+      "normalization": "Application-owned runtime and model requirements; optional prepare supplies installed records during this service startup. Optional executionDevices supplies a borrowed catalog to ONNX and llama.cpp; its supplying owner retains catalog disposal responsibility. onnx.load forwards executionPreference and executionTarget with existing model-path resolution, cancellation and omitted-target behavior. getONNXRuntime() returns the actual prepared ONNX owner for native composition after context.getService('local-ai'); callers reacquire after recovery and retain the acquired handle for cleanup. llama.load({model,assetProjectionId,resourcePaths,executionTarget}) retains resourcePaths.model from the existing model-assets owner through actual managed process exit. Omitted target retains the same model's selection or configured default; null requests the runtime default. Explicit Windows NVIDIA targets resolve this host's deviceId to its CUDA device identity; unsupported or unavailable selections report their actual failure without substitution. execution distinguishes requested/resolved/configured targets from observedTarget:null. Existing external listeners retain their model/device ownership and reject managed reconfiguration. llama.status/models observe without starting or restarting an engine. Independent services, complete responses and exact owned-process cleanup remain unchanged. autoStart:false leaves selected engines unprepared and unstarted at Core startup. Explicit localai.prepare invokes configured preparation, emits complete localai.preparation events, starts configured engines and returns current state. Concurrent callers share preparation and completed preparation is reused; engine/model readiness remains separate. Omission preserves startup preparation."
     },
     {
       "id": "core-local-ai:default",
@@ -4712,7 +4808,7 @@
       "summary": "Creates the SDK-owned provider that assembles one selected app and explicit services into a portable Core payload.",
       "availability": "Node; produces a portable payload rather than an executable host",
       "protocol": "arcane-native-builder/1 portable provider",
-      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; optional appDescriptor.native.window carries positive integral logical client width/height, optional resizable and optional state normal/maximized/fullscreen into manifest.window with omitted fields preserved; the selected platform host owns the applied behavior. Generated coreListener opt-in composes one passive model-observation service from the existing host.runtime and actual services exposing localai.status/image.status/decisions.status before listener binding, with absent owners null and renderer attachment separate. Ordinary stdio and sharedHost/headless behavior remains unchanged; no model creation, getService or readiness barrier. Generated runtime/arcane-core.mjs accepts --arcane-app-entry <app-relative-module> through the host's supported Node executable. It imports the packaged app/ module's top-level work with complete process.argv unchanged and no automatic export call; the app owns launch-context reads, services, signals and shutdown. Include the entry and complete source closure through package.nativeResources. The flag skips ordinary Core startup; omission retains it. See mcp-stdio.md#launch-from-a-native-package and core-native-packaging.md#app-owned-runtime-entry. Reports executable:false and never substitutes for an unavailable platform host"
+      "normalization": "Preserves complete selected app and dependency releases; an explicit services selection overrides appDescriptor.native.services, otherwise the descriptor selection is used; optional appDescriptor.native.window carries positive integral logical client width/height, optional resizable and optional state normal/maximized/fullscreen into manifest.window with omitted fields preserved; the selected platform host owns the applied behavior. Generated coreListener opt-in composes one passive model-observation service from the existing host.runtime and actual services exposing localai.status/image.status/decisions.status before listener binding, with absent owners null and renderer attachment separate. Ordinary stdio and sharedHost/headless behavior remains unchanged; no model creation, getService or readiness barrier. Generated runtime/arcane-core.mjs accepts --arcane-app-entry <app-relative-module> through the host's supported Node executable. It imports the packaged app/ module's top-level work with complete process.argv unchanged and no automatic export call; the app owns launch-context reads, services, signals and shutdown. Include the entry and complete source closure through package.nativeResources. The flag skips ordinary Core startup; omission retains it. See mcp-stdio.md#launch-from-a-native-package and core-native-packaging.md#app-owned-runtime-entry. Reports executable:false and never substitutes for an unavailable platform host Build assembles temporarily then publishes at outputRoot/app-id; later successful builds replace only that app. Previous output is retained through completion callback and cancellation acceptance and restored on publication failure. Models and saved state remain in separate persistent directories."
     },
     {
       "id": "native-portable-provider:arcaneNativeBuilderProvider",
@@ -4754,7 +4850,7 @@
       "summary": "Assembles selected application services and browser content with the SDK-owned Windows x64 WebView2 and SEA host.",
       "availability": "Node for assembly; Windows x64 with WebView2 Runtime for execution",
       "protocol": "arcane-native-builder/1 windows-x64 provider",
-      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; app displayName plus .exe (app ID fallback) and matching .exe.config use Windows filename substitutions only; manifest.host.executable owns inventory, icon, verify and run while generic cache/Core names remain unchanged; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; native.window selects initial 96-DPI logical client width/height, optional resizable and optional state normal/maximized/fullscreen through manifest.window. The matching host scales dimensions to actual DPI, fits initial placement to the usable screen and applies an explicit state afterward; omitted fields preserve existing host behavior. Fullscreen fills the selected monitor without a frame and retains normal bounds/frame controls for restoration. Requesting-window window.state/window.setState observe actual minimized/maximized state and prevent activation/focus assignment during visible transitions without selecting TopMost or changing Core, origin or profile. Saved Settings remain application-owned; no saved-bounds subsystem is added and initial-fit logic is not reapplied during later resizing; run cancellation closes stdin and waits for host-owned graceful shutdown. Packaged runtime/ArcaneCore.exe accepts --arcane-app-entry <app-relative-module> directly, without a script argument or GUI launcher; it imports the packaged app/ module's top-level work, preserves complete process.argv and invokes no export. Include the entry and complete source closure through package.nativeResources. The app owns launch-context reads, services, signals and shutdown; the flag skips ordinary Core startup, while omission preserves it. See mcp-stdio.md#launch-from-a-native-package and core-native-packaging.md#app-owned-runtime-entry"
+      "normalization": "Uses a selected hostDirectory or the exact installed SDK version's numeric release asset; preserves complete payloads; app displayName plus .exe (app ID fallback) and matching .exe.config use Windows filename substitutions only; manifest.host.executable owns inventory, icon, verify and run while generic cache/Core names remain unchanged; native.icon PNG/ICO derives the copied executable and host.icon without an app compiler, while other formats retain assembly with native.icon.unsupported and executableIcon:false; the matching host loads the selected window/taskbar icon and handles window.setTheme with per-field applied/unsupported results; native.window selects initial 96-DPI logical client width/height, optional resizable and optional state normal/maximized/fullscreen through manifest.window. The matching host scales dimensions to actual DPI, fits initial placement to the usable screen and applies an explicit state afterward; omitted fields preserve existing host behavior. Fullscreen fills the selected monitor without a frame and retains normal bounds/frame controls for restoration. Requesting-window window.state/window.setState observe actual minimized/maximized state and prevent activation/focus assignment during visible transitions without selecting TopMost or changing Core, origin or profile. Saved Settings remain application-owned; no saved-bounds subsystem is added and initial-fit logic is not reapplied during later resizing; run cancellation closes stdin and waits for host-owned graceful shutdown. Packaged runtime/ArcaneCore.exe accepts --arcane-app-entry <app-relative-module> directly, without a script argument or GUI launcher; it imports the packaged app/ module's top-level work, preserves complete process.argv and invokes no export. Include the entry and complete source closure through package.nativeResources. The app owns launch-context reads, services, signals and shutdown; the flag skips ordinary Core startup, while omission preserves it. See mcp-stdio.md#launch-from-a-native-package and core-native-packaging.md#app-owned-runtime-entry Successful builds publish at outputRoot/app-id through the shared joined replacement lifecycle, retaining previous output through completion/cancellation acceptance and restoring it on failure. Separate runtime caches, models, profiles and unrelated outputs are preserved."
     },
     {
       "id": "native-windows-provider:arcaneNativeBuilderProvider",
@@ -4796,7 +4892,7 @@
       "summary": "Composes a complete selected portable payload with the architecture-selected SDK Mac host in an application bundle.",
       "availability": "Node assembly; matching Darwin architecture and selected host artifact for execution",
       "protocol": "arcane-native-builder/1 macos-arm64 and macos-x64 provider",
-      "normalization": "Resources remains target.rootDir; bundleRoot names the app bundle; selected hostDirectory or exact-version host assets; run closes stdin and awaits graceful drain; source availability does not establish artifact publication or Mac execution"
+      "normalization": "Resources remains target.rootDir; bundleRoot names the app bundle; selected hostDirectory or exact-version host assets; run closes stdin and awaits graceful drain; source availability does not establish artifact publication or Mac execution Accepted bundles use outputRoot/app-id.app; later successful builds replace only that bundle through the joined publication lifecycle, preserving separate model and saved-state directories."
     },
     {
       "id": "native-macos-provider:arcaneNativeBuilderProvider",
@@ -4880,7 +4976,7 @@
       "summary": "Resolves matching per-app native state, workspace and optional shared endpoint defaults for packaged UI and external MCP.",
       "availability": "Node native locations on Windows/Linux/macOS; Android and other hosts supply stateRoot and native adaptation",
       "protocol": "Pure native launch-context resolution and existing local IPC",
-      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. Optional coreListener:{endpoint} is preserved without endpoint defaults and attaches to that same window-owned runtime in the generated entry; selecting it together with sharedHost reports TypeError there. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned."
+      "normalization": "Returns a new complete context with only omitted stateRoot/workspaceRoot/modelsDirectory and selected sharedHost endpoint/log fields filled; preserves explicit values and additional payloads. Native launchContext presence opts generated entry into resolution; omitted sharedHost retains stdio. Optional coreListener:{endpoint} is preserved without endpoint defaults and attaches to that same window-owned runtime in the generated entry; selecting it together with sharedHost reports TypeError there. No I/O, saved-state discovery, process startup, migration or ArcaneData/Repos change. Malformed selected appId/stateRoot/sharedHost inputs report TypeError; platform IPC errors remain operation-owned. An omitted modelsDirectory resolves to the selected absolute stateRoot/Models independently of replaceable build output. Explicit model directories remain unchanged; resolution creates or migrates no files."
     },
     {
       "id": "core-host:readCoreLaunchContext",

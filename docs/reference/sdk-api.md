@@ -481,6 +481,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `KOKORO_SAMPLE_RATE` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Native PCM sample rate |
 | `KOKORO_VOICES` | constant | `arcane-os/local-ai/kokoro` | Core native speech | Complete 28-voice US/GB selection |
 | `createNemotronRuntime()` | function | `arcane-os/local-ai/nemotron` | Core native speech | Node with a matching first-party helper, selected NeMo ASR runtime and models; Windows/Linux/macOS source, Android host adaptation |
+| `NEMO_SPEECH_MODELS` | constant | `arcane-os/local-ai/nemotron` | Core native speech | Node; selected upstream model catalog, no acquisition at import |
+| `prepareNemotronModels()` | function | `arcane-os/local-ai/nemotron` | Core native speech | Node with the shared model-assets service |
+| `prepareMagpieModels()` | function | `arcane-os/local-ai/nemotron` | Core native speech | Node with the shared model-assets service |
 | `createNemotronRuntime default export` | function | `arcane-os/local-ai/nemotron` | Core native speech | Same named function |
 | `buildNemotronHelper()` | function | `arcane-os/local-ai/nemotron/build` | Core native speech | Node with CMake 3.26+, C++17 toolchain and platform-matching public NeMo ASR headers/libraries/CMake package |
 | `buildNemotronHelper default export` | function | `arcane-os/local-ai/nemotron/build` | Core native speech | Same named function |
@@ -494,6 +497,9 @@ The remaining data-only subpaths are eight JSON Schemas and package metadata.
 | `buildWhisperOpenVinoRuntime()` | function | `arcane-os/local-ai/whisper/openvino-build` | Core native speech | Windows x64 Node with installed matching Whisper/OpenVINO sources and CMake/MSVC toolchain |
 | `createSpeechService default export` | function | `arcane-os/core/speech` | Core native speech | Same shared speech service factory |
 | `prepareCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with complete Blob/File members and available Core service |
+| `discoverCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with an available model-assets Core service |
+| `openExistingCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with an available model-assets Core service |
+| `downloadCoreModelAssets()` | function | `arcane-os/ai/core-model-assets` | Core model assets | Browser with an available model-assets Core service |
 | `createModelAssetService()` | function | `arcane-os/core/model-assets` | Core model assets | Node Core with an application-selected working directory |
 | `createModelAssetService default export` | function | `arcane-os/core/model-assets` | Core model assets | Same native working-file service factory |
 | `createLocalAIService default export` | function | `arcane-os/core/local-ai` | Core local AI | Same native service factory |
@@ -7923,7 +7929,12 @@ reports `ARCANE_NATIVE_RUN_UNSUPPORTED`.
 
 `build()` copies the complete selected app and dependency releases, the
 published SDK/runtime dependencies and the canonical Core entry/client into a
-fresh output directory. Service factories are imported only when a real native
+temporary assembly, then publishes it at `<outputRoot>/<app-id>/`. Later
+successful builds replace only that app's generated output. Publication retains
+the previous output until the completion callback and cancellation boundary
+accept the replacement; failure restores it. Models and saved state belong in
+their separate persistent directories. See [stable output and recovery](core-native-packaging.md#output-and-host-contract).
+Service factories are imported only when a real native
 host later launches the generated Core entry, never during packaging.
 
 The generated `runtime/arcane-core.mjs` also accepts
@@ -8063,6 +8074,11 @@ the selected output root. There is no compiler or OS checkout requirement for
 application builds. The build machine needs its normal Node/npm toolchain and
 `tar`; execution needs Windows x64, .NET Framework 4.6.2 or later and WebView2.
 
+Successful builds publish the complete payload at `<outputRoot>/<app-id>/`,
+replacing that app's prior generated artifact through the same
+[joined publication lifecycle](core-native-packaging.md#output-and-host-contract).
+Runtime caches, models, saved profiles and unrelated outputs remain separate.
+
 The matching Windows host consumes `appDescriptor.native.window` through
 `manifest.window`. Optional `width` and `height` select initial client dimensions
 in 96-DPI logical units; the host scales them for its actual DPI and fits the
@@ -8158,6 +8174,9 @@ asset is published or its Mac runtime has been executed.
 
 Build preserves the complete portable payload inside the bundle's Resources
 directory (`target.rootDir`) and returns its `.app` location as `bundleRoot`.
+The accepted bundle is `<outputRoot>/<app-id>.app/`; a later successful build
+replaces that bundle through the shared [publication lifecycle](core-native-packaging.md#output-and-host-contract),
+preserving separate saved state and model directories.
 The bundle supplies the SDK launcher and selected Node runtime. `verify()`
 reads assembled files; `run()` directly launches the bundled executable only on
 the matching Darwin architecture, observes diagnostics and waits for graceful
@@ -8341,6 +8360,11 @@ Android and other adapted hosts provide their actual `stateRoot` and own native
 IPC/process adaptation.
 
 An omitted `workspaceRoot` becomes `<absolute selected stateRoot>/Workspace`.
+An omitted `modelsDirectory` becomes `<absolute selected stateRoot>/Models`.
+Explicit model directories remain unchanged. Services pass this persistent
+directory to the shared model-assets owner; resolution creates or migrates no
+files. These per-app model locations remain separate from replaceable native
+build output. See [persistent model locations](model-assets.md).
 Only a selected `sharedHost` object receives a default endpoint and log file:
 Windows uses a named pipe containing the URL-encoded complete absolute state
 path; Linux/macOS use `<absolute selected stateRoot>/core.sock`. The log is
@@ -8667,7 +8691,7 @@ separate states; prompts, models and application policy remain caller-owned.
 ### Signature and result
 
 ```text
-createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices}={})
+createLocalAIService(configuration,{appRoot,runtimes=[],signal,onEvent,prepare,executionDevices,autoStart=true}={})
 ```
 
 Import it from `arcane-os/core/local-ai`. `configuration` is the authored local-AI
@@ -8690,6 +8714,16 @@ preparation; the development listener and independently composed image/model
 asset services keep their own lifetimes. Pass only llama.cpp/Ollama/ONNX
 requirements to this factory; `createLocalImageService()` owns selected image
 requirements. The managed development and native entrypoints separate them.
+
+`autoStart:false` leaves these selected engines unprepared and unstarted during
+Core startup. Call `client.invoke('localai.prepare', {}, {signal})` when the
+application explicitly requests preparation. The operation invokes the
+configured `prepare` owner, emits its complete events as `localai.preparation`,
+starts configured engines and returns current state. Concurrent callers share
+in-flight preparation; completed preparation is reused. Engine/model readiness
+remains separate, so this result alone does not establish inference readiness.
+The default `autoStart:true` preserves startup preparation. No model is selected
+by this option.
 
 The service provides `localai.status`, explicit `localai.services.recover`,
 `llama.status/models/load/unload/chat`, `onnx.status/load/run/unload`, and the documented native Ollama methods.
@@ -8995,7 +9029,8 @@ microphone, loading a model or starting inference at construction.
 ```javascript
 createNemotronRuntime({
     runtime, prepare, modelId = 'nemotron-3.5-asr-streaming-0.6b',
-    modelPath, diarizationModelPath, gpu, onEvent
+    modelPath, diarizationModelPath, modelAssets, assetProjectionId,
+    resourcePaths, gpu, onEvent
 } = {})
 ```
 
@@ -9004,6 +9039,14 @@ with `helperExecutable` and selected native library paths. Select `gpu`
 explicitly (native ordinal, or `-1` for CPU). Model paths may come from the
 descriptor; omit the diarization path when speaker labels are not requested.
 Preparation, models and device selection remain caller-owned.
+
+Alternatively supply the existing `modelAssets` service and a completed
+`assetProjectionId`, with `resourcePaths:{model,diarization?}` naming exact
+projection members. `load()` retains that projection before yielding and keeps
+it through actual helper cleanup; the caller can release preparation ownership
+after loading begins. Explicit load accepts these selection fields, and an
+active selection must be unloaded before replacement. Direct paths remain
+supported. See [shared catalog preparation](#preparenemotronmodels).
 
 ### Returned members and lifetime
 
@@ -9056,6 +9099,53 @@ callback rules and cancellation/reset outcomes.
 
 The default export from `arcane-os/local-ai/nemotron` is the same
 `createNemotronRuntime` function, with identical inputs, results and lifetime.
+
+## NEMO_SPEECH_MODELS
+
+Import this catalog from `arcane-os/local-ai/nemotron`. `stt` describes the
+selected Nemotron ASR and diarization GGUF companions; `tts` describes Magpie,
+NanoCodec and the matching ten tokenizer/configuration members. Each selection
+contains `modelId`, `providerId`, `name`, ordinary `members`, `resourcePaths`
+and optional `archives`. The upstream selections come from NVIDIA's
+NeMo-Speech.cpp 0.2.0 catalog. Importing the catalog performs no I/O and installs
+no runtime or model. See [the exact companion contract](native-speech.md#selected-nemo-model-acquisition).
+
+## prepareNemotronModels()
+
+```text
+prepareNemotronModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})
+```
+
+Import from `arcane-os/local-ai/nemotron`. Explicitly prepares the catalog's
+complete ASR and diarization selection through the existing model-assets
+service. Optional `directories` are searched first when `refresh` is false;
+the first complete matching catalog record is opened without downloading.
+Otherwise the shared `prepare` owner acquires the complete selection beneath
+`workingDirectory/model-assets/`. `refresh:true` requests a separate acquisition.
+
+The promise resolves to `{assetProjectionId,directory,members,resourcePaths,release}`.
+An omitted `id` is generated. Ordered asynchronous `onProgress` receives full
+file-based semantic progress; existing selections report `reuse` then `ready`.
+Call the idempotent asynchronous `release()` to relinquish preparation ownership
+after the engine has retained it. Complete acquisitions and borrowed originals
+remain stored. Cancellation and callback failures join cleanup and preserve
+actual failures. The wrapper selects no device, installs no native runtime and
+starts no microphone or inference. See [native model acquisition](native-speech.md#selected-nemo-model-acquisition).
+
+## prepareMagpieModels()
+
+```text
+prepareMagpieModels({modelAssets,workingDirectory,directories,id,signal,onProgress,refresh=false}={})
+```
+
+Import from `arcane-os/local-ai/nemotron`. It has the same preparation,
+discovery, progress, cancellation and release contract as `prepareNemotronModels`,
+using the catalog's complete Magpie/NanoCodec/tokenizer selection. Its returned
+`resourcePaths` contains `model`, `codec` and `tokenizerConfig`. The shared TAR
+reader extracts the ten selected tokenizer members from the catalog's selected
+upstream archive ranges; offsets stay transport-local. Pass the completed
+projection to the existing Magpie engine. Voice, language and device selection
+remain caller-owned; preparation performs no synthesis.
 
 ## buildNemotronHelper()
 
@@ -9320,7 +9410,7 @@ through `encoder: 'openvino-npu'`; they do not run this producer at startup.
 
 ### Overview and usage
 
-`createSpeechService({stt,tts,signal}={})` from `arcane-os/core/speech` composes
+`createSpeechService({stt,tts,signal,autoLoad=true}={})` from `arcane-os/core/speech` composes
 independently selected STT and TTS engines as one Core service. Supply either
 role or both. Construction downloads, installs and loads nothing; the host
 owns engine creation, model/device selection and supported formats.
@@ -9363,6 +9453,9 @@ The returned object has `name: 'speech'`, `current`, `subscribe`, `close`,
 - `start(context)` subscribes and starts both configured engine loads
   independently, returning immediately. Core and status remain responsive
   during loading; one role's failure leaves the other usable.
+  With `autoLoad:false`, subscriptions and role capabilities remain available
+  while startup requests no engine load. Explicit `speech.load` activates
+  the selected role. The default preserves automatic startup loading.
 - `current()` and `methods['speech.status']()` return the same snapshot:
   `ready`, `transcriptionAvailable`, `synthesisAvailable`, `status`,
   `sttEngine`, `ttsEngine`, `roles.stt`, `roles.tts` and `closed`.
@@ -9443,15 +9536,22 @@ engine. See [complete preparation and cleanup usage](model-assets.md).
 
 `createModelAssetService({appRoot=process.cwd()}={})` from
 `arcane-os/core/model-assets` returns the Core service for
-`modelAssets.open/write/complete/release/status` and `modelAssets.state`.
+`modelAssets.open/write/complete/release/status`,
+`modelAssets.discover/openExisting/prepare/cancelPrepare`, and `modelAssets.state`.
 Relative working directories resolve from `appRoot`; explicit absolute
 directories remain caller-selected. Each projection has its own child
 directory and complete member files.
 
 `current()` returns `{closing,projections}`. `retain(id)` accepts a completed
 projection and returns `{id,directory,members,release}` for a native owner.
-Native `prepare({id,workingDirectory,members,signal,onProgress,refresh=false})`
-accepts ordered `{path,url}` members and returns their ready projection.
+Native `prepare({id,workingDirectory,members=[],archives=[],signal,onProgress,refresh=false})`
+accepts ordered `{path,url}` members and optional uncompressed TAR selections,
+returning their complete ready projection. An archive declares
+`{url,format:'tar',ranges?,members:[{path,member}]}`. Optional inclusive
+`{start,end,stopBefore?}` ranges use HTTP partial responses; the parser handles
+ordinary and PAX member paths and preserves each selected file completely.
+All declared companions must finish before readiness. Range framing stays
+transport-local.
 Complete native acquisitions persist beneath `workingDirectory/model-assets/`
 through unload, disposal and restart; ordinary calls reuse the exact complete
 ordered source selection without a network freshness check. Explicit
@@ -9461,6 +9561,30 @@ completed files. Matching same-process preparations share acquisition with
 independent callbacks and cancellation; the last interested cancellation joins
 unfinished I/O and removes only that attempt. Separate processes may acquire
 the same selection independently. Startup downloads nothing.
+
+`discover({directories,catalog=[],recursive=true,signal})` reads only explicit
+installed directories and returns `{directories,models}`. Directory observations
+contain `{directory,exists,error?}`. Each model record has
+`{directory,entryPath,members:[{path,nativePath,available}],missingMembers,complete,source,catalogId?}`.
+The source is `directory`, `catalog` or `acquisition`. Split GGUF filename sets
+are one numerically ordered selection, including missing expected shards and
+the first shard as entry. This grouping also applies to completed acquisitions;
+all declared companions remain present. Ordinary readable symlinked files and
+directories are followed, with real-path cycle detection.
+
+Catalog entries `{id,members,archives?,entryPath?}` declare exact companion sets.
+Acquisition-backed matching honors supplied source URLs and archive member
+names; path-only catalogs and ordinary directory discovery make no origin or
+runtime-readiness claim. No files are downloaded, loaded or moved by discovery.
+
+`openExisting({id,directory,members:[{path}],signal})` opens a complete borrowed
+projection using those existing files. Missing members reject with
+`MODEL_ASSET_MEMBERS_MISSING` and the complete missing-member list. Release
+never deletes or copies borrowed originals. The three new operations also have
+matching Core RPC methods. Request-scoped `modelAssets.progress` carries
+`{id,progress}` with full file-based semantic progress; `cancelPrepare` aborts
+and joins actual acquisition cleanup. The browser helpers below preserve the
+request correlation and cancellation joins.
 `release(id)` relinquishes live preparation ownership. Native retains continue
 through actual engine release; completed native acquisitions remain stored.
 Browser `open/write/complete` projections retain their temporary lifetime and
@@ -9471,6 +9595,46 @@ all native retain lifetimes before cleanup. The native owner releases its
 handle only after its actual context/worker use ends. Original stored model
 files remain with their application owner. See
 [working-file service and wire operations](model-assets.md#native-ownership).
+
+## discoverCoreModelAssets()
+
+```text
+discoverCoreModelAssets({client=getInstalledCoreClient(),directories,catalog,recursive,signal}={})
+```
+
+Import from `arcane-os/ai/core-model-assets`. Resolves the native `discover`
+result described above through the installed Core connection. Directories and
+catalog selections remain application-owned. Complete shard and companion
+availability is filesystem evidence, not a selected or loaded model. See
+[discovery records](model-assets.md).
+
+## openExistingCoreModelAssets()
+
+```text
+openExistingCoreModelAssets({client=getInstalledCoreClient(),directory,members,signal}={})
+```
+
+Import from `arcane-os/ai/core-model-assets`. Opens selected complete existing
+files through Core and returns `{id,directory,members,release}`. The helper
+generates its projection ID; `release()` is asynchronous and idempotent.
+Native engines retain their own use; borrowed original files remain intact.
+Cancellation joins uncancelled cleanup before rejecting.
+
+## downloadCoreModelAssets()
+
+```text
+downloadCoreModelAssets({client=getInstalledCoreClient(),workingDirectory,members,archives,refresh=false,signal,onProgress}={})
+```
+
+Import from `arcane-os/ai/core-model-assets`. Explicitly invokes native
+acquisition for complete ordinary and optional TAR-selected members and returns
+`{id,directory,members,release}`. It generates the ID, observes only that request's
+complete progress, and awaits asynchronous callbacks in order. Cancellation or
+a callback failure joins native `cancelPrepare` cleanup and local callback
+delivery before settlement; actual cleanup failures remain observable.
+Release relinquishes preparation ownership while completed downloads remain
+stored. No model, runtime or device is selected implicitly. See
+[download and progress usage](model-assets.md).
 
 ## createModelAssetService default export
 

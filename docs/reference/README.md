@@ -84,6 +84,10 @@ alone does not make bare module names resolve in a browser.
 | Edit an original PNG with a complete prompt and explicit strength | [Local image editing](local-image-editing.md) |
 | Project complete stored model files into native working files | [Model assets through Core](model-assets.md) |
 | Prepare selected upstream model members in native services | [Native preparation and retained lifetime](model-assets.md#native-ownership) |
+| Discover installed models, ordered GGUF shards and required companion files | [Model discovery and existing-file projections](model-assets.md) |
+| Download selected model members with visible file progress and joined cancellation | [downloadCoreModelAssets()](sdk-api.md#downloadcoremodelassets) and [native model assets](model-assets.md) |
+| Prepare the complete Nemotron or Magpie model selection | [Shared native speech catalog](sdk-api.md#nemo_speech_models) |
+| Keep models in platform-specific persistent app storage and prepare engines on demand | [Model locations and activation](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |
 | Read complete selected Git text without changing a checkout | [Git text snapshots](git-text-snapshot.md) |
@@ -92,6 +96,7 @@ alone does not make bare module names resolve in a browser.
 | Write, commit and push complete selected repository text | [Selected-text repository writing](core-repositories.md#write-commit-and-push-selected-text) |
 | Observe existing checkout configuration and capture an explicit remote/ref | [Repository configuration and selected targets](core-repositories.md#existing-checkout-configuration-and-selected-targets) |
 | Build an installed-SDK portable Core payload | [Portable Core packaging](core-native-packaging.md) |
+| Replace only the selected app's successful native build while preserving model storage | [Stable native output](core-native-packaging.md#output-and-host-contract) |
 | Resolve matching native state/workspace/endpoint defaults and preserve explicit launch values | [Launch-time locations](core-native-packaging.md#launch-time-locations) and [resolveNativeLaunchContext()](sdk-api.md#resolvenativelaunchcontext) |
 | Build a Windows executable without an OS checkout | [Windows executable packaging](core-native-packaging.md#windows-executable) |
 | Compose a Mac application with an architecture-matched host | [macOS application composition](core-native-packaging.md#macos-application-composition) |
