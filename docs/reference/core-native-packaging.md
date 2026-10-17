@@ -341,6 +341,10 @@ It returns a new complete context and fills only omitted fields:
 | `stateRoot` on Windows | `%LOCALAPPDATA%/Arcane/<appId>`; standard home `AppData/Local` fallback when the environment value is absent |
 | `stateRoot` on macOS | `~/Library/Application Support/Arcane/<appId>` |
 | `stateRoot` on Linux | Absolute `$XDG_DATA_HOME/Arcane/<appId>`, otherwise `~/.local/share/Arcane/<appId>` |
+| `modelsDirectory` on Windows | `%LOCALAPPDATA%/Arcane/Models`, with the same standard home fallback |
+| `modelsDirectory` on macOS | `~/Library/Application Support/Arcane/Models` |
+| `modelsDirectory` on Linux | Absolute `$XDG_DATA_HOME/Arcane/Models`, otherwise `~/.local/share/Arcane/Models` |
+| `modelsDirectory` on other adapted hosts | `<resolved stateRoot>/Models` unless the host supplies an explicit shared location |
 | `workspaceRoot` | `<resolved stateRoot>/Workspace` |
 | `sharedHost.endpoint`, only when `sharedHost` is selected | Windows named pipe `\\.\pipe\Arcane-` followed by the URL-encoded complete resolved state path; Linux/macOS socket `<resolved stateRoot>/core.sock` |
 | `sharedHost.logFile`, only when `sharedHost` is selected | `<resolved stateRoot>/Core.log` |
@@ -355,9 +359,15 @@ shared entry creates its selected state directory because its socket/log need
 that parent; application services continue to own workspace I/O. Custom
 endpoint/log parent directories retain the existing shared-host requirements.
 
-Explicit `stateRoot`, `workspaceRoot`, endpoint, log filename and additional
-fields remain authored values; the resolver derives omitted paths from the
-absolute selected state location. Relative explicit paths retain the caller's
+Models default to one directory per operating-system user, independent of the
+application ID or app-private state root. Apps selecting the same sources and
+shared model store reuse the SDK acquisition owner. Preferences, profiles,
+chat history, workspace and IPC remain app-scoped. Existing app-local models
+are not moved or deleted: callers can discover and open them in place.
+
+Explicit `stateRoot`, `modelsDirectory`, `workspaceRoot`, endpoint, log filename
+and additional fields remain authored values. The resolver derives app-private
+paths from the absolute selected state location. Relative explicit paths retain the caller's
 working-directory meaning, so UI and MCP callers must select the same location.
 No hashing, app-local OS path composition, directory scanning, or new repository
 location rule is involved. `resolveArcaneDataPaths()` continues to own its

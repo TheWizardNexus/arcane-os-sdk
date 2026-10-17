@@ -63,6 +63,11 @@ async function prepareNativeProjection(client, method, params, {signal, onProgre
         operationSignal.throwIfAborted();
         return {id, directory: projection.directory, members: projection.members, release};
     } catch (error) {
+        // Core publishes the terminal transfer state before rejecting prepare.
+        // Deliver that queued state before our cleanup cancellation can suppress
+        // it. Explicit caller cancellation still owns its existing boundary.
+        try { await delivery; }
+        catch (deliveryError) { callbackFailure ??= deliveryError; }
         const reason = callbackFailure ?? (error?.code === 'ARCANE_REQUEST_ABORTED' && operationSignal.aborted ? operationSignal.reason : error);
         controller.abort(reason);
         const errors = [reason];

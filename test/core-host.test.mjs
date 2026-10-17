@@ -125,7 +125,9 @@ test('native launch resolver shares the selected app state and preserves explici
     assert.deepEqual(resolveNativeLaunchContext({appId, context: resolved}), resolved);
     const omitted = resolveNativeLaunchContext({appId, context: {stateRoot}});
     assert.equal(omitted.workspaceRoot, path.join(stateRoot, 'Workspace'));
-    assert.equal(omitted.modelsDirectory, path.join(stateRoot, 'Models'));
+    assert.equal(omitted.modelsDirectory, ['win32', 'darwin', 'linux'].includes(process.platform)
+        ? resolveNativeLaunchContext({appId, context: {stateRoot: stateRoot + '-other'}}).modelsDirectory
+        : path.join(stateRoot, 'Models'));
     assert.equal(Object.hasOwn(omitted, 'sharedHost'), false);
     const selected = {endpoint: 'app-owned-endpoint', logFile: '../app-owned-log', extra: {complete: true}};
     assert.deepEqual(resolveNativeLaunchContext({appId, context: {stateRoot, sharedHost: selected}}).sharedHost, selected);
@@ -150,6 +152,12 @@ test('native launch resolver uses the desktop host defaults only when selected',
     if (roots[process.platform]) {
         assert.equal(resolveNativeLaunchContext({appId}).stateRoot, roots[process.platform]);
         assert.equal(resolveNativeLaunchContext({appId, context: {stateRoot: undefined}}).stateRoot, roots[process.platform]);
+        const first = resolveNativeLaunchContext({appId});
+        const second = resolveNativeLaunchContext({appId: 'octopus-radio'});
+        assert.equal(first.modelsDirectory, path.join(path.dirname(roots[process.platform]), 'Models'));
+        assert.equal(first.modelsDirectory, second.modelsDirectory);
+        assert.notEqual(first.stateRoot, second.stateRoot);
+        assert.notEqual(first.workspaceRoot, second.workspaceRoot);
     } else {
         assert.throws(function hostNeedsRoot() { resolveNativeLaunchContext({appId}); }, {name: 'TypeError'});
     }

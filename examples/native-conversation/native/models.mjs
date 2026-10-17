@@ -9,7 +9,11 @@ export default function createConversationModels(options, launchContext) {
     const directory = locations.modelsDirectory;
     const llmDirectory = path.join(directory, 'LLM');
     const speechDirectory = path.join(directory, 'Speech');
-    const directories = [llmDirectory, path.join(launchContext.appRoot, 'models'), ...(options.directories ?? [])];
+    // Read existing app-local installations in place; new downloads use the
+    // SDK's same-user shared directory. No migration or duplicate copy is made.
+    const previousModels = path.join(path.resolve(locations.stateRoot), 'Models');
+    const directories = [...new Set([llmDirectory, path.join(previousModels, 'LLM'),
+        path.join(launchContext.appRoot, 'models'), ...(options.directories ?? [])])];
     const catalog = launchContext.models ?? LANGUAGE_MODELS;
     const assets = createModelAssetService({appRoot: launchContext.appRoot});
     // These factories share the host's one composition context and asset owner.
@@ -24,7 +28,8 @@ export default function createConversationModels(options, launchContext) {
             async 'conversationModels.catalog'(_parameters, request) {
                 const [installed, installedSpeech] = await Promise.all([
                     assets.discover({directories, catalog, signal: request.signal}),
-                    assets.discover({directories: [speechDirectory, path.join(launchContext.appRoot, 'models')],
+                    assets.discover({directories: [...new Set([speechDirectory, path.join(previousModels, 'Speech'),
+                        path.join(launchContext.appRoot, 'models')])],
                         catalog: Object.values(NEMO_SPEECH_MODELS).map(function speechCatalog(model) {
                             return {id: model.modelId, ...model};
                         }), signal: request.signal})

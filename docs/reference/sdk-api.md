@@ -8340,8 +8340,9 @@ import createDiarizationService from 'arcane-os/core/diarization';
 
 ### Overview
 
-Resolves one application's native state, workspace and optional shared endpoint
-through the same public owner used by its packaged executable and external MCP.
+Resolves one application's native state, workspace and optional shared endpoint,
+plus a same-user shared model directory, through the same public owner used by
+its packaged executable and external MCP.
 This synchronous function performs no I/O, saved-state discovery, process start
 or migration.
 
@@ -8352,7 +8353,7 @@ resolveNativeLaunchContext({appId,context={}}={})
 ```
 
 Import from `arcane-os/core/host`. The result is a new complete context with
-omitted fields filled. Windows defaults to `%LOCALAPPDATA%/Arcane/<appId>`
+omitted fields filled. `stateRoot` defaults on Windows to `%LOCALAPPDATA%/Arcane/<appId>`
 (home `AppData/Local` fallback), macOS to
 `~/Library/Application Support/Arcane/<appId>`, and portable Linux Node to
 absolute `$XDG_DATA_HOME/Arcane/<appId>` or `~/.local/share/Arcane/<appId>`.
@@ -8360,11 +8361,21 @@ Android and other adapted hosts provide their actual `stateRoot` and own native
 IPC/process adaptation.
 
 An omitted `workspaceRoot` becomes `<absolute selected stateRoot>/Workspace`.
-An omitted `modelsDirectory` becomes `<absolute selected stateRoot>/Models`.
-Explicit model directories remain unchanged. Services pass this persistent
-directory to the shared model-assets owner; resolution creates or migrates no
-files. These per-app model locations remain separate from replaceable native
-build output. See [persistent model locations](model-assets.md).
+An omitted `modelsDirectory` uses the operating-system user's shared Arcane
+model directory: `%LOCALAPPDATA%/Arcane/Models` on Windows (home `AppData/Local`
+fallback), `~/Library/Application Support/Arcane/Models` on macOS, and absolute
+`$XDG_DATA_HOME/Arcane/Models` or `~/.local/share/Arcane/Models` on Linux. This
+default remains shared when the application explicitly selects another
+`stateRoot`; application state and workspace stay separate. Explicit
+`modelsDirectory` values remain unchanged. Other adapted hosts may supply a
+shared directory explicitly; their omitted value remains
+`<absolute selected stateRoot>/Models`.
+
+This resolver supplies a location to its consumers; it neither changes every
+provider's store nor creates, moves or migrates model files. Services select
+that directory as the shared model-assets working directory, while applications
+may also discover their existing app-local originals. Model storage remains
+separate from replaceable native build output. See [persistent model locations](model-assets.md).
 Only a selected `sharedHost` object receives a default endpoint and log file:
 Windows uses a named pipe containing the URL-encoded complete absolute state
 path; Linux/macOS use `<absolute selected stateRoot>/core.sock`. The log is
@@ -9126,6 +9137,11 @@ Otherwise the shared `prepare` owner acquires the complete selection beneath
 The promise resolves to `{assetProjectionId,directory,members,resourcePaths,release}`.
 An omitted `id` is generated. Ordered asynchronous `onProgress` receives full
 file-based semantic progress; existing selections report `reuse` then `ready`.
+Native acquisition additionally reports its shared resume, ownership-wait,
+activity and terminal states described under [`createModelAssetService()`](#createmodelassetservice).
+Completed members and saved partial transfers remain available for retry;
+HTTP continuation depends on the source response. Direct installed-directory
+reuse keeps its existing phase/file-count callback shape.
 Call the idempotent asynchronous `release()` to relinquish preparation ownership
 after the engine has retained it. Complete acquisitions and borrowed originals
 remain stored. Cancellation and callback failures join cleanup and preserve
@@ -9556,11 +9572,38 @@ Complete native acquisitions persist beneath `workingDirectory/model-assets/`
 through unload, disposal and restart; ordinary calls reuse the exact complete
 ordered source selection without a network freshness check. Explicit
 `refresh:true` acquires a separate complete set without replacing active files.
-Independent members transfer concurrently and progress reports phases and
-completed files. Matching same-process preparations share acquisition with
-independent callbacks and cancellation; the last interested cancellation joins
-unfinished I/O and removes only that attempt. Separate processes may acquire
-the same selection independently. Startup downloads nothing.
+Independent members transfer concurrently. Interrupted or cancelled acquisitions
+retain completed members and closed partial files for retry. A retry reuses the
+same recorded attempt and downloads only missing members. Ordinary-file HTTP
+continuation uses its retained strong ETag or Last-Modified validator with
+`Range` and `If-Range`; a matching `206` response appends. A full `200`, `416`,
+missing validator or prior encoded response restarts only that member and
+reports `restart`. One prior partial remains until its replacement completes.
+TAR selections replay the required segment framing while preserving already
+completed companions. HTTP framing remains internal to the transfer, not
+model identity or user-facing progress.
+
+Matching same-process preparations share acquisition with independent callbacks
+and cancellation; cancelling one interested caller leaves the others running.
+The last interested cancellation joins I/O while retaining resumable data.
+Matching selections in separate processes coordinate their recorded transfer
+owner, report `waiting`, then reuse or resume after that owner releases or exits.
+Unrelated acquisitions remain concurrent. Member completion follows stream/file
+closure and promotion; whole-acquisition readiness follows all selected members.
+Startup downloads nothing, and retry remains an explicit preparation request.
+
+Native acquisition progress is
+`{phase,state,message,completed,total,unit:'files',memberIndex?,path?,reason?,recovery?,error?,activity?}`.
+Phases are `open`, `download`, `reuse`, `resume`, `restart`, `complete`, `ready`,
+`waiting`, `heartbeat`, `stalled`, `interrupted`, `cancelled` and `failed`.
+States are `waiting`, `downloading`, `stalled`, `interrupted`, `cancelled`,
+`failed` and `ready`. A five-second heartbeat keeps active work observable;
+`stalled` means no source activity arrived for fifteen seconds, not a diagnosed
+outage. Waiting may include the other owner's observed `activity`. Plain
+`message` and `recovery` belong in ordinary status; complete `error` details
+remain diagnostic data. Progress uses phases and completed-file counts, not
+invented percentages. Terminal acquisition state does not imply that a
+cancelled subscriber receives callbacks after its cancellation boundary.
 
 `discover({directories,catalog=[],recursive=true,signal})` reads only explicit
 installed directories and returns `{directories,models}`. Directory observations
@@ -9632,8 +9675,15 @@ acquisition for complete ordinary and optional TAR-selected members and returns
 complete progress, and awaits asynchronous callbacks in order. Cancellation or
 a callback failure joins native `cancelPrepare` cleanup and local callback
 delivery before settlement; actual cleanup failures remain observable.
+When Core rejects preparation, the helper first delivers already queued
+terminal progress before its internal cleanup cancellation and rejection.
+Explicit caller cancellation retains its no-late-callback boundary.
 Release relinquishes preparation ownership while completed downloads remain
-stored. No model, runtime or device is selected implicitly. See
+stored. Interrupted/cancelled native transfers retain completed members and
+saved partials for an explicit retry; the shared owner's HTTP continuation and
+member-restart rules apply. Progress forwards its full ownership-wait,
+heartbeat/stall and terminal records without inventing completion. No model,
+runtime or device is selected implicitly. See
 [download and progress usage](model-assets.md).
 
 ## createModelAssetService default export

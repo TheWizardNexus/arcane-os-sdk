@@ -24,26 +24,33 @@ Reply starts playback.
 
 The SDK launch context owns the default `modelsDirectory`:
 
-- Windows: `%LOCALAPPDATA%/Arcane/native-conversation/Models`.
-- macOS: `~/Library/Application Support/Arcane/native-conversation/Models`.
-- Linux: `$XDG_DATA_HOME/Arcane/native-conversation/Models`, or
-  `~/.local/share/Arcane/native-conversation/Models` when XDG is unset.
+- Windows: `%LOCALAPPDATA%/Arcane/Models`.
+- macOS: `~/Library/Application Support/Arcane/Models`.
+- Linux: `$XDG_DATA_HOME/Arcane/Models`, or
+  `~/.local/share/Arcane/Models` when XDG is unset.
 - Android: `Models` inside the app-private `stateRoot` supplied by its host.
 
+Desktop applications running as the same user share that SDK-owned model
+location; their preferences, profiles and conversations remain app-private.
 The example separates `LLM` and `Speech` within that directory. A launch-context
 `modelsDirectory` overrides the location. The app's own `models/` directory is
 also discovered; the model service can receive additional `directories` through
 its service options. Existing files are retained where they are, without copies.
-Models and profiles remain outside the replaceable built app.
+The former app-local `Models/LLM` and `Models/Speech` directories remain discovery
+inputs, without migration or deletion. Models and profiles remain outside the
+replaceable built app.
 
 The small app-owned catalog offers IBM Granite GGUF downloads. The additional
 URL input accepts a complete model or a GGUF shard set, one direct URL per
 member. The SDK discovers `name-00001-of-000NN.gguf` sets as one model, retains
 every shard and loads the first shard through llama.cpp. Incomplete discovered
 sets remain in developer inspection with their missing filenames; they are not
-offered as usable models. Downloads show the active file and completed files,
-and can be cancelled. A transfer with no file completion yet remains visibly
-in progress rather than inventing a percentage.
+offered as usable models. The SDK owns retry, partial-download retention,
+completed-file reuse and cooperative transfer ownership. Downloads show the
+active file, completed files, activity and terminal outcome, and can be cancelled.
+A transfer with no file completion yet has an indeterminate bar rather than an
+invented percentage. When preparation stops, its status remains visible and
+retry uses the retained download state.
 
 `downloadCoreModelAssets()` owns acquisition; `openExistingCoreModelAssets()`
 retains a complete installed set while the native engine uses it. The language

@@ -119,8 +119,9 @@ file, without a whole-model buffer or base64 conversion. No model or runtime
 is selected or downloaded by service startup. The result remains the ready
 projection snapshot with ordered `members: [{path,nativePath}]`.
 
-Complete acquisitions persist under `workingDirectory/model-assets/` across
-release, native unload, service disposal and process restart. Relative working
+Complete acquisitions and interrupted transfer state persist under
+`workingDirectory/model-assets/` across release, native unload, service disposal
+and process restart. Relative working
 directories resolve from `appRoot`. Reuse matches the entire ordered
 `[{path,url}]` selection in that actual store; the operation `id` is a separate
 live lifetime, not the stored selection. Different URLs, relative paths, member
@@ -136,9 +137,14 @@ untouched. Later ordinary preparations reuse the newer completed selection.
 A failed refresh leaves the earlier completed acquisition available. Refresh
 does not change the selected URLs or imply upstream revision discovery.
 
-Progress uses `open`, `download`, `complete`, `reuse` and `ready` phases, with
-`completed`, `total` and `unit:'files'`; member progress additionally includes
-`memberIndex` and `path`. Progress callbacks may return a promise, which the
+Progress includes `open`, `download`, `resume`, `restart`, `complete`, `reuse`
+and `ready`, plus waiting, heartbeat, stalled and terminal interruption states.
+Records carry `state`, a user-facing `message`, `completed`, `total` and
+`unit:'files'`; member progress additionally includes `memberIndex` and `path`.
+Recovery guidance belongs in `recovery`; a complete serialized `error` belongs
+in developer inspection. A stalled state means no recent transfer activity was
+observed, not that the SDK has established an Internet outage. Render active
+transfers without inventing a per-file percentage. Progress callbacks may return a promise, which the
 preparation observes in order. Each caller owns its callbacks; a slow or failed
 callback does not hold another caller's transfer or result. Callbacks must not
 await cleanup of the preparation currently calling them. Callback failures
@@ -245,20 +251,40 @@ build output. The native launch context exposes its platform-specific
 The model-assets service creates no platform directory policy of its own.
 
 `resolveNativeLaunchContext({appId,context})` defaults `modelsDirectory` to
-`Models` beneath the resolved persistent `stateRoot`. It preserves an explicitly
-supplied `modelsDirectory` unchanged and creates or migrates no files:
+one shared location for the operating-system user, independent of the app ID.
+It preserves an explicitly supplied `modelsDirectory` unchanged and creates,
+moves or migrates no files:
 
-| Host | Default application state root |
+| Host | Default shared model directory |
 | --- | --- |
-| Windows | `%LOCALAPPDATA%/Arcane/<appId>`; the user's `AppData/Local` when that environment variable is absent |
-| macOS | `~/Library/Application Support/Arcane/<appId>` |
-| Linux | `$XDG_DATA_HOME/Arcane/<appId>` when absolute, otherwise `~/.local/share/Arcane/<appId>` |
-| Android or another host adaptation | The host supplies its explicit app-private `stateRoot` |
+| Windows | `%LOCALAPPDATA%/Arcane/Models`; the user's `AppData/Local` when that environment variable is absent |
+| macOS | `~/Library/Application Support/Arcane/Models` |
+| Linux | `$XDG_DATA_HOME/Arcane/Models` when absolute, otherwise `~/.local/share/Arcane/Models` |
+| Android or another host adaptation | `<stateRoot>/Models`; the host supplies an explicit shared `modelsDirectory` when its platform allows sharing |
 
 Pass this `modelsDirectory` as the acquisition `workingDirectory` and as one
 discovery directory. Completed files then live beneath its `model-assets`
 subdirectory, separate from replaceable application builds. Additional selected
 application directories can participate in the same discovery call.
+
+```javascript
+import {resolveNativeLaunchContext} from 'arcane-os/core/host';
+
+const {modelsDirectory} = resolveNativeLaunchContext({appId: 'moon-radio'});
+const projection = await modelAssets.prepare({
+    id: selectedOperationId,
+    workingDirectory: modelsDirectory,
+    members: selectedMembers,
+    signal,
+    onProgress: renderPreparationProgress
+});
+```
+
+App settings, profiles, chat history, workspace and IPC retain their app-private
+locations. This default applies to applications using the native launch resolver;
+explicit acquisition directories and other provider-owned model stores keep
+their existing contracts. Discover existing app-local models and open them in
+place rather than copying or removing them.
 
 ### Prepare a selected local runtime on demand
 
@@ -290,8 +316,10 @@ record above; opening and downloading return `{id,directory,members,release}`.
 The existing Blob-based `prepareCoreModelAssets` keeps its original contract.
 
 Download progress callbacks receive the complete semantic progress record,
-correlated to this preparation and observed in order. Callback failure cancels
-the operation. Cancellation joins explicit native cleanup and local callback
+correlated to this preparation and observed in order. On request failure, queued
+terminal progress is delivered before internal cleanup cancellation and promise
+rejection. Explicit caller cancellation retains its no-late-callback boundary.
+Callback failure cancels the operation. Cancellation joins explicit native cleanup and local callback
 delivery before the helper settles; cleanup failures remain observable.
 Callbacks must not await their own enclosing preparation or cancellation join.
 Applications initiate downloads explicitly and display actual phases, selected
@@ -303,24 +331,31 @@ refresh mode share an acquisition, including across service instances. They
 keep independent operation IDs, retain handles, cancellation and callbacks.
 Cancelling, releasing or disposing one interested caller leaves the others
 running. The final interested caller aborts the acquisition and joins its
-streams, writes and closes before removing only its unfinished attempt. Original
+streams, writes and closes while preserving completed members and resumable
+partial transfers. Original
 failures and cleanup failures remain observable. A completed acquisition stays
 available even if a caller cancels or its callback fails after completion.
 
-The service records completion only after every selected response and file
-close finishes. That record is ordinary cache state describing the selected
-sources and completed acquisition. A missing original member requires another
-complete acquisition. Failed attempts are removed after their owned I/O drains;
-there is no partial-transfer resumption. An abruptly interrupted process can
-leave an unfinished directory, which later calls ignore without sweeping it.
-There is no automatic migration, eviction or removal of completed acquisitions.
+The service promotes each file from its partial-transfer location only after
+the complete response and file close finish. It records whole-acquisition
+completion after every selected member is complete. These records describe
+ordinary transfer and cache state, not content hashes or admission receipts.
+Retry reuses completed members and resumes saved ordinary-file transfers with
+HTTP Range and available HTTP continuation metadata. HTTP offsets and validators
+remain transport-local and never become progress or model policy. If the source
+cannot continue the saved representation, the SDK reports a restart of that
+member; completed siblings remain available. Selected TAR companions preserve
+completed files; an interrupted member may require replaying its TAR segment to
+restore the archive parser's framing. No full-archive substitute is selected.
 
-Independent processes use disjoint attempt directories and may fetch the same
-selection concurrently. They do not overwrite each other's files or coordinate
-a cross-process acquisition lock. Concurrent completions can produce multiple
-reusable sets; either complete result may be selected when their completion
-order ties. Applications may retain their existing shared Core owner without
-introducing an additional host or application-local cache copy.
+Processes selecting the same ordered sources and actual store coordinate a
+short selection operation and one transfer owner. Another process waits with
+observable status rather than starting a duplicate transfer. Cancelling a
+waiting request stops its wait; it does not cancel the other process. If a
+transfer owner exits, a later contender can reclaim its recorded operation and
+continue retained data. This requires no additional application server, copied
+cache implementation or new shared Core process. Existing completed models and
+unrelated attempts are never swept or migrated automatically.
 
 ```javascript
 import {createModelAssetService} from 'arcane-os/core/model-assets';

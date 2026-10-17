@@ -65,10 +65,10 @@ function inspect(label, value) {
     inspection.append(document.createTextNode(`${label}\n${content}\n\n`));
 }
 
-function report(error) {
+function report(error, outcome = 'The operation could not finish. Review the selected setup and try again. Details are in developer inspection.') {
     console.error('Native conversation operation failed.', error);
     inspect('Failure', error);
-    status.textContent = 'The operation could not finish. Stop, review the selected setup, and try again. Details are in developer inspection.';
+    status.textContent = outcome;
 }
 
 function controls() {
@@ -117,7 +117,7 @@ async function refreshModels() {
     ]);
     if (retired) return;
     catalog = discovered;
-    modelDirectory.textContent = `Model storage: ${catalog.directory}`;
+    modelDirectory.textContent = `Shared model storage: ${catalog.directory}`;
     const previousDownload = availableModel.value;
     availableModel.replaceChildren(...catalog.catalog.map(model => new Option(model.name, model.id)));
     if (catalog.catalog.some(model => model.id === previousDownload)) availableModel.value = previousDownload;
@@ -143,13 +143,21 @@ function progressRow(label) {
     progress.setAttribute('aria-label', label);
     row.append(text, progress);
     downloadStatus.append(row);
+    let lastProgress = {};
     return function showProgress(value) {
         inspect(label, value);
-        const count = Number.isFinite(value.completed) && Number.isFinite(value.total) && value.total > 0
-            ? ` · ${value.completed} of ${value.total} files` : '';
-        text.textContent = `${label} · ${value.phase}${value.path ? ` · ${value.path}` : ''}${count}`;
-        progress.hidden = value.phase === 'ready' || value.phase === 'complete';
-        if (count) { progress.max = value.total; progress.value = value.completed; }
+        // Keep the SDK's specific transfer outcome when the enclosing speech
+        // operation also reports that preparation failed.
+        if (value.enclosingFailure && ['interrupted', 'cancelled', 'failed'].includes(lastProgress.state ?? lastProgress.phase)) return;
+        lastProgress = {...lastProgress, ...value};
+        const count = Number.isFinite(lastProgress.completed) && Number.isFinite(lastProgress.total) && lastProgress.total > 0
+            ? ` · ${lastProgress.completed} of ${lastProgress.total} files` : '';
+        text.textContent = `${label} · ${value.message ?? value.phase}${lastProgress.path ? ` · ${lastProgress.path}` : ''}${count}`;
+        row.dataset.state = value.state ?? value.phase;
+        progress.hidden = ['ready', 'complete', 'interrupted', 'cancelled', 'failed'].includes(value.phase);
+        // An active file has no invented fraction. Completed-file counts stay
+        // visible while the SDK reports transfer activity or interruption.
+        if (progress.hidden && count) { progress.max = lastProgress.total; progress.value = lastProgress.completed; }
         else progress.removeAttribute('value');
     };
 }
@@ -166,8 +174,10 @@ async function prepareSelected(operation) {
     }
     catch (error) {
         if (current.controller.signal.aborted && error === current.controller.signal.reason) {
-            status.textContent = 'Preparation cancelled. Completed models remain installed.';
-        } else throw error;
+            status.textContent = 'Preparation cancelled. Downloaded files are kept; retry resumes supported downloads.';
+        } else {
+            report(error, 'Preparation stopped. Downloaded files are kept. Retry the selected download or speech preparation to continue; details are in developer inspection.');
+        }
     } finally {
         if (preparation === current) {
             preparation = null;
@@ -220,6 +230,13 @@ async function prepareSpeech(signal) {
             } : {})}, {signal});
             signal.throwIfAborted();
             onProgress({phase: 'ready'});
+        } catch (error) {
+            onProgress({phase: signal.aborted ? 'cancelled' : 'failed',
+                enclosingFailure: true,
+                message: signal.aborted
+                    ? 'Preparation cancelled. Downloaded files are kept.'
+                    : 'Preparation stopped. Retry to continue; details are in developer inspection.'});
+            throw error;
         } finally { await projection?.release(); }
     }));
     const failures = outcomes.filter(result => result.status === 'rejected').map(result => result.reason);

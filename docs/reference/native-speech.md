@@ -350,11 +350,24 @@ before downloading. `openExisting()` borrows its original files and never
 deletes them. Incomplete selections stay visible through the owner's discovery
 results and are not mistaken for a complete model. When no complete match is
 available, the existing acquisition path prepares the complete selected set;
-its completed downloads remain reusable. Explicit `refresh: true` requests a
-fresh acquisition. The host chooses the roots: its portable native launch
-context supplies `modelsDirectory` under the resolved per-user `stateRoot` by
-default, while explicit directory overrides remain supported. An application
-may include its own `models` directory among the discovery roots.
+its completed members and closed partial files remain available after an
+interruption or cancellation. Explicit retry reuses those members and resumes
+ordinary HTTP transfers when the source accepts their conditional range;
+otherwise only that member restarts with an explicit progress event. TAR
+segments replay while completed tokenizer companions remain reusable.
+Matching cross-process selections wait for the actual transfer owner, then
+reuse or resume its recorded attempt; unrelated downloads remain concurrent.
+See [native acquisition and recovery](model-assets.md#native-ownership) for the
+shared owner's complete contract. Explicit `refresh: true` requests a
+fresh acquisition. The host chooses the roots: on Windows, Linux and macOS its
+portable native launch-context resolver defaults `modelsDirectory` to the
+operating-system user's shared `Arcane/Models` directory, independently of
+app-private state and workspace. Explicit directory overrides remain unchanged;
+other adapted hosts supply their shared directory explicitly or retain the
+resolver's app-state fallback. This location applies to services using that
+resolver value, not every provider store. Resolution moves no existing files.
+An application may include its own `models` directory and prior app-local
+model locations among the discovery roots, borrowing those originals in place.
 
 The result is `{assetProjectionId, directory, members, resourcePaths, release}`.
 `release()` is idempotent and releases preparation ownership. Each engine
@@ -369,8 +382,18 @@ native work and helper exit have joined. Load failures also join asset cleanup,
 and cleanup failures remain observable.
 
 `onProgress` receives ordered, awaited shared-owner phase and file-completion
-events, including reuse and ready for installed selections. Signal cancellation
-stops that preparation's work; an abort after projection creation releases it
+events. Native acquisition includes `state`, plain `message`, file counts and
+optional member, reason, recovery, error or other-owner activity. Its five-second
+heartbeat and fifteen-second no-source-activity `stalled` state describe actual
+transfer observations, not an inferred outage or percentage. `interrupted`,
+`cancelled`, `failed` and `ready` are distinct terminal states. Direct
+installed-directory reuse retains the existing `reuse`/`ready` records with
+`completed`, `total` and `unit:'files'`.
+
+Signal cancellation stops that caller's preparation interest; another interested
+caller may continue the shared acquisition. The final cancellation joins I/O
+and retains resumable data; cancelled subscribers keep their existing callback
+boundary. An abort after projection creation releases preparation ownership
 before rejecting. Engine load cancellation remains separate: cancelling the
 caller's wait does not cancel a shared activation; explicit engine unload/close
 owns that cancellation.

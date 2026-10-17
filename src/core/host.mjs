@@ -9,37 +9,41 @@ export {startCoreListener, startSharedCoreHost, connectSharedCoreHost, runShared
 
 const is = new Is(false);
 
-/** Resolve one app's native locations without creating or migrating data. */
+function userDataDirectory() {
+    const home = homedir();
+    switch (process.platform) {
+        case 'win32': return process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+        case 'darwin': return path.join(home, 'Library', 'Application Support');
+        case 'linux': {
+            const xdg = process.env.XDG_DATA_HOME;
+            return xdg && path.isAbsolute(xdg) ? xdg : path.join(home, '.local', 'share');
+        }
+        default: return null;
+    }
+}
+
+/** Resolve app-private state and same-user shared models without moving data. */
 export function resolveNativeLaunchContext({appId, context = {}} = {}) {
     if (!is.string(appId) || !appId) throw new TypeError('Native launch resolution requires an appId.');
     if (context === null || !is.object(context) || is.array(context)) {
         throw new TypeError('Native launch context must be an object.');
     }
+    const userDirectory = userDataDirectory();
     let stateRoot = context.stateRoot;
     if (stateRoot === undefined) {
-        const home = homedir();
-        switch (process.platform) {
-            case 'win32':
-                stateRoot = path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Arcane', appId);
-                break;
-            case 'darwin':
-                stateRoot = path.join(home, 'Library', 'Application Support', 'Arcane', appId);
-                break;
-            case 'linux': {
-                const xdg = process.env.XDG_DATA_HOME;
-                stateRoot = path.join(xdg && path.isAbsolute(xdg) ? xdg : path.join(home, '.local', 'share'), 'Arcane', appId);
-                break;
-            }
-            default:
-                throw new TypeError('This native host must supply its persistent stateRoot.');
-        }
+        if (!userDirectory) throw new TypeError('This native host must supply its persistent stateRoot.');
+        stateRoot = path.join(userDirectory, 'Arcane', appId);
     }
     if (!is.string(stateRoot) || !stateRoot) throw new TypeError('Native stateRoot must be a nonempty directory path.');
     const root = path.resolve(stateRoot);
     const resolved = {
         ...context,
         stateRoot,
-        modelsDirectory: context.modelsDirectory === undefined ? path.join(root, 'Models') : context.modelsDirectory,
+        // Model files are reusable resources; preferences, profiles and chat stay
+        // under the application's stateRoot. Other hosts supply their shared path.
+        modelsDirectory: context.modelsDirectory === undefined
+            ? userDirectory ? path.join(userDirectory, 'Arcane', 'Models') : path.join(root, 'Models')
+            : context.modelsDirectory,
         workspaceRoot: context.workspaceRoot === undefined ? path.join(root, 'Workspace') : context.workspaceRoot
     };
     if (context.sharedHost !== undefined) {

@@ -1,4 +1,6 @@
-import {mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile} from 'node:fs/promises';
+import {watch} from 'node:fs';
+import {randomUUID} from 'node:crypto';
 import {Buffer} from 'node:buffer';
 import path from 'node:path';
 import Is from 'strong-type';
@@ -146,11 +148,16 @@ async function discoverDirectories(appRoot, {directories, catalog = [], recursiv
             catch (error) { if (error.code !== 'ENOENT') throw error; linked.set(entry, null); }
         }
         let acquisition;
+        let acquisitionComplete = false;
         if (path.basename(directory).startsWith('acquisition-')) {
-            try { acquisition = JSON.parse(await readFile(path.join(directory, 'acquisition.json'), {encoding: 'utf8', signal})); }
-            catch (error) {
-                if (error.code !== 'ENOENT') throw error;
-                if (path.basename(path.dirname(directory)) === 'model-assets') return;
+            try { acquisition = JSON.parse(await readFile(path.join(directory, 'acquisition.json'), {encoding: 'utf8', signal})); acquisitionComplete = true; }
+            catch (error) { if (error.code !== 'ENOENT') throw error; }
+            if (!acquisition) {
+                try { acquisition = JSON.parse(await readFile(path.join(directory, 'transfer.json'), {encoding: 'utf8', signal})); }
+                catch (error) {
+                    if (error.code !== 'ENOENT') throw error;
+                    if (path.basename(path.dirname(directory)) === 'model-assets') return;
+                }
             }
         }
         if (acquisition) {
@@ -164,7 +171,9 @@ async function discoverDirectories(appRoot, {directories, catalog = [], recursiv
                         && (member.archiveMember === undefined || member.archiveMember === original.archiveMember);
                 });
             });
-            add(discoveryRecord(files, members, 'acquisition', selection, discoveryEntry(groups, selection?.entryPath)));
+            const record = discoveryRecord(files, members, 'acquisition', selection, discoveryEntry(groups, selection?.entryPath));
+            if (!acquisitionComplete) record.complete = false;
+            add(record);
             return;
         }
         for (const selection of selections) {
@@ -193,31 +202,198 @@ async function discoverDirectories(appRoot, {directories, catalog = [], recursiv
     return {directories: roots, models};
 }
 
-async function storedAcquisition(directory, members, signal) {
-    let latest;
+async function storedAcquisitions(directory, members, signal) {
+    const acquisitions = [];
     for (const entry of await readdir(directory, {withFileTypes: true})) {
         signal.throwIfAborted();
         if (!entry.isDirectory() || !entry.name.startsWith('acquisition-')) continue;
         const root = path.join(directory, entry.name);
         let selected;
-        try { selected = JSON.parse(await readFile(path.join(root, 'acquisition.json'), {encoding: 'utf8', signal})); }
-        catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+        let committed = false;
+        try { selected = JSON.parse(await readFile(path.join(root, 'acquisition.json'), {encoding: 'utf8', signal})); committed = true; }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (!selected) {
+            try { selected = JSON.parse(await readFile(path.join(root, 'transfer.json'), {encoding: 'utf8', signal})); }
+            catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+        }
         if (!sameMembers(selected.members, members)) continue;
-        nativeAcquisitionOrder = Math.max(nativeAcquisitionOrder, selected.order);
+        nativeAcquisitionOrder = Math.max(nativeAcquisitionOrder, selected.order ?? 0);
         const files = path.join(root, 'files');
         const locations = members.map(function originalLocation(member) { return memberLocation(files, member); });
-        let available = true;
-        for (const member of locations) {
+        const completedMembers = [];
+        for (const [index, member] of locations.entries()) {
             signal.throwIfAborted();
-            try { if (!(await stat(member.nativePath)).isFile()) available = false; }
-            catch (error) { if (error.code !== 'ENOENT') throw error; available = false; }
+            // Only an atomically promoted final filename is a completed member
+            // in the resumable layout. Older completion records keep their meaning.
+            try { if ((await stat(member.nativePath)).isFile()) completedMembers.push(index); }
+            catch (error) { if (error.code !== 'ENOENT') throw error; }
         }
-        if (available && (!latest || selected.order > latest.order
-            || (selected.order === latest.order && entry.name > latest.name))) {
-            latest = {name: entry.name, order: selected.order, directory: files, members: locations};
+        acquisitions.push({root, name: entry.name, order: selected.order ?? 0, refresh: selected.refresh === true,
+            complete: committed && completedMembers.length === members.length, completedMembers, directory: files, members: locations});
+    }
+    acquisitions.sort(function newestAcquisition(left, right) { return right.order - left.order || right.name.localeCompare(left.name); });
+    return acquisitions;
+}
+
+async function saveAcquisitionState(root, name, record) {
+    const pending = path.join(root, `${name}.${randomUUID()}.pending`);
+    await writeFile(pending, JSON.stringify(record), {encoding: 'utf8', flag: 'wx'});
+    await rename(pending, path.join(root, name));
+}
+
+function processExists(pid) {
+    try { process.kill(pid, 0); return true; }
+    catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+}
+
+/** Atomic directory publication keeps an owner record visible with its lock. */
+async function acquireDirectoryOwner(directory, name, signal, waiting) {
+    const lock = path.join(directory, name);
+    const candidate = await mkdtemp(path.join(directory, `${name}-candidate-`));
+    const owner = {pid: process.pid, token: randomUUID(), acquiredAt: new Date().toISOString(),
+        scope: lock, expires: 'When the recorded process exits; live ownership has no elapsed-time expiry.',
+        release: 'Retire the owned directory atomically after owned I/O settles, then remove its own metadata.',
+        recovery: 'A contender may recover this directory only after its recorded process has exited.'};
+    let acquired = false;
+    async function retireOwner(selectedLock) {
+        const retired = path.join(directory, `${name}-released-${randomUUID()}`);
+        await rename(selectedLock, retired);
+        await unlink(path.join(retired, 'owner.json'));
+        await rmdir(retired);
+    }
+    let acquisitionError;
+    try {
+        await writeFile(path.join(candidate, 'owner.json'), JSON.stringify(owner), {encoding: 'utf8', flag: 'wx'});
+        while (!acquired) {
+            signal.throwIfAborted();
+            let notify;
+            let rejectWait;
+            const changed = new Promise(function observeOwnerChange(resolve, reject) { notify = resolve; rejectWait = reject; });
+            changed.catch(function observeWaitRejection() {});
+            const watcher = watch(directory, function ownerChanged() { notify(); });
+            watcher.on('error', rejectWait);
+            // A crashed process emits no filesystem event. This heartbeat checks
+            // that exact owner, and also keeps a live wait observable to callers.
+            const heartbeat = setTimeout(notify, 5000);
+            heartbeat.unref?.();
+            function aborted() { rejectWait(signal.reason); }
+            signal.addEventListener('abort', aborted, {once: true});
+            try {
+                try { await rename(candidate, lock); acquired = true; }
+                catch (error) {
+                    if (!['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES'].includes(error.code)) throw error;
+                    let active;
+                    try { active = JSON.parse(await readFile(path.join(lock, 'owner.json'), 'utf8')); }
+                    catch (readError) {
+                        if (readError.code !== 'ENOENT') throw readError;
+                        try {
+                            // Empty ownerless directories can remain from an
+                            // older interrupted release. rmdir cannot remove a
+                            // newly published nonempty owner directory.
+                            await rmdir(lock);
+                            continue;
+                        } catch (emptyError) {
+                            if (emptyError.code === 'ENOENT') {
+                                if (error.code === 'EPERM' || error.code === 'EACCES') throw error;
+                                continue;
+                            }
+                            if (!['ENOTEMPTY', 'EEXIST'].includes(emptyError.code)) throw emptyError;
+                        }
+                    }
+                    if (active && !processExists(active.pid)) {
+                        let current;
+                        try { current = JSON.parse(await readFile(path.join(lock, 'owner.json'), 'utf8')); }
+                        catch (readError) { if (readError.code === 'ENOENT') continue; throw readError; }
+                        // The old process may have released normally and then
+                        // exited after our first read. Do not retire its successor.
+                        if (current.token !== active.token) continue;
+                        // Keep this nonempty operation record after recovery.
+                        // A delayed contender for the same dead owner cannot
+                        // replace it with a newly published live owner's lock.
+                        const retired = path.join(directory, `${name}-exited-${active.token}`);
+                        try { await rename(lock, retired); }
+                        catch (recoveryError) {
+                            if (recoveryError.code === 'ENOENT') continue;
+                            if (!['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES'].includes(recoveryError.code)) throw recoveryError;
+                            const recovered = JSON.parse(await readFile(path.join(retired, 'owner.json'), 'utf8'));
+                            if (recovered.token !== active.token) throw recoveryError;
+                        }
+                        continue;
+                    }
+                    await waiting?.(active);
+                    signal.throwIfAborted();
+                    await changed;
+                }
+            } finally {
+                clearTimeout(heartbeat);
+                watcher.close();
+                signal.removeEventListener('abort', aborted);
+            }
+        }
+    } catch (error) { acquisitionError = error; throw error; }
+    finally {
+        if (!acquired) {
+            try {
+                try { await unlink(path.join(candidate, 'owner.json')); }
+                catch (error) { if (error.code !== 'ENOENT') throw error; }
+                await rmdir(candidate);
+            } catch (error) {
+                if (acquisitionError) throw new AggregateError([acquisitionError, error], 'Acquiring model ownership and releasing its candidate failed.');
+                throw error;
+            }
         }
     }
-    return latest ? {directory: latest.directory, members: latest.members} : null;
+    return async function releaseDirectoryOwner() {
+        const current = JSON.parse(await readFile(path.join(lock, 'owner.json'), 'utf8'));
+        if (current.token !== owner.token) throw failure('MODEL_ASSET_OWNER_CHANGED', 'Model acquisition ownership changed before release.');
+        await retireOwner(lock);
+    };
+}
+
+async function retainRestartedPart(attempt, memberIndex) {
+    const partial = path.join(attempt, 'parts', `${memberIndex}.part`);
+    const previous = path.join(attempt, 'parts', `${memberIndex}.previous.part`);
+    try { await stat(previous); }
+    catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        try { await rename(partial, previous); return; }
+        catch (renameError) { if (renameError.code !== 'ENOENT') throw renameError; return; }
+    }
+    // Retain the earlier resumable original while replacing only this member's
+    // failed replacement. Repeated retries do not accumulate duplicate parts.
+    try { await unlink(partial); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
+
+async function selectNativeAcquisition(entry, progress) {
+    const {directory, members, controller, refresh} = entry;
+    const {signal} = controller;
+    const release = await acquireDirectoryOwner(directory, '.selection-owner', signal, function waitingForSelection() { progress('waiting'); });
+    let selectionError;
+    try {
+        const stored = await storedAcquisitions(directory, members, signal);
+        if (!refresh) {
+            const complete = stored.find(function completeAcquisition(candidate) { return candidate.complete; });
+            if (complete) return complete;
+        }
+        const resumable = stored.find(function incompleteAcquisition(candidate) { return !candidate.complete && (!refresh || candidate.refresh); });
+        if (resumable) return resumable;
+        const root = await mkdtemp(path.join(directory, 'acquisition-'));
+        const files = path.join(root, 'files');
+        await mkdir(files);
+        await mkdir(path.join(root, 'parts'));
+        const order = ++nativeAcquisitionOrder;
+        await saveAcquisitionState(root, 'transfer.json', {members, order, refresh, completedMembers: [], transports: {}});
+        return {root, order, refresh, complete: false, completedMembers: [], directory: files,
+            members: members.map(function selectedMember(member) { return memberLocation(files, member); })};
+    } catch (error) { selectionError = error; throw error; }
+    finally {
+        try { await release(); }
+        catch (error) {
+            if (selectionError) throw new AggregateError([selectionError, error], 'Selecting model assets and releasing selection ownership failed.');
+            throw error;
+        }
+    }
 }
 
 async function fetchModelResponse(url, signal, range) {
@@ -287,7 +463,7 @@ async function extractTarRange(response, range, selected, found, entry, progress
             if (!pending.length && !ended) {
                 const chunk = await reader.read();
                 ended = chunk.done;
-                if (!ended) pending = Buffer.from(chunk.value);
+                if (!ended) { pending = Buffer.from(chunk.value); entry.activity(); }
             }
             if (!pending.length && ended) {
                 if (allowEnd && remaining === length) return false;
@@ -336,7 +512,8 @@ async function extractTarRange(response, range, selected, found, entry, progress
                     for (const memberIndex of memberIndexes) {
                         const location = entry.location.members[memberIndex];
                         await mkdir(path.dirname(location.nativePath), {recursive: true});
-                        handles.push(await open(location.nativePath, 'wx'));
+                        const partial = await entry.archivePart(memberIndex);
+                        handles.push(await open(partial, 'wx'));
                         progress('download', memberIndex);
                     }
                     await consume(length, async function originalMemberContent(content) {
@@ -352,7 +529,7 @@ async function extractTarRange(response, range, selected, found, entry, progress
                 if (errors.length) throw new AggregateError(errors, 'Extracting a model member and closing its files failed.');
                 for (const memberIndex of memberIndexes) {
                     found.add(memberIndex);
-                    completeMember(memberIndex);
+                    await completeMember(memberIndex);
                 }
             } else await consume(length);
             await consume((512 - length % 512) % 512);
@@ -365,95 +542,258 @@ async function extractTarRange(response, range, selected, found, entry, progress
     if (operationError) throw operationError;
 }
 
+async function downloadNativeMember(entry, memberIndex, state, save, progress, completeMember, noteFailure) {
+    const member = entry.members[memberIndex];
+    const {signal} = entry.controller;
+    const partial = path.join(entry.attempt, 'parts', `${memberIndex}.part`);
+    let offset = 0;
+    try { offset = (await stat(partial)).size; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const previous = state.transports[memberIndex];
+    let response;
+    let reader;
+    let handle;
+    let cancellation;
+    let ended = false;
+    let operationError;
+    let remaining;
+
+    async function restart(reason) {
+        progress('restart', memberIndex, false, {reason});
+        await retainRestartedPart(entry.attempt, memberIndex);
+        offset = 0;
+    }
+    async function request(headers) {
+        try { return await fetch(member.url, {signal, headers}); }
+        catch (error) { noteFailure(error, 'interrupted'); throw error; }
+    }
+    function cancelReader() {
+        if (!reader || ended) return;
+        cancellation ??= reader.cancel(signal.reason);
+        cancellation.catch(function observeReaderCancellation() {});
+    }
+    try {
+        signal.throwIfAborted();
+        if (offset && previous?.encoding && previous.encoding !== 'identity') await restart('The previous response used encoded HTTP content and cannot be appended by Range.');
+        const validator = previous?.etag && !previous.etag.startsWith('W/') ? previous.etag : previous?.lastModified;
+        if (offset && !validator) await restart('The source supplied no HTTP validator for continuing its earlier response.');
+        const headers = {'Accept-Encoding': 'identity'};
+        if (offset) {
+            headers.Range = `bytes=${offset}-`;
+            headers['If-Range'] = validator;
+            progress('resume', memberIndex);
+        } else progress('download', memberIndex);
+        response = await request(headers);
+        signal.throwIfAborted();
+        if (offset && response.status === 416) {
+            await response.body?.cancel();
+            response = undefined;
+            await restart('The server no longer accepts this saved HTTP range.');
+            response = await request({'Accept-Encoding': 'identity'});
+        }
+        if (!response.ok) {
+            const error = failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset request failed: ${response.status} ${response.statusText}`);
+            error.url = member.url;
+            error.status = response.status;
+            error.response = await response.text();
+            noteFailure(error, response.status >= 500 || response.status === 408 || response.status === 429 ? 'interrupted' : 'failed');
+            throw error;
+        }
+        if (!response.body) throw failure('MODEL_ASSET_DOWNLOAD_FAILED', `Model asset response has no content stream: ${member.url}`);
+        if (offset && response.status === 200) await restart('The server returned the complete file instead of the saved HTTP range.');
+        if (response.status === 206) {
+            const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') ?? '');
+            const encoding = response.headers.get('content-encoding');
+            const validatorHeader = previous?.etag && !previous.etag.startsWith('W/') ? 'etag' : 'last-modified';
+            const currentValidator = response.headers.get(validatorHeader);
+            const changed = currentValidator && currentValidator !== validator;
+            if (!offset || !range || Number(range[1]) !== offset || Number(range[2]) < offset
+                || Number(range[2]) + 1 !== Number(range[3]) || (encoding && encoding !== 'identity') || changed) {
+                const error = failure('MODEL_ASSET_DOWNLOAD_RANGE_FAILED', 'The server did not return the requested continuation of this model file.');
+                error.url = member.url;
+                error.status = response.status;
+                throw error;
+            }
+            // Content-Range framing is private to this HTTP transfer. It never
+            // participates in model identity, admission or user-facing progress.
+            remaining = Number(range[2]) - Number(range[1]) + 1;
+        }
+        state.transports[memberIndex] = {
+            etag: response.headers.get('etag'), lastModified: response.headers.get('last-modified'),
+            encoding: response.headers.get('content-encoding')
+        };
+        await save();
+        handle = await open(partial, 'a');
+        reader = response.body.getReader();
+        signal.addEventListener('abort', cancelReader, {once: true});
+        if (signal.aborted) cancelReader();
+        while (true) {
+            signal.throwIfAborted();
+            let chunk;
+            try { chunk = await reader.read(); }
+            catch (error) { noteFailure(error, 'interrupted'); throw error; }
+            signal.throwIfAborted();
+            if (chunk.done) { ended = true; break; }
+            if (remaining !== undefined) {
+                remaining -= chunk.value.byteLength;
+                if (remaining < 0) throw failure('MODEL_ASSET_DOWNLOAD_RANGE_FAILED', 'The server exceeded its HTTP Content-Range.');
+            }
+            await handle.appendFile(chunk.value);
+            progress('download', memberIndex, true);
+        }
+        if (remaining !== undefined && remaining !== 0) throw failure('MODEL_ASSET_DOWNLOAD_RANGE_FAILED', 'The server ended before its HTTP Content-Range.');
+        signal.throwIfAborted();
+    } catch (error) { operationError = error; noteFailure(error, 'failed'); }
+    signal.removeEventListener('abort', cancelReader);
+    try {
+        if (reader && !ended) { cancellation ??= reader.cancel(operationError); await cancellation; }
+        else if (!reader && response?.body && !response.bodyUsed && !response.body.locked) await response.body.cancel(operationError);
+    } catch (error) {
+        if (error !== operationError) operationError = operationError ? new AggregateError([operationError, error], 'Downloading a model member and closing its response failed.') : error;
+    }
+    try { reader?.releaseLock(); }
+    catch (error) { operationError = operationError ? new AggregateError([operationError, error], 'Downloading a model member and releasing its reader failed.') : error; }
+    try { await handle?.close(); }
+    catch (error) { operationError = operationError ? new AggregateError([operationError, error], 'Downloading a model member and closing its file failed.') : error; }
+    if (operationError) { noteFailure(operationError, 'failed'); throw operationError; }
+    await completeMember(memberIndex);
+}
+
 async function acquireNativeMembers(entry) {
-    const {directory, members, controller} = entry;
+    const {members, controller} = entry;
     const {signal} = controller;
-    let attempt;
     let completed = 0;
-    let committed = false;
     let firstFailure;
+    let failureState;
+    let releaseOwner;
+    let state;
+    let stateTail = Promise.resolve();
+    let heartbeat;
+    let acquisitionError;
+    let lastActivity = Date.now();
+    entry.activity = function receivedTransportContent() { lastActivity = Date.now(); };
     const activity = new Map();
-    function progress(phase, memberIndex, repeatedActivity = false) {
+    function noteFailure(error, selectedState) {
+        if (firstFailure || signal.aborted) return;
+        firstFailure = error;
+        failureState = selectedState;
+        controller.abort(error);
+    }
+    function save() {
+        const next = stateTail.then(function saveTransferState() { return saveAcquisitionState(entry.attempt, 'transfer.json', state); });
+        stateTail = next.catch(function observeStateFailure(error) { noteFailure(error, 'failed'); });
+        return next;
+    }
+    function progress(phase, memberIndex, repeatedActivity = false, details = {}) {
+        if (phase === 'download') lastActivity = Date.now();
         if (repeatedActivity) {
             const now = Date.now();
             if (now - (activity.get(memberIndex) ?? 0) < 1000) return;
             activity.set(memberIndex, now);
         }
-        entry.publish({phase, completed, total: members.length, unit: 'files',
-            ...(memberIndex === undefined ? {} : {memberIndex, path: members[memberIndex].path})});
+        const selectedState = details.state ?? ({waiting: 'waiting', stalled: 'stalled', interrupted: 'interrupted',
+            cancelled: 'cancelled', failed: 'failed', ready: 'ready'})[phase] ?? 'downloading';
+        const messages = {
+            waiting: 'Another application is preparing these model files. Waiting for its acquisition.',
+            downloading: 'Downloading model files.', stalled: 'The model download is still open; no recent data has arrived.',
+            interrupted: 'The model download was interrupted. Completed files and resumable data were kept.',
+            cancelled: 'The model download was cancelled. Completed files and resumable data were kept.',
+            failed: 'The model download failed. Existing files and resumable data were kept.', ready: 'Model files are ready.'
+        };
+        const notification = {phase, state: selectedState, message: phase === 'resume' ? 'Resuming the saved model download.'
+            : phase === 'restart' ? 'Restarting this model file because its saved HTTP continuation is unavailable. Earlier partial data was retained.'
+                : phase === 'reuse' ? 'Reusing downloaded model files.' : messages[selectedState],
+            completed, total: members.length, unit: 'files',
+            ...(memberIndex === undefined ? {} : {memberIndex, path: members[memberIndex].path}), ...details};
+        if (['interrupted', 'cancelled', 'failed'].includes(selectedState)) notification.recovery = 'Retry to reuse completed files and continue saved downloads.';
+        if (selectedState === 'stalled') notification.recovery = 'Wait for the source to respond, or cancel and retry later.';
+        if (state) state.progress = notification;
+        entry.publish(notification);
     }
     try {
         signal.throwIfAborted();
-        const stored = await storedAcquisition(directory, members, signal);
-        if (stored && !entry.refresh) {
-            entry.location = stored;
+        const selected = await selectNativeAcquisition(entry, progress);
+        entry.attempt = selected.root;
+        entry.location = {directory: selected.directory, members: selected.members};
+        if (selected.complete) {
             completed = members.length;
             progress('reuse');
             progress('ready');
-            return stored;
+            return entry.location;
         }
         signal.throwIfAborted();
-        attempt = await mkdtemp(path.join(directory, 'acquisition-'));
-        const files = path.join(attempt, 'files');
-        await mkdir(files);
-        entry.location = {directory: files, members: members.map(function selectedMember(member) { return memberLocation(files, member); })};
+        releaseOwner = await acquireDirectoryOwner(selected.root, '.transfer-owner', signal, async function waitingForTransfer() {
+            try {
+                const observed = JSON.parse(await readFile(path.join(selected.root, 'transfer.json'), 'utf8'));
+                completed = observed.completedMembers?.length ?? 0;
+                progress('waiting', undefined, false, {activity: observed.progress});
+            } catch (error) { if (error.code !== 'ENOENT') throw error; progress('waiting'); }
+        });
+        const current = (await storedAcquisitions(entry.directory, members, signal)).find(function ownedAttempt(candidate) { return candidate.root === selected.root; });
+        if (current?.complete) {
+            completed = members.length;
+            progress('reuse');
+            progress('ready');
+            return entry.location;
+        }
+        try { state = JSON.parse(await readFile(path.join(selected.root, 'transfer.json'), 'utf8')); }
+        catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+            state = {members, order: selected.order, refresh: selected.refresh, transports: {}};
+        }
+        state.transports ??= {};
+        state.completedMembers = current?.completedMembers ?? [];
+        const finished = new Set(state.completedMembers);
+        completed = finished.size;
+        await mkdir(path.join(selected.root, 'parts'), {recursive: true});
         progress('open');
-        function completeMember(memberIndex) {
-            completed += 1;
+        await save();
+        heartbeat = setInterval(function reportTransferHeartbeat() {
+            const stalled = Date.now() - lastActivity >= 15000;
+            progress(stalled ? 'stalled' : 'heartbeat');
+            save().catch(function observeHeartbeatFailure(error) { noteFailure(error, 'failed'); });
+        }, 5000);
+        heartbeat.unref?.();
+        async function completeMember(memberIndex) {
+            const location = entry.location.members[memberIndex];
+            await mkdir(path.dirname(location.nativePath), {recursive: true});
+            await rename(path.join(entry.attempt, 'parts', `${memberIndex}.part`), location.nativePath);
+            finished.add(memberIndex);
+            state.completedMembers = [...finished];
+            completed = finished.size;
+            await save();
+            try { await unlink(path.join(entry.attempt, 'parts', `${memberIndex}.previous.part`)); }
+            catch (error) { if (error.code !== 'ENOENT') throw error; }
             progress('download', memberIndex);
         }
+        entry.archivePart = async function prepareArchivePart(memberIndex) {
+            const partial = path.join(entry.attempt, 'parts', `${memberIndex}.part`);
+            try {
+                await stat(partial);
+                await retainRestartedPart(entry.attempt, memberIndex);
+                progress('restart', memberIndex, false, {reason: 'The selected TAR segment must be replayed to recover its member framing.'});
+            } catch (error) { if (error.code !== 'ENOENT') throw error; }
+            return partial;
+        };
+        if (completed) progress('reuse');
         const jobs = members.map(function ordinaryJob(member, memberIndex) {
-            if (member.archiveMember !== undefined) return null;
+            if (member.archiveMember !== undefined || finished.has(memberIndex)) return null;
             return async function downloadMember() {
-                let handle;
-                let response;
-                let downloadError;
-                const failures = [];
-                let bodyOwned = false;
-                try {
-                    signal.throwIfAborted();
-                    const nativePath = entry.location.members[memberIndex].nativePath;
-                    await mkdir(path.dirname(nativePath), {recursive: true});
-                    handle = await open(nativePath, 'wx');
-                    signal.throwIfAborted();
-                    progress('download', memberIndex);
-                    response = await fetchModelResponse(member.url, signal);
-                    bodyOwned = true;
-                    for await (const content of response.body) {
-                        signal.throwIfAborted();
-                        await handle.appendFile(content);
-                        progress('download', memberIndex, true);
-                    }
-                    signal.throwIfAborted();
-                } catch (error) {
-                    downloadError = error;
-                    failures.push(error);
-                    firstFailure ??= error;
-                    controller.abort(error);
-                }
-                if (response?.body && !bodyOwned && !response.bodyUsed && !response.body.locked) {
-                    try { await response.body.cancel(downloadError); } catch (error) { if (error !== downloadError) failures.push(error); }
-                }
-                if (handle) {
-                    try { await handle.close(); } catch (error) { failures.push(error); }
-                }
-                if (failures.length) {
-                    const error = failures.length === 1 ? failures[0] : new AggregateError(failures, 'Downloading a model member and closing its resources failed.');
-                    firstFailure ??= error;
-                    controller.abort(error);
-                    throw error;
-                }
-                completeMember(memberIndex);
+                try { await downloadNativeMember(entry, memberIndex, state, save, progress, completeMember, noteFailure); }
+                catch (error) { noteFailure(error, 'failed'); throw error; }
             };
         }).filter(Boolean);
         let archiveIndex = members.findIndex(function archiveMember(member) { return member.archiveMember !== undefined; });
         for (const archive of entry.archives) {
             const selected = new Map();
             for (const member of archive.members) {
+                const memberIndex = archiveIndex++;
+                if (finished.has(memberIndex)) continue;
                 const name = tarName(member.member);
                 if (!selected.has(name)) selected.set(name, []);
-                selected.get(name).push(archiveIndex++);
+                selected.get(name).push(memberIndex);
             }
+            if (!selected.size) continue;
             jobs.push(async function downloadArchiveMembers() {
                 const found = new Set();
                 try {
@@ -472,8 +812,7 @@ async function acquireNativeMembers(entry) {
                         throw error;
                     }
                 } catch (error) {
-                    firstFailure ??= error;
-                    controller.abort(error);
+                    noteFailure(error, error.code?.startsWith('MODEL_ASSET_ARCHIVE_') ? 'failed' : 'interrupted');
                     throw error;
                 }
             });
@@ -485,27 +824,41 @@ async function acquireNativeMembers(entry) {
                 await jobs[nextJob++]();
             }
         }));
-        const failures = results.filter(function rejected(result) { return result.status === 'rejected'; })
-            .map(function reason(result) { return result.reason; });
+        const failures = [...new Set(results.filter(function rejected(result) { return result.status === 'rejected'; })
+            .map(function reason(result) { return result.reason; }))];
         if (failures.length > 1) throw new AggregateError(failures, 'Downloading model asset members failed.', {cause: firstFailure});
         if (failures.length) throw failures[0];
         signal.throwIfAborted();
         progress('complete');
         // The record describes a completed acquisition, not content identity.
         // Publish it after every stream and file close, leaving older entries alone.
-        const pending = path.join(attempt, 'acquisition.pending.json');
-        await writeFile(pending, JSON.stringify({members, order: ++nativeAcquisitionOrder}), {encoding: 'utf8', flag: 'wx', signal});
+        await save();
         signal.throwIfAborted();
-        await rename(pending, path.join(attempt, 'acquisition.json'));
-        committed = true;
+        await saveAcquisitionState(entry.attempt, 'acquisition.json', {members, order: state.order, refresh: state.refresh});
+        clearInterval(heartbeat);
         progress('ready');
+        await save();
         return entry.location;
     } catch (error) {
-        if (attempt && !committed) {
-            try { await rm(attempt, {recursive: true}); }
-            catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Preparing native model assets failed and cleanup failed.'); }
+        acquisitionError = error;
+        clearInterval(heartbeat);
+        progress(failureState ?? (signal.aborted ? 'cancelled' : 'failed'), undefined, false, {error: serializeCoreError(error)});
+        if (state) {
+            try { await save(); }
+            catch (stateError) {
+                acquisitionError = new AggregateError([error, stateError], 'Preparing model assets and retaining their interrupted state failed.');
+                throw acquisitionError;
+            }
         }
         throw error;
+    } finally {
+        clearInterval(heartbeat);
+        await stateTail;
+        try { await releaseOwner?.(); }
+        catch (error) {
+            if (acquisitionError) throw new AggregateError([acquisitionError, error], 'Preparing model assets and releasing their acquisition owner failed.');
+            throw error;
+        }
     }
 }
 
@@ -591,7 +944,8 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
                 return {path: member.path, nativePath: member.nativePath};
             }),
             preparationOwned: record.preparationOwned, uses: record.uses.size,
-            error: record.error ? serializeCoreError(record.error) : null
+            error: record.error ? serializeCoreError(record.error) : null,
+            ...(record.progress ? {progress: record.progress} : {})
         };
     }
 
@@ -777,6 +1131,9 @@ export function createModelAssetService({appRoot = process.cwd()} = {}) {
                         record.directory = location.directory;
                         record.members = location.members;
                     }
+                    record.progress = value;
+                    record.state = value.state;
+                    publish(record);
                     await onProgress?.(value);
                 }});
         });

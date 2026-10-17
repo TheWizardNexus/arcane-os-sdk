@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {Buffer} from 'node:buffer';
+import {spawn} from 'node:child_process';
 import {mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -20,8 +21,8 @@ async function fixture(t, selectedFetch, beforeClose) {
     const originalFetch = globalThis.fetch;
     const services = new Set();
 
-    function createService() {
-        const selectedService = createModelAssetService({appRoot: root});
+    function createService(factory = createModelAssetService) {
+        const selectedService = factory({appRoot: root});
         services.add(selectedService);
         return selectedService;
     }
@@ -83,7 +84,11 @@ test('native preparation streams all members concurrently and preserves complete
     assert.equal(path.dirname(path.dirname(projection.directory)), path.join(root, 'selected-working-files', 'model-assets'));
     assert.deepEqual(projection.members.map(function memberPath(member) { return member.path; }), ['onnx/model.onnx', 'tokenizer.json']);
     for (const [index, member] of projection.members.entries()) assert.deepEqual(await readFile(member.nativePath), contents[index]);
-    assert.deepEqual(progress.at(-1), {phase: 'ready', completed: 2, total: 2, unit: 'files'});
+    assert.equal(progress.at(-1).phase, 'ready');
+    assert.equal(progress.at(-1).state, 'ready');
+    assert.equal(progress.at(-1).completed, 2);
+    assert.equal(progress.at(-1).total, 2);
+    assert.equal(progress.at(-1).unit, 'files');
     use = service.retain(projection.id);
     await service.release(projection.id);
     assert.equal(service.current().projections[0].preparationOwned, false);
@@ -94,7 +99,7 @@ test('native preparation streams all members concurrently and preserves complete
     assert.deepEqual(await service.release(projection.id), {id: projection.id, state: 'released'});
 });
 
-test('native preparation preserves the complete HTTP failure and removes only its working projection', async function failedDownload(t) {
+test('native preparation preserves the complete HTTP failure and its resumable acquisition', async function failedDownload(t) {
     const body = '  Complete upstream failure.\r\nKeep this final line. 🦑  ';
     const {root, service} = await fixture(t, async function rejectedDownload() {
         return new Response(body, {status: 503, statusText: 'Selected model unavailable'});
@@ -110,7 +115,7 @@ test('native preparation preserves the complete HTTP failure and removes only it
         return true;
     });
     assert.deepEqual(service.current().projections, []);
-    assert.deepEqual(await acquisitions(root), []);
+    assert.equal((await acquisitions(root)).length, 1);
 });
 
 test('native preparation cancellation joins its response stream before cleanup', async function cancelledDownload(t) {
@@ -134,7 +139,7 @@ test('native preparation cancellation joins its response stream before cleanup',
     cancellation.abort(reason);
     await rejected;
     assert.deepEqual(service.current().projections, []);
-    assert.deepEqual(await acquisitions(root), []);
+    assert.equal((await acquisitions(root)).length, 1);
 });
 
 test('release during opening prevents native transfers from starting', async function releaseBeforeDownload(t) {
@@ -163,7 +168,7 @@ test('release during opening prevents native transfers from starting', async fun
     assert.deepEqual(await acquisitions(root), []);
 });
 
-test('native disposal and explicit release join an unfinished download before deleting files', async function joinedNativeCleanup(t) {
+test('native disposal and explicit release join an unfinished download while retaining its acquisition', async function joinedNativeCleanup(t) {
     for (const operation of ['dispose', 'release']) {
         await t.test(operation, async function joinedCleanup(child) {
             const entered = deferred();
@@ -190,11 +195,11 @@ test('native disposal and explicit release join an unfinished download before de
             const observed = cleanup.then(function cleanupSettled() { settled = true; });
             await aborted.promise;
             assert.equal(settled, false);
-            assert.deepEqual(await readdir(projection.directory), ['model.onnx']);
+            assert.deepEqual(await readdir(projection.directory), []);
             finish.resolve();
             await rejected;
             await observed;
-            await assert.rejects(readdir(projection.directory), {code: 'ENOENT'});
+            assert.deepEqual(await readdir(projection.directory), []);
         });
     }
 });
@@ -290,7 +295,7 @@ test('native acquisition identity preserves the complete ordered paths, urls and
     }).sort());
 });
 
-test('a missing original member requires a new complete native acquisition', async function missingOriginal(t) {
+test('a missing original member reacquires only that member in the existing acquisition', async function missingOriginal(t) {
     const members = [
         {path: 'onnx/model.onnx', url: 'https://models.invalid/moon/model.onnx'},
         {path: 'onnx/model.onnx_data', url: 'https://models.invalid/moon/model.onnx_data'}
@@ -307,15 +312,15 @@ test('a missing original member requires a new complete native acquisition', asy
 
     const restarted = createService();
     const second = await restarted.prepare({id: 'after-member-loss', workingDirectory: 'selected-working-files', members});
-    assert.notEqual(second.directory, first.directory);
-    assert.deepEqual([...calls].sort(), [...members, ...members].map(function selectedUrl(member) { return member.url; }).sort());
+    assert.equal(second.directory, first.directory);
+    assert.deepEqual([...calls].sort(), [...members, members[1]].map(function selectedUrl(member) { return member.url; }).sort());
     assert.equal(await readFile(first.members[0].nativePath, 'utf8'), `Complete selected original ${members[0].url}.`);
     for (const [index, member] of second.members.entries()) {
         assert.equal(await readFile(member.nativePath, 'utf8'), `Complete selected original ${members[index].url}.`);
     }
 });
 
-test('an interrupted native acquisition retries every member instead of resuming partial originals', async function incompleteAcquisition(t) {
+test('an interrupted native acquisition retries only missing members and preserves completed originals', async function incompleteAcquisition(t) {
     const firstDownloaded = deferred();
     const members = [
         {path: 'model.onnx', url: 'https://models.invalid/moon/model.onnx'},
@@ -337,14 +342,241 @@ test('an interrupted native acquisition retries every member instead of resuming
             if (event.memberIndex === 0 && event.completed === 1) firstDownloaded.resolve();
         }
     }), {code: 'MODEL_ASSET_DOWNLOAD_FAILED'});
-    assert.deepEqual(await acquisitions(root), []);
+    assert.equal((await acquisitions(root)).length, 1);
 
     failTokenizer = false;
     const completed = await service.prepare({id: 'retry-complete-set', workingDirectory: 'selected-working-files', members});
-    assert.deepEqual([...calls].sort(), [...members, ...members].map(function selectedUrl(member) { return member.url; }).sort());
+    assert.deepEqual([...calls].sort(), [...members, members[1]].map(function selectedUrl(member) { return member.url; }).sort());
     for (const [index, member] of completed.members.entries()) {
         assert.equal(await readFile(member.nativePath, 'utf8'), `Complete original ${members[index].url}.`);
     }
+});
+
+test('an interrupted response resumes its retained part with HTTP Range while completed companions are reused', async function resumedNativeMember(t) {
+    const prefix = Buffer.from('  Original beginning.\r\n月 ');
+    const suffix = Buffer.from('Every remaining line. 🦑  ');
+    const interrupted = new TypeError('Synthetic connection interruption.\nComplete diagnostic.');
+    const written = deferred();
+    const companionReady = deferred();
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/resumable'}, {path: 'tokenizer.json', url: 'https://models.invalid/companion'}];
+    const requests = [];
+    let initial = true;
+    let modelProgress = 0;
+    const {root, service, createService} = await fixture(t, async function selectedResponse(url, options) {
+        requests.push({url, headers: options.headers});
+        if (url === members[1].url) return new Response('Complete companion.');
+        if (initial) {
+            return new Response(new ReadableStream({
+                start(controller) { controller.enqueue(prefix); },
+                async pull(controller) {
+                    await Promise.all([written.promise, companionReady.promise]);
+                    controller.error(interrupted);
+                }
+            }), {headers: {ETag: '"selected-revision"'}});
+        }
+        return new Response(suffix, {status: 206, headers: {
+            ETag: '"selected-revision"', 'Content-Range': `bytes ${prefix.length}-${prefix.length + suffix.length - 1}/${prefix.length + suffix.length}`
+        }});
+    }, function finishFixture() { written.resolve(); companionReady.resolve(); });
+    const events = [];
+    await assert.rejects(service.prepare({id: 'interrupted-stream', workingDirectory: 'selected-working-files', members,
+        onProgress(event) {
+            events.push(event);
+            if (event.memberIndex === 0 && event.phase === 'download' && ++modelProgress === 2) written.resolve();
+            if (event.memberIndex === 1 && event.completed === 1) companionReady.resolve();
+        }
+    }), function originalFailure(error) { return error === interrupted; });
+    const [name] = await acquisitions(root);
+    const attempt = path.join(root, 'selected-working-files', 'model-assets', name);
+    assert.deepEqual(await readFile(path.join(attempt, 'parts/0.part')), prefix);
+    assert.equal(await readFile(path.join(attempt, 'files/tokenizer.json'), 'utf8'), 'Complete companion.');
+    assert.equal(events.at(-1).state, 'interrupted');
+    assert.equal(events.at(-1).error.message, interrupted.message);
+    assert.equal((await service.discover({directories: ['selected-working-files']})).models[0].complete, false);
+
+    initial = false;
+    const restarted = createService();
+    const ready = await restarted.prepare({id: 'continued-stream', workingDirectory: 'selected-working-files', members});
+    assert.equal(ready.directory, path.join(attempt, 'files'));
+    assert.deepEqual(await readFile(ready.members[0].nativePath), Buffer.concat([prefix, suffix]));
+    assert.equal(requests.filter(function companionRequest(request) { return request.url === members[1].url; }).length, 1);
+    assert.equal(requests.at(-1).headers.Range, `bytes=${prefix.length}-`);
+    assert.equal(requests.at(-1).headers['If-Range'], '"selected-revision"');
+    assert.deepEqual(await readdir(path.join(attempt, 'parts')), []);
+});
+
+async function partialAcquisition(root, members, {transport = {etag: '"original"'}, complete = []} = {}) {
+    const attempt = path.join(root, 'selected-working-files/model-assets/acquisition-retained');
+    await mkdir(path.join(attempt, 'files'), {recursive: true});
+    await mkdir(path.join(attempt, 'parts'));
+    await writeFile(path.join(attempt, 'transfer.json'), JSON.stringify({members, order: 1, refresh: false,
+        completedMembers: complete, transports: {0: transport}}));
+    await writeFile(path.join(attempt, 'parts/0.part'), 'Original partial.');
+    return attempt;
+}
+
+test('ignored or unavailable HTTP continuations replace only their member and retire its superseded part', async function restartedNativeMember(t) {
+    for (const selected of ['ignored-range', 'unsatisfied-range', 'no-validator']) {
+        await t.test(selected, async function restartMember(child) {
+            const members = [{path: 'model.gguf', url: 'https://models.invalid/replacement'}];
+            const requests = [];
+            const {root, service} = await fixture(child, async function replacementResponse(url, options) {
+                requests.push(options.headers);
+                if (selected === 'unsatisfied-range' && requests.length === 1) return new Response('', {status: 416});
+                return new Response('Complete replacement.', {headers: {ETag: '"replacement"'}});
+            });
+            const attempt = await partialAcquisition(root, members, {transport: selected === 'no-validator' ? {} : {etag: '"original"'}});
+            const events = [];
+            const ready = await service.prepare({id: selected, workingDirectory: 'selected-working-files', members,
+                onProgress(event) { events.push(event); }});
+            assert.equal(await readFile(ready.members[0].nativePath, 'utf8'), 'Complete replacement.');
+            assert.deepEqual(await readdir(path.join(attempt, 'parts')), []);
+            assert.ok(events.some(function explicitRestart(event) { return event.phase === 'restart' && event.reason && event.message; }));
+            assert.equal(requests[0].Range, selected === 'no-validator' ? undefined : 'bytes=17-');
+            assert.equal(requests.length, selected === 'unsatisfied-range' ? 2 : 1);
+        });
+    }
+});
+
+test('an invalid HTTP continuation leaves its original part and full failure observable', async function invalidNativeRange(t) {
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/invalid-range'}];
+    const {root, service} = await fixture(t, async function wrongRange() {
+        return new Response('Wrong continuation.', {status: 206, headers: {'Content-Range': 'bytes 1-19/20', ETag: '"original"'}});
+    });
+    const attempt = await partialAcquisition(root, members);
+    await assert.rejects(service.prepare({id: 'invalid-range', workingDirectory: 'selected-working-files', members}), {code: 'MODEL_ASSET_DOWNLOAD_RANGE_FAILED'});
+    assert.equal(await readFile(path.join(attempt, 'parts/0.part'), 'utf8'), 'Original partial.');
+    assert.deepEqual(await readdir(path.join(attempt, 'files')), []);
+});
+
+test('a recovered all-promoted attempt publishes completion without redownloading', async function completedPromotionRecovery(t) {
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/promoted'}];
+    const {root, service} = await fixture(t, function unusedFetch() { throw new Error('Promoted model members must be reused.'); });
+    const attempt = await partialAcquisition(root, members);
+    await rm(path.join(attempt, 'parts/0.part'));
+    await writeFile(path.join(attempt, 'files/model.gguf'), 'Complete promoted model.');
+    const before = await service.discover({directories: ['selected-working-files']});
+    assert.equal(before.models[0].complete, false);
+    const ready = await service.prepare({id: 'promoted-recovery', workingDirectory: 'selected-working-files', members});
+    assert.equal(ready.directory, path.join(attempt, 'files'));
+    assert.deepEqual(JSON.parse(await readFile(path.join(attempt, 'acquisition.json'), 'utf8')).members, members);
+    assert.equal((await service.discover({directories: ['selected-working-files']})).models[0].complete, true);
+});
+
+test('independent SDK instances coordinate filesystem ownership and a cancelled waiter leaves the owner running', async function independentNativeOwnership(t) {
+    const isolated = await import('../src/core/services/model-assets.mjs?independent-acquisition-fixture');
+    const entered = deferred();
+    const waiting = deferred();
+    const finish = deferred();
+    const cancelled = new AbortController();
+    const reason = new Error('Cancel only the other instance.');
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/owned'}];
+    const requests = [];
+    let ownerSignal;
+    let first;
+    let second;
+    const {service, createService} = await fixture(t, async function ownedResponse(url, {signal}) {
+        requests.push(url);
+        ownerSignal = signal;
+        entered.resolve();
+        await finish.promise;
+        return new Response('Complete shared model.');
+    }, async function releaseFixture() { cancelled.abort(reason); finish.resolve(); await Promise.allSettled([first, second]); });
+    first = service.prepare({id: 'first-owner', workingDirectory: 'selected-working-files', members});
+    await entered.promise;
+    const other = createService(isolated.createModelAssetService);
+    second = other.prepare({id: 'independent-waiter', workingDirectory: 'selected-working-files', members, signal: cancelled.signal,
+        onProgress(event) { if (event.state === 'waiting') waiting.resolve(); }});
+    const rejected = assert.rejects(second, function originalCancellation(error) { return error === reason; });
+    await waiting.promise;
+    cancelled.abort(reason);
+    await rejected;
+    assert.equal(ownerSignal.aborted, false);
+    finish.resolve();
+    const complete = await first;
+    const reused = await other.prepare({id: 'independent-reuse', workingDirectory: 'selected-working-files', members});
+    assert.equal(reused.directory, complete.directory);
+    assert.deepEqual(requests, [members[0].url]);
+});
+
+test('a second OS process resumes the same acquisition after its transfer owner exits', async function crashedProcessAcquisition(t) {
+    const members = [{path: 'model.gguf', url: 'https://models.invalid/process-resume'}];
+    const prefix = 'Original child-process prefix.\n';
+    const suffix = 'Complete parent-process continuation.\n';
+    const waiting = deferred();
+    const cancellation = new AbortController();
+    const requests = [];
+    let child;
+    let childExited = false;
+    let childExit;
+    let preparation;
+    let childDiagnostics = '';
+    const {root, service} = await fixture(t, async function continuedResponse(url, options) {
+        requests.push({url, headers: options.headers});
+        return new Response(suffix, {status: 206, headers: {ETag: '"process-revision"',
+            'Content-Range': `bytes ${Buffer.from(prefix).length}-${Buffer.from(prefix + suffix).length - 1}/${Buffer.from(prefix + suffix).length}`}});
+    }, async function releaseOwnedChild() {
+        cancellation.abort(new Error('The synthetic process acquisition fixture is closing.'));
+        if (child && !childExited) child.kill();
+        await childExit;
+        await Promise.allSettled([preparation]);
+    });
+    const source = `
+import {createModelAssetService} from ${JSON.stringify(new URL('../src/core/services/model-assets.mjs', import.meta.url).href)};
+const service = createModelAssetService({appRoot: ${JSON.stringify(root)}});
+const members = ${JSON.stringify(members)};
+process.on('message', function retainFixtureChannel() {});
+globalThis.fetch = async function syntheticResponse(url, options) {
+    process.send({kind: 'request', url});
+    return new Response(new ReadableStream({
+        start(controller) { controller.enqueue(new TextEncoder().encode(${JSON.stringify(prefix)})); },
+        pull() { return new Promise(function retainOpenResponse() {}); }
+    }), {headers: {ETag: '"process-revision"'}});
+};
+let activity = 0;
+service.prepare({id: 'child-owner', workingDirectory: 'selected-working-files', members,
+    onProgress(event) {
+        if (event.memberIndex === 0 && event.phase === 'download' && ++activity === 2) {
+            process.send({kind: 'partial', directory: service.current().projections[0].directory});
+        }
+    }
+}).catch(function reportChildFailure(error) { process.send({kind: 'failure', message: error.stack ?? String(error)}); });
+`;
+    child = spawn(process.execPath, ['--input-type=module', '--eval', source], {stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true});
+    child.stdout.on('data', function retainChildOutput(content) { childDiagnostics += content.toString(); });
+    child.stderr.on('data', function retainChildError(content) { childDiagnostics += content.toString(); });
+    childExit = new Promise(function observeChildExit(resolve, reject) {
+        child.once('error', reject);
+        child.once('close', function childClosed(code, signal) { childExited = true; resolve({code, signal}); });
+    });
+    childExit.catch(function observeSpawnFailure() {});
+    const childRequests = [];
+    const partial = await new Promise(function observePersistedPartial(resolve, reject) {
+        child.on('message', function childMessage(message) {
+            if (message.kind === 'request') childRequests.push(message.url);
+            if (message.kind === 'partial') resolve(message);
+            if (message.kind === 'failure') reject(new Error(message.message));
+        });
+        childExit.then(function unexpectedExit() { reject(new Error(`The synthetic owner exited before saving its partial.\n${childDiagnostics}`)); }, reject);
+    });
+    assert.equal(await readFile(path.join(path.dirname(partial.directory), 'parts/0.part'), 'utf8'), prefix);
+    preparation = service.prepare({id: 'parent-waiter', workingDirectory: 'selected-working-files', members, signal: cancellation.signal,
+        onProgress(event) { if (event.state === 'waiting') waiting.resolve(); }});
+    preparation.catch(function observePreparationFailure() {});
+    await waiting.promise;
+    assert.deepEqual(requests, []);
+    assert.equal(childExited, false, childDiagnostics);
+    child.kill();
+    await childExit;
+    const ready = await preparation;
+    assert.equal(ready.directory, partial.directory);
+    assert.equal(await readFile(ready.members[0].nativePath, 'utf8'), prefix + suffix);
+    assert.deepEqual(childRequests, [members[0].url]);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].headers.Range, `bytes=${Buffer.from(prefix).length}-`);
+    assert.equal(requests[0].headers['If-Range'], '"process-revision"');
+    assert.ok((await readdir(path.dirname(ready.directory))).some(function recoveredOwner(name) { return name.startsWith('.transfer-owner-exited-'); }));
+    assert.deepEqual(await readdir(path.join(path.dirname(ready.directory), 'parts')), []);
 });
 
 test('matching service instances share acquisition while one cancelled subscriber detaches', async function sharedCancellation(t) {
@@ -442,7 +674,7 @@ test('a shared progress observer failure rejects only its caller and preserves t
     assert.equal(await readFile(ready.members[0].nativePath, 'utf8'), 'Complete original after observer failure.');
 });
 
-test('cancelling the final shared subscriber joins the aborted acquisition before removing its attempt', async function finalSharedCancellation(t) {
+test('cancelling the final shared subscriber joins the aborted acquisition and retains its attempt', async function finalSharedCancellation(t) {
     const entered = deferred();
     const joined = deferred();
     const aborted = deferred();
@@ -492,12 +724,12 @@ test('cancelling the final shared subscriber joins the aborted acquisition befor
     secondCancellation.abort(secondReason);
     await aborted.promise;
     assert.equal(settled, false);
-    assert.deepEqual(await readdir(pending.directory), ['model.onnx']);
+    assert.deepEqual(await readdir(pending.directory), []);
     finish.resolve();
     await secondRejected;
     assert.deepEqual(service.current().projections, []);
     assert.deepEqual(other.current().projections, []);
-    assert.deepEqual(await acquisitions(root), []);
+    assert.equal((await acquisitions(root)).length, 1);
 });
 
 test('native disposal waits for retained engine ownership and preserves completed assets afterward', async function retainedDisposal(t) {
@@ -659,7 +891,10 @@ test('archive preparation extracts complete selected companions from ordered ups
     assert.deepEqual(projection.members.map(function memberPath(member) { return member.path; }), ['model.gguf', 'tokenizer/model_config.yaml', 'tokenizer/speakers.json']);
     assert.equal(await readFile(projection.members[1].nativePath, 'utf8'), config);
     assert.equal(await readFile(projection.members[2].nativePath, 'utf8'), speakers);
-    assert.deepEqual(progress.at(-1), {phase: 'ready', completed: 3, total: 3, unit: 'files'});
+    assert.equal(progress.at(-1).phase, 'ready');
+    assert.equal(progress.at(-1).state, 'ready');
+    assert.equal(progress.at(-1).completed, 3);
+    assert.equal(progress.at(-1).total, 3);
     assert.equal(calls.length, 3);
     await service.release(projection.id);
     const reused = await service.prepare({id: 'archive-reuse', ...selection});
@@ -667,7 +902,7 @@ test('archive preparation extracts complete selected companions from ordered ups
     assert.equal(calls.length, 3);
 });
 
-test('archive member absence rejects the acquisition without keeping a partial selected set', async function missingArchiveCompanion(t) {
+test('archive member absence rejects preparation while retaining its incomplete selected acquisition', async function missingArchiveCompanion(t) {
     const {root, service} = await fixture(t, async function archiveResponse() { return new Response(tarMember('other.json', 'Complete unrelated member.')); });
     await assert.rejects(service.prepare({
         id: 'missing-archive-member', workingDirectory: 'models',
@@ -677,7 +912,7 @@ test('archive member absence rejects the acquisition without keeping a partial s
         assert.deepEqual(error.members, ['config.json']);
         return true;
     });
-    assert.deepEqual(await acquisitions(root, 'models'), []);
+    assert.equal((await acquisitions(root, 'models')).length, 1);
 });
 
 test('RPC cancellation control joins actual native download settlement', async function joinedRPCPreparation(t) {
@@ -760,6 +995,36 @@ test('browser native preparation correlates ordered callbacks and joins remote c
     assert.equal(listeners.size, 0);
 });
 
+test('browser native preparation delivers its queued terminal progress before rejecting the complete Core failure', async function browserTerminalFailure() {
+    const listeners = new Set();
+    const completeFailure = new Error('Complete native failure.\nKeep this final diagnostic. 月');
+    completeFailure.response = 'Complete upstream response.\r\n🦑';
+    const observed = [];
+    const client = {
+        uuid() { return 'native-terminal-failure'; },
+        events: {on(event, listener) { listeners.add(listener); return function unsubscribe() { listeners.delete(listener); }; }},
+        async invoke(method, params) {
+            if (method === 'modelAssets.cancelPrepare') return {id: params.id, state: 'released'};
+            assert.equal(method, 'modelAssets.prepare');
+            for (const listener of listeners) listener({id: params.id, progress: {
+                phase: 'interrupted', state: 'interrupted', message: 'The model download was interrupted.',
+                error: {message: completeFailure.message, response: completeFailure.response}
+            }});
+            throw completeFailure;
+        }
+    };
+    await assert.rejects(downloadCoreModelAssets({client, workingDirectory: 'models', members: [{path: 'model.gguf', url: 'https://models.invalid/model'}],
+        async onProgress(event) { await Promise.resolve(); observed.push(event); }
+    }), function retainedFailure(error) {
+        assert.equal(observed.length, 1);
+        assert.equal(observed[0].state, 'interrupted');
+        assert.equal(observed[0].error.message, completeFailure.message);
+        assert.equal(observed[0].error.response, completeFailure.response);
+        return error === completeFailure;
+    });
+    assert.equal(listeners.size, 0);
+});
+
 test('one archive member can stream into every declared destination', async function repeatedArchiveSource(t) {
     const original = '  Complete shared tokenizer original.\r\n月 🧀  ';
     const {service} = await fixture(t, async function selectedArchive() { return new Response(tarMember('dictionary.txt', original)); });
@@ -832,17 +1097,17 @@ test('discovery follows installed-model links without repeating linked-directory
     const selected = path.join(root, 'selected');
     await mkdir(originals);
     await mkdir(selected);
-    await writeFile(path.join(originals, 'complete.model'), 'Complete linked model.');
-    try {
+    const originalName = process.platform === 'win32' ? 'moon.gguf' : 'complete.model';
+    await writeFile(path.join(originals, originalName), 'Complete linked model.');
+    if (process.platform === 'win32') {
+        await symlink(originals, path.join(selected, 'installed'), 'junction');
+    } else {
         await symlink(path.join(originals, 'complete.model'), path.join(selected, 'moon.gguf'), 'file');
-        await symlink(selected, path.join(selected, 'same-directory'), process.platform === 'win32' ? 'junction' : 'dir');
-    } catch (error) {
-        if (error.code !== 'EPERM' && error.code !== 'EACCES') throw error;
-        t.skip('This fixture host does not permit symbolic links.');
-        return;
     }
+    await symlink(selected, path.join(selected, 'same-directory'), process.platform === 'win32' ? 'junction' : 'dir');
     const result = await service.discover({directories: [selected]});
     assert.equal(result.models.length, 1);
     assert.equal(result.models[0].entryPath, 'moon.gguf');
     assert.equal(result.models[0].complete, true);
+    assert.equal(await readFile(path.join(originals, originalName), 'utf8'), 'Complete linked model.');
 });
