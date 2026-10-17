@@ -86,7 +86,7 @@ alone does not make bare module names resolve in a browser.
 | Prepare selected upstream model members in native services | [Native preparation and retained lifetime](model-assets.md#native-ownership) |
 | Discover installed models, ordered GGUF shards and required companion files | [Model discovery and existing-file projections](model-assets.md) |
 | Download selected model members with visible file progress and joined cancellation | [downloadCoreModelAssets()](sdk-api.md#downloadcoremodelassets) and [native model assets](model-assets.md) |
-| Prepare the complete Nemotron or Magpie model selection | [Shared native speech catalog](sdk-api.md#nemo_speech_models) |
+| Prepare the complete Nemotron or Magpie model selection | [Shared native speech catalog](sdk-api.md#preparenemotronmodels) |
 | Keep models in platform-specific persistent app storage and prepare engines on demand | [Model locations and activation](model-assets.md) |
 | Retain a Nemotron model and diarize caller-fed audio streams | [Native speaker diarization](diarization.md) |
 | Persist application-selected preferences through Core | [Core preferences service](core-preferences.md) |

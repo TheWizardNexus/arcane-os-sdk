@@ -9100,7 +9100,7 @@ callback rules and cancellation/reset outcomes.
 The default export from `arcane-os/local-ai/nemotron` is the same
 `createNemotronRuntime` function, with identical inputs, results and lifetime.
 
-## NEMO_SPEECH_MODELS
+## `NEMO_SPEECH_MODELS`
 
 Import this catalog from `arcane-os/local-ai/nemotron`. `stt` describes the
 selected Nemotron ASR and diarization GGUF companions; `tts` describes Magpie,
