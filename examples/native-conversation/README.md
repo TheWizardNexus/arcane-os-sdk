@@ -12,6 +12,11 @@ segments in the editable draft; **Speak draft** reads that exact draft through
 the selected Magpie voice. Reply stays unavailable until an installed model is
 explicitly selected. No model or endpoint is invented.
 
+Startup prepares STT and enables the selected TTS route through
+`AI.setSpeechMuted(false)`. This loads speech models without opening the
+microphone or producing an utterance. Talk opens capture; Speak draft or a
+completed explicit Reply starts playback.
+
 The editable draft assembles complete ASR-final segments as separate lines.
 Reply first requests an endpoint and waits for those update callbacks, then
 sends the complete draft unchanged. Provisional snapshots replace the current
@@ -42,13 +47,20 @@ The ordinary selected Windows build is `npm run build`. For the SDK owner's
 already-selected host output, use the existing public composition:
 
 ```js
-import {buildApplication} from 'arcane-os';
+import {buildApplication, loadArcaneNativeProvider} from 'arcane-os';
 import {createWindowsNativeProvider} from 'arcane-os/native/windows-provider';
 
+const {toolchainRoot, providerSource} = await loadArcaneNativeProvider({target: 'windows-x64'});
 const result = await buildApplication({
     workspaceRoot: exampleRoot,
     appId: 'native-conversation',
+    toolchainRoot,
+    providerSource,
     target: 'windows-x64',
+    targetRequest: {
+        target: 'windows-x64', platform: 'windows', architecture: 'x64',
+        format: 'exe', signing: {mode: 'unsigned-local-test', profileId: null}
+    },
     nativeBuilder: createWindowsNativeProvider({hostDirectory}),
     outputRoot,
     onEvent

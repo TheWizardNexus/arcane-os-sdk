@@ -146,8 +146,8 @@ async function configureSelection(modelId) {
             await ai.transitionProviders(selections, {startLanguageModel: false});
         }
         selectedModel = modelId;
-        // Loading a role never opens capture. Talk retains the microphone gesture.
-        await Promise.all([runtime.load('stt'), runtime.load('tts')]);
+        // Public unmute loads TTS and aligns AI speech state; Talk alone opens capture.
+        await Promise.all([runtime.load('stt'), ai.setSpeechMuted(false)]);
         if (revision === selectionRevision && !retired) status.textContent = modelId
             ? 'Ready. Talk opens the microphone; Reply starts the selected local model when needed.'
             : 'Speech is ready. No language model is selected; Talk and Speak draft remain available.';

@@ -8,7 +8,7 @@
   "package": {
     "entry": "index.html",
     "strategy": "static",
-    "include": ["index.html", "App.js", "img/icon.png", "modules"],
+    "include": ["index.html", "App.js", "App.css", "img/icon.png", "modules"],
     "exclude": [],
     "shared": ["browser-runtime"],
     "nativeResources": {"include": ["native", "package.json"]}

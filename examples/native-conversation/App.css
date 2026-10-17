@@ -1,0 +1,14 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background, rgb(13, 18, 32)); color: var(--text-color, rgb(235, 241, 255)); font: 1rem/1.5 system-ui, sans-serif; }
+main { max-width: 64rem; margin: auto; padding: 1.5rem; }
+h1 { margin-top: 0; }
+.controls { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+button, select, textarea { font: inherit; }
+button, select { padding: .6rem .8rem; }
+textarea { width: 100%; min-height: 7rem; padding: .75rem; }
+:focus-visible { outline: 3px solid rgb(100, 190, 255); outline-offset: 3px; }
+#conversation { padding-left: 1.5rem; }
+#conversation li { margin: 1rem 0; }
+#conversation p, #partial, pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#microphone { font-weight: 700; }
+details { margin-top: 1.5rem; }

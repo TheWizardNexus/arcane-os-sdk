@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "native-conversation",
+  "displayName": "Arcane Native Conversation",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "strategy": "static",
+  "include": [
+    "index.html",
+    "App.js",
+    "App.css",
+    "img/icon.png",
+    "modules"
+  ],
+  "exclude": [],
+  "nativeResources": {
+    "include": [
+      "native",
+      "package.json"
+    ],
+    "exclude": []
+  },
+  "shared": [
+    "browser-runtime"
+  ]
+}
