@@ -541,6 +541,7 @@ const navigationGroups=[
             ['EventManager','docs/reference/event-manager.md'],
             ['Availability','docs/reference/availability-and-normalization.md'],
             ['Protocols','docs/reference/protocols.md'],
+            ['Browser folder without a host','docs/reference/file-browser-output.md','',true],
             ['Behavioral testing','docs/reference/behavioral-testing.md']
         ]
     },

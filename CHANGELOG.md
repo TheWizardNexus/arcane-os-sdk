@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.98.0
+
+- Add public `packageApp({moduleFormat: 'embedded'})` output for browser folders
+  with classic scripts and a selected embedded ESM graph. Preserve complete
+  source, exports, live bindings, cyclic references, document mappings and
+  distinct module URL identities through browser-owned module loading.
+- Place generated maps before module execution, retain selected assets and
+  licenses, and disable generated PWA output for this invocation. Existing
+  import-map and native module modes remain available.
+- Document the supported static loading shape and its limits. Package-output
+  verification does not establish browser file/USB execution; network services,
+  neighboring-file fetches and host-dependent APIs retain their actual runtime
+  requirements.
+
 ## 0.97.1
 
 - Extract repeated selected TAR members in order, retaining the last complete

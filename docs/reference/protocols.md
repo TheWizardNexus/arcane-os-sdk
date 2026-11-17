@@ -324,6 +324,29 @@ unrelated manifest URLs, other link relationships, comments, templates and other
 inactive HTML retain their content. Source documents and saved PWA settings
 remain unchanged; the operation does not sweep every packaged HTML file.
 
+## Embedded-module file-browser output
+
+`packageApp({moduleFormat: 'embedded'})` uses the same selected graph owner as
+native module output. Each selected document receives a generated import map
+before its first executable script. The map carries complete ESM source through
+`data:` URLs, with distinct graph identities for different original module URLs
+and document resolutions. Static imports, re-exports and literal dynamic imports
+resolve through that graph. Browser module linking remains responsible for
+exports, live bindings and cycles.
+
+Classic application scripts stay ordinary file scripts; the packager rewrites
+their literal module references. Module script entries use the embedded module
+URL directly because import maps do not resolve a script element's `src`.
+Selected source files, licenses and ordinary relative assets remain in the
+package inventory. This invocation disables generated PWA output and preserves
+the saved PWA configuration and other package modes.
+
+This representation supports the no-host reader shape documented in
+[file-browser output](file-browser-output.md). It does not turn neighboring-file
+`fetch()`, Workers, dynamic source evaluation or host-dependent SDK capabilities
+into portable file operations. Package-output verification and actual browser
+file execution are separate evidence boundaries.
+
 ## Installed-package browser routes
 
 An external application can serve and package its installed SDK directly,

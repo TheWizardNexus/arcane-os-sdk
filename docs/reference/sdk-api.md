@@ -1069,6 +1069,15 @@ ordinary browser output remain unchanged. See
 [native-module package output](protocols.md#native-module-package-output)
 for resource handling and the static transformation boundary.
 
+Select `moduleFormat: 'embedded'` for a browser folder whose selected module
+graph is carried in each document's generated import map as complete `data:`
+modules. Ordinary classic scripts remain files, and their literal dynamic
+imports use the embedded graph. The browser retains ESM exports, live bindings
+and cycles; this mode does not transpile JavaScript. It automatically disables
+generated browser PWA output for this invocation. See
+[file-browser output](file-browser-output.md) for the supported no-host loading
+shape, asset handling and browser execution boundary.
+
 `browserDecisions` defaults to `false`. Explicit `browserDecisions: true`
 acquires the bundled Transformers.js 4.3.0 entry, matching ONNX Runtime
 1.31.0-dev.20260914-8d85527a0 asyncify module/WASM and both licenses into

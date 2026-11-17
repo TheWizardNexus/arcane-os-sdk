@@ -907,9 +907,9 @@ async function replaceDirectory(stagingRoot,outputRoot){
 async function packageWithContext(context,options={}){
     const {signal,onEvent,moduleFormat='import-map',browserPwa:requestedBrowserPwa=true,browserDecisions=false}=options;
     if (!is.boolean(browserDecisions)) throw new TypeError('packageApp browserDecisions must be a boolean.');
-    const browserPwa=context.target==='browser'&&requestedBrowserPwa;
-    if(!['import-map','native'].includes(moduleFormat)){
-        throw new TypeError('packageApp moduleFormat must be "import-map" or "native".');
+    const browserPwa=context.target==='browser'&&moduleFormat!=='embedded'&&requestedBrowserPwa;
+    if(!['import-map','native','embedded'].includes(moduleFormat)){
+        throw new TypeError('packageApp moduleFormat must be "import-map", "native", or "embedded".');
     }
     const pwaEnabled=browserPwa&&context.config.pwa?.enabled===true;
     const appPath=appRelativeRoot(context.rootConfig,context.appId);
@@ -1031,10 +1031,11 @@ async function packageWithContext(context,options={}){
             if (errors.length === 1) throw errors[0];
             if (errors.length > 1) throw new AggregateError(errors, 'Selected PWA reference removal failed.');
         }
-        if(moduleFormat==='native'){
+        if(moduleFormat==='native'||moduleFormat==='embedded'){
             files=await materializeNativeModules({
                 stagingRoot,
                 files,
+                moduleFormat,
                 documents:inspected.browserDocuments.map(function documentPath(document){return document.packagePath;}),
                 sharedFiles:browserRecords.filter(function sharedRecord(record){return record.appRelativePath===undefined;})
                     .map(function sharedPath(record){return record.destination;}),

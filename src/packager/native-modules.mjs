@@ -149,8 +149,9 @@ function removeAttribute(element,name){
     }):[];
 }
 
-/** Materialize a native URL graph in the existing package stage, never in source. */
-export async function materializeNativeModules({stagingRoot,files,documents,sharedFiles,signal,onEvent}){
+/** Materialize the selected module representation in the package stage, never in source. */
+export async function materializeNativeModules({stagingRoot,files,documents,sharedFiles,signal,onEvent,moduleFormat='native'}){
+    const embedded=moduleFormat==='embedded';
     const inventory=new Set(files);
     const sharedComponents=new Set(sharedFiles.filter(function componentFile(file){
         return /(?:^|\/)components\/.*\.html?$/iu.test(file);
@@ -174,7 +175,7 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
         if(nodeIndex.has(key))return nodeIndex.get(key);
         const node={
             id:nodes.length,kind,address,context,file,source,
-            sourceKey:`${kind}\n${sourceKey??file}`,
+            sourceKey:`${kind}\n${sourceKey??(kind==='module'?address.href:file)}`,
             desired:destination??file,
             destination:destination??file,
             importer:importer??address,
@@ -207,20 +208,27 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
                 documentUrl:documentBase
             });
         let kind=null;
-        if(module||reference.kind==='script')kind=reference.kind==='script'?'worker':'script';
+        if(module||reference.kind==='script')kind=reference.kind==='script'?'worker':embedded?'module':'script';
         if(reference.kind==='component')kind='component';
         if(['asset','fetch'].includes(reference.kind)&&sharedComponents.has(fileAt(target))){
             kind='component';
         }
         if(reference.kind==='style'||/\.css(?:[?#]|$)/iu.test(target.href))kind='style';
         const dependency=kind?getNode(kind,target,node.context):null;
+        if(embedded&&module&&!dependency){
+            throw new TypeError(`Embedded module output requires the selected module ${target.href} imported by ${node.importer.href}.`);
+        }
         return {
-            target,dependency,
+            target,dependency,kind:reference.kind,
             baseKind:module||node.kind==='worker'?undefined:reference.baseKind
         };
     }
 
     function edgeUrl(node,edge){
+        if(embedded&&edge.dependency?.kind==='module'){
+            return edge.kind==='import'||edge.kind==='import-resolve'
+                ?edge.dependency.moduleSpecifier:edge.dependency.embeddedUrl;
+        }
         const target=new URL(edge.target);
         if(edge.dependency){
             target.pathname=packageUrl(edge.dependency.destination).pathname;
@@ -244,7 +252,11 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
             const src=script.attribute('src');
             const hasSource=script.attributes.has('src');
             if(!component&&hasSource){
-                scriptPlans.push({script,reference:{url:src,kind:'document-script',baseKind:'document'}});
+                scriptPlans.push({script,reference:{
+                    url:src,
+                    kind:embedded&&type==='module'?'document-module':'document-script',
+                    baseKind:'document'
+                }});
                 continue;
             }
             if(!component&&node.context.base.origin!==new URL(packageOrigin).origin){
@@ -271,7 +283,7 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
         signal?.throwIfAborted();
         const node=nodes[index];
         node.source??=await readSource(node.file);
-        if(node.kind==='script'||node.kind==='worker'){
+        if(node.kind==='script'||node.kind==='module'||node.kind==='worker'){
             node.render=function renderScript(reference){return rewriteNativeJavaScript(node.source,reference);};
         }else if(node.kind==='style'){
             node.render=function renderStyle(reference){return rewriteNativeStylesheet(node.source,reference);};
@@ -285,7 +297,7 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
                     }
                     plan.body=await readSource(plan.sourceFile);
                 }
-                plan.dependency=getNode('script',node.address,node.context,{
+                plan.dependency=getNode(embedded&&!component&&plan.module?'module':'script',node.address,node.context,{
                     source:component?createHTMLImportScript(plan.body):plan.body,
                     sourceKey:`${node.kind}:${node.file}#script-${plan.index}`,
                     destination:scriptPath(node.file,plan.index,!component&&plan.module),
@@ -339,7 +351,7 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
                     if(element.tag==='link'){
                         const relationships=element.attribute('rel').trim().toLowerCase().split(/\s+/u);
                         const kind=relationships.includes('stylesheet')?'style'
-                            :relationships.includes('modulepreload')?'document-script':'asset';
+                            :relationships.includes('modulepreload')?embedded?'document-module':'document-script':'asset';
                         attributes.push(['href',kind]);
                     }
                     if(['img','source'].includes(element.tag)&&element.attributes.has('srcset')){
@@ -376,16 +388,34 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
                     });
                     if(content!==body)edits.push({start:style.start,end:style.end,value:content});
                 }
+                if(embedded&&!component&&node.context.embeddedImports){
+                    let position=structure.scripts[0]?.start??null;
+                    for(const element of structure.elements){
+                        if(element.tag!=='link'||!element.attribute('rel').trim().toLowerCase().split(/\s+/u).includes('modulepreload'))continue;
+                        if(position===null||element.start<position)position=element.start;
+                    }
+                    if(position!==null){
+                        const json=JSON.stringify({imports:node.context.embeddedImports},null,2).replaceAll('<','\\u003c');
+                        edits.push({
+                            start:position,end:position,
+                            value:`<script type="importmap" data-arcane-embedded-modules>\n${json}\n</script>\n`
+                        });
+                    }
+                }
                 return applyNativeReferenceEdits(node.source,edits);
             };
         }
         node.render(function collectReference(reference){
             let edge;
             if(reference.dependency){
-                edge={target:new URL(reference.url),dependency:reference.dependency,baseKind:reference.baseKind};
-            }else if(reference.kind==='document-script'){
+                edge={target:new URL(reference.url),dependency:reference.dependency,baseKind:reference.baseKind,kind:reference.kind};
+            }else if(reference.kind==='document-script'||reference.kind==='document-module'){
                 const target=new URL(reference.url,node.context.base);
-                edge={target,dependency:getNode('script',target,node.context),baseKind:'document'};
+                const dependency=getNode(reference.kind==='document-module'?'module':'script',target,node.context);
+                if(embedded&&!dependency){
+                    throw new TypeError(`Embedded module output requires the selected script ${target.href} in ${node.file}.`);
+                }
+                edge={target,dependency,baseKind:'document',kind:reference.kind};
             }else{
                 edge=resourceEdge(node,reference);
                 // Fragment attributes are attached to the host document, not the fetched HTML.
@@ -443,9 +473,35 @@ export async function materializeNativeModules({stagingRoot,files,documents,shar
         for(const member of group)member.destination=destination;
     }
 
+    if(embedded){
+        // Resolve graph identities before encoding source, so cycles never expand URLs recursively.
+        for(const group of groups){
+            const node=group[0];
+            if(node.kind!=='module')continue;
+            const specifier=`arcane-embedded/module-${node.group}`;
+            for(const member of group)member.moduleSpecifier=specifier;
+        }
+        for(const group of groups){
+            signal?.throwIfAborted();
+            const node=group[0];
+            if(node.kind!=='module')continue;
+            let index=0;
+            const content=node.render(function embeddedReference(){return edgeUrl(node,node.edges[index++]);});
+            // The fragment preserves distinct original module identities even when their source agrees.
+            const url=`data:text/javascript;base64,${Buffer.from(content,'utf8').toString('base64')}#${node.moduleSpecifier}`;
+            for(const member of group){
+                member.embeddedUrl=url;
+                member.context.embeddedImports??={};
+                member.context.embeddedImports[member.moduleSpecifier]=url;
+            }
+            if(is.function(onEvent))await onEvent({type:'package.embedded-module.created',path:node.file,specifier:node.moduleSpecifier});
+        }
+    }
+
     for(const group of groups){
         signal?.throwIfAborted();
         const node=group[0];
+        if(embedded&&node.kind==='module')continue;
         let index=0;
         const content=node.render(function nativeReference(){return edgeUrl(node,node.edges[index++]);});
         const destination=path.join(stagingRoot,...node.destination.split('/'));
